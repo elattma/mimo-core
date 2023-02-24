@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "chat"
+version = "0.1.0"
+description = ""
+authors = ["Mohamed Elattma <mo@mimo.team>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.9.16"
+langchain = "^0.0.94"
+openai = "^0.26.5"
+ulid-py = "^1.1.0"
+
+[tool.poetry.group.local]
+optional = true
+
+[tool.poetry.group.local.dependencies]
+boto3-stubs = {version = "1.26.79", extras = ["dynamodb", "secretsmanager"]}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

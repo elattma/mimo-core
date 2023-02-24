@@ -4,5 +4,9 @@
   "editor.codeActionsOnSave": {
     "source.fixAll": true,
     "source.organizeImports": true
-  }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "python.analysis.extraPaths": ["./backend/python"]
 }
