@@ -10,10 +10,10 @@ const Layout = ({ children }: Props) => {
   return (
     <ChatHistoryProvider>
       <div className="flex h-full w-full flex-col-reverse lg:flex-row">
-        <main className="grow bg-red-100">
+        <main className="grow">
           <ChatInterface />
         </main>
-        <aside className="bg-blue-100 max-lg:h-64 lg:w-96 xl:w-128">
+        <aside className="shrink-0 border-solid border-neutral-border max-lg:h-64 max-lg:border-b lg:w-96 lg:border-l xl:w-128">
           {children}
         </aside>
       </div>

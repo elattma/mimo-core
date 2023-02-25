@@ -1,45 +1,52 @@
 "use client";
 
-import { Chat, useChatHistoryContext } from "@/contexts/chat-history-context";
+import { useChatHistoryContext } from "@/contexts/chat-history-context";
+import { useUser } from "@auth0/nextjs-auth0/client";
 
 const ChatHistory = () => {
   const { chatHistory } = useChatHistoryContext();
+  const user = useUser();
   return (
-    <div className="w-full grow">
+    <div className="w-full grow overflow-auto">
       {chatHistory.map((chat, index) => {
         if (chat.user === "user")
-          return <UserChat chat={chat} key={`chat-${index}`} />;
+          return (
+            <UserChat
+              message={chat.message}
+              username={user.user?.nickname || user.user?.name || ""}
+              key={`chat-${index}`}
+            />
+          );
         if (chat.user === "mimo")
-          return <MimoChat chat={chat} key={`chat-${index}`} />;
+          return <MimoChat message={chat.message} key={`chat-${index}`} />;
       })}
     </div>
   );
 };
 
 interface UserChatProps {
-  chat: Chat;
+  username: string;
+  message: string;
 }
 
-const UserChat = ({ chat }: UserChatProps) => {
+const UserChat = ({ username, message }: UserChatProps) => {
   return (
-    <div>
-      <p>
-        {chat.user}: {chat.message}
+    <div className="w-full p-6">
+      <p className="text-neutral-text-contrast">
+        {username}: {message}
       </p>
     </div>
   );
 };
 
 interface MimoChatProps {
-  chat: Chat;
+  message: string;
 }
 
-const MimoChat = ({ chat }: MimoChatProps) => {
+const MimoChat = ({ message }: MimoChatProps) => {
   return (
-    <div>
-      <p>
-        {chat.user}: {chat.message}
-      </p>
+    <div className="w-full border-y border-solid border-neutral-border bg-neutral-bg p-6">
+      <p className="text-gray-text-contrast">mimo: {message}</p>
     </div>
   );
 };
