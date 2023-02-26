@@ -62,13 +62,18 @@ def handler(event, context):
     if pc_db is None:
         pc_db = ParentChildDB("mimo-{stage}-pc".format(stage=stage))
 
-    userMessageItems = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value)
-    if not userMessageItems or len(userMessageItems) == 0:
-        print("empty history!")
     chat_history = []
-    for item in userMessageItems:
-        if item['author'] == user:
-            chat_history.append(message)
+    try:
+        userMessageItems = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value)
+        if not userMessageItems or len(userMessageItems) == 0:
+            print("empty history!")
+        else:
+            for item in userMessageItems:
+                if item and item.get_author() == user:
+                    chat_history.append(item.get_message())
+    except Exception as e:
+        print(e)
+        print("empty history!")
 
     memory = ConversationalBufferWindowMemory(k=3, buffer=chat_history)
     chatgpt_chain = LLMChain(llm=llm_client, prompt=PROMPT_TEMPLATE, verbose=True, memory=memory)

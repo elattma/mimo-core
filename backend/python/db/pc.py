@@ -13,16 +13,14 @@ class KeyNamespaces(Enum):
 
 class ParentChildItem(ABC):
     def __init__(self, parent: str, child: str, parent_namespace: str, child_namespace: str):
-        self.parent = parent
-        self.child = child
-        self.parent_namespace = parent_namespace
-        self.child_namespace = child_namespace
+        self.parent = parent_namespace + parent
+        self.child = child_namespace + child
 
     @abstractmethod
     def to_dict(self):
         return {
-            'parent': self.parent_namespace + self.parent,
-            'child': self.child_namespace + self.child
+            'parent': self.parent,
+            'child': self.child
         }
 
     @staticmethod
@@ -43,6 +41,12 @@ class UserMessageItem(ParentChildItem):
         d['message'] = str(self.message)
         d['timestamp'] = int(self.timestamp)
         return d
+
+    def get_author(self):
+        return self.author
+    
+    def get_message(self):
+        return self.message
 
     @staticmethod
     def from_dict(d: Dict):
