@@ -2,11 +2,12 @@ import {
   PythonFunction,
   PythonLayerVersion,
 } from "@aws-cdk/aws-lambda-python-alpha";
-import { CfnOutput, Duration, Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, Fn, Stack, StackProps } from "aws-cdk-lib";
 import {
   ApiKeySourceType,
   Cors,
   IAuthorizer,
+  IModel,
   JsonSchemaType,
   LambdaIntegration,
   RestApi,
@@ -17,6 +18,7 @@ import {
   CertificateValidation,
 } from "aws-cdk-lib/aws-certificatemanager";
 import { ITable } from "aws-cdk-lib/aws-dynamodb";
+import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { ILayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
@@ -28,6 +30,7 @@ export interface ApiStackProps extends StackProps {
   readonly stageId: string;
   readonly domainName: string;
   readonly mimoTable: ITable;
+  readonly integrationsPath: string;
 }
 
 export class ApiStack extends Stack {
@@ -52,6 +55,11 @@ export class ApiStack extends Stack {
     this.createDefaultApiKey();
 
     this.createChatRoutes(props.stageId, props.mimoTable);
+    this.createIntegrationRoutes(
+      props.stageId,
+      props.mimoTable,
+      props.integrationsPath
+    );
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -143,6 +151,98 @@ export class ApiStack extends Stack {
         },
       }),
     ];
+  };
+
+  createIntegrationRoutes = (
+    stageId: string,
+    mimoTable: ITable,
+    integrationsPath: string
+  ) => {
+    // GET /integration
+    const integration = this.api.root.addResource("integration");
+    const getIntegrationHandler = new PythonFunction(
+      this,
+      "get-integration-lambda",
+      {
+        runtime: Runtime.PYTHON_3_9,
+        handler: "handler",
+        entry: path.join(__dirname, "../../backend/integration"),
+        index: "get.py",
+        layers: this.commonPythonLayers,
+        timeout: Duration.seconds(5),
+        memorySize: 512,
+        environment: {
+          STAGE: stageId,
+          INTEGRATIONS_PATH: integrationsPath,
+        },
+        bundling: {
+          assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
+        },
+      }
+    );
+    mimoTable.grantReadData(getIntegrationHandler);
+    getIntegrationHandler.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+        resources: [`*`],
+      })
+    );
+
+    const integrationModel = this.api.addModel("IntegrationModel", {
+      contentType: "application/json",
+      modelName: "Integration",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          description: {
+            type: JsonSchemaType.STRING,
+          },
+          icon: {
+            type: JsonSchemaType.STRING,
+          },
+          oauth2_link: {
+            type: JsonSchemaType.STRING,
+          },
+          authorized: {
+            type: JsonSchemaType.BOOLEAN,
+            default: false,
+          },
+        },
+        required: ["name", "description", "icon", "oauth2_link", "authorized"],
+      },
+    });
+
+    const integrationListModel = this.api.addModel("IntegrationListModel", {
+      contentType: "application/json",
+      modelName: "IntegrationList",
+      schema: {
+        type: JsonSchemaType.ARRAY,
+        items: {
+          ref: getModelRef(this.api, integrationModel),
+        },
+      },
+    });
+
+    // TODO: figure out response for 1 specific integration
+    integration.addMethod("GET", new LambdaIntegration(getIntegrationHandler), {
+      apiKeyRequired: true,
+      authorizer: this.authorizer,
+      requestParameters: {
+        "method.request.querystring.integration": false,
+      },
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": integrationListModel,
+          },
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
   };
 
   createChatRoutes = (stageId: string, mimoTable: ITable) => {
@@ -276,3 +376,11 @@ const RESPONSE_PARAMS = {
   "method.response.header.Access-Control-Allow-Origin": true,
   "method.response.header.Access-Control-Allow-Credentials": true,
 };
+
+const getModelRef = (api: RestApi, model: IModel): string =>
+  Fn.join("", [
+    "https://apigateway.amazonaws.com/restapis/",
+    api.restApiId,
+    "/models/",
+    model.modelId,
+  ]);

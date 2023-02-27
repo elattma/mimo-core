@@ -6,10 +6,12 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
+import json
 
 class KeyNamespaces(Enum):
     USER = "USER#"
     MESSAGE = "MESSAGE#"
+    INTEGRATION = "INTEGRATION#"
 
 class ParentChildItem(ABC):
     def __init__(self, parent: str, child: str, parent_namespace: str, child_namespace: str):
@@ -52,6 +54,24 @@ class UserMessageItem(ParentChildItem):
     def from_dict(d: Dict):
         return UserMessageItem(d['parent'], d['child'], d['author'], d['message'], d['timestamp'])
 
+class UserIntegrationItem(ParentChildItem):
+    def __init__(self, parent: str, child: str, access_token: str, refresh_token: str, timestamp: int):
+        super().__init__(parent, child, KeyNamespaces.USER.value, KeyNamespaces.MESSAGE.value)
+        self.access_token = access_token
+        self.refresh_token = refresh_token
+        self.timestamp = timestamp
+
+    def to_dict(self):
+        d = super().to_dict()
+        d['accessToken'] = str(self.access_token)
+        d['refreshToken'] = str(self.refresh_token)
+        d['timestamp'] = int(self.timestamp)
+        return d
+
+    @staticmethod
+    def from_dict(d: Dict):
+        return UserIntegrationItem(d['parent'], d['child'], d['accessToken'], d['refreshToken'], d['timestamp'])
+
 
 class ParentChildDB:
     def __init__(self, table_name: str):
@@ -91,6 +111,11 @@ class ParentChildDB:
                 return []
             items = []
             for item in response['Items']:
-                if parent.startswith(KeyNamespaces.USER.value):
-                    items.append(UserMessageItem.from_dict(item))
+                if item['child']:
+                    if item['child'].startswith(KeyNamespaces.MESSAGE.value):
+                        items.append(UserMessageItem.from_dict(item))
+                    if item['child'].startswith(KeyNamespaces.INTEGRATION.value):
+                        items.append(UserIntegrationItem.from_dict(item))
+                else:
+                    print("invalid item!" + json.dumps(item))
             return items

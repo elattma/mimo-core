@@ -75,7 +75,7 @@ def handler(event, context):
         print(e)
         print("empty history!")
 
-    memory = ConversationalBufferWindowMemory(k=3, buffer=chat_history)
+    memory = ConversationalBufferWindowMemory(k=3, buffer=chat_history[0:3])
     chatgpt_chain = LLMChain(llm=llm_client, prompt=PROMPT_TEMPLATE, verbose=True, memory=memory)
     output = chatgpt_chain.predict(human_input=message)
 

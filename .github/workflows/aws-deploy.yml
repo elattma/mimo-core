@@ -1,0 +1,29 @@
+name: aws-deploy
+on: [push, workflow_dispatch]
+jobs:
+  aws_cdk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: "us-east-1"
+      - name: Install depedencies
+        working-directory: ./infrastructure
+        run: npm ci
+      - name: Build
+        working-directory: ./infrastructure
+        run: npm run build
+      - name: Synth stack
+        working-directory: ./infrastructure
+        run: npx cdk synth
+      - name: Deploy stack
+        working-directory: ./infrastructure
+        run: npx cdk deploy "mimo-beta/*" --require-approval never
