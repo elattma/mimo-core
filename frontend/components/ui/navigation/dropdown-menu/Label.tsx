@@ -9,7 +9,10 @@ const Label = forwardRef<
 >(({ className, ...props }, forwardedRef) => (
   <Primitive
     ref={forwardedRef}
-    className={["", className].join(" ")}
+    className={[
+      "p-theme-1/4 text-sm font-medium leading-none text-gray-text-contrast",
+      className,
+    ].join(" ")}
     {...props}
   />
 ));

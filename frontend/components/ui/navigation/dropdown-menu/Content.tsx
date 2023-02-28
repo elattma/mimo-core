@@ -9,7 +9,11 @@ const Content = forwardRef<
 >(({ children, className, ...props }, forwardedRef) => (
   <Primitive
     ref={forwardedRef}
-    className={["", className].join(" ")}
+    className={[
+      "mt-theme-1/4 min-w-[8rem] rounded-theme border border-neutral-border/50 bg-neutral-base p-theme-1/8 shadow-md",
+      className,
+    ].join(" ")}
+    collisionPadding={12}
     {...props}
   >
     {children}

@@ -9,7 +9,10 @@ const Separator = forwardRef<
 >(({ className, ...props }, forwardedRef) => (
   <Primitive
     ref={forwardedRef}
-    className={["", className].join(" ")}
+    className={[
+      "-mx-theme-1/8 my-theme-1/8 h-px bg-neutral-border/50",
+      className,
+    ].join(" ")}
     {...props}
   />
 ));
