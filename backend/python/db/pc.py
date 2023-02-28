@@ -19,6 +19,16 @@ class ParentChildItem(ABC):
     parent: str
     child: str
 
+    def get_raw_parent(self):
+        if not self.parent:
+            return None
+        return self.parent.split('#')[-1]
+    
+    def get_raw_child(self):
+        if not self.child:
+            return None
+        return self.child.split('#')[-1]
+
 @dataclass
 class UserMessageItem(ParentChildItem):
     author: str

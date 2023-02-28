@@ -14,7 +14,7 @@ def handler(event, context):
     user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
 
     if not user or not stage:
-        return to_response_error(Errors.MISSING_PARAMS)
+        return to_response_error(Errors.MISSING_PARAMS.value)
 
     if pc_db is None:
         pc_db = ParentChildDB("mimo-{stage}-pc".format(stage=stage))

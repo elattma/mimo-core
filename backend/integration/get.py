@@ -19,13 +19,11 @@ def handler(event, context):
     user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
 
     if not stage or not integrations_path or not user:
-        return to_response_error(Errors.MISSING_PARAMS)
+        return to_response_error(Errors.MISSING_PARAMS.value)
 
     if pc_db is None:
         pc_db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
 
-    print(integrations)
-    print(len(integrations))
     if not integrations or len(integrations) < 1:
         ssm_client = boto3.client('ssm')
         next_token = None
@@ -36,28 +34,23 @@ def handler(event, context):
                 **({'NextToken': next_token} if next_token is not None else {})
             )
             next_token = response.get('NextToken')
-            print(response)
 
             for parameter in response['Parameters']:
                 id, key = re.search(r'/\w+/\w+/\w+/(\w+)/(\w+)', parameter.get('Name')).groups()
                 value = parameter.get('Value')
-                print(f'{id}, {key}, {value}')
                 if id and key and value:
                     if not integrations.get(id):
                         integrations[id] = Integration(**{f"{key}": value})
                     else:
                         setattr(integrations.get(id), key, value)
-                print(integrations)
             if next_token is None:
                 break
     
     user_integration_items: List[UserIntegrationItem] = pc_db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
-    response_integrations: List[Integration] = integrations.copy()
+    response_integrations: Mapping[str, Integration] = integrations.copy()
     for item in user_integration_items:
-        integration = response_integrations.get(item.child.replace(KeyNamespaces.INTEGRATION.value, ''))
+        integration = response_integrations[item.get_raw_child()]
         if integration:
-            response_integrations.get(integration).__dict__['authorized'] = True
+            integration.authorized = True
 
-    print(response_integrations.values())
-    print(list(response_integrations.values()))
     return to_response_success([integration.__dict__ for integration in response_integrations.values()])

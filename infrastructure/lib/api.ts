@@ -60,6 +60,7 @@ export class ApiStack extends Stack {
       props.mimoTable,
       props.integrationsPath
     );
+    this.createItemRoutes(props.stageId, props.mimoTable);
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -151,6 +152,92 @@ export class ApiStack extends Stack {
         },
       }),
     ];
+  };
+
+  createItemRoutes = (stageId: string, mimoTable: ITable) => {
+    const item = this.api.root.addResource("item");
+    const getItemHandler = new PythonFunction(this, "get-item-lambda", {
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      entry: path.join(__dirname, "../../backend/item"),
+      index: "get.py",
+      layers: this.commonPythonLayers,
+      timeout: Duration.seconds(5),
+      memorySize: 512,
+      environment: {
+        STAGE: stageId,
+      },
+      bundling: {
+        assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
+      },
+    });
+    mimoTable.grantReadWriteData(getItemHandler);
+    this.integrationsSecret.grantRead(getItemHandler);
+
+    const itemModel = this.api.addModel("ItemModel", {
+      contentType: "application/json",
+      modelName: "Item",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          title: {
+            type: JsonSchemaType.STRING,
+          },
+          link: {
+            type: JsonSchemaType.STRING,
+          },
+          preview: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["id", "title", "link"],
+      },
+    });
+
+    const itemResponseModel = this.api.addModel("ItemResponseModel", {
+      contentType: "application/json",
+      modelName: "ItemResponse",
+      schema: {
+        type: JsonSchemaType.ARRAY,
+        items: {
+          type: JsonSchemaType.OBJECT,
+          properties: {
+            integration: {
+              type: JsonSchemaType.STRING,
+            },
+            icon: {
+              type: JsonSchemaType.STRING,
+            },
+            items: {
+              type: JsonSchemaType.ARRAY,
+              items: {
+                ref: getModelRef(this.api, itemModel),
+              },
+            },
+            next_token: {
+              type: JsonSchemaType.STRING,
+            },
+          },
+        },
+      },
+    });
+
+    item.addMethod("GET", new LambdaIntegration(getItemHandler), {
+      apiKeyRequired: true,
+      authorizer: this.authorizer,
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": itemResponseModel,
+          },
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
   };
 
   createIntegrationRoutes = (
@@ -251,7 +338,7 @@ export class ApiStack extends Stack {
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
         entry: path.join(__dirname, "../../backend/integration"),
-        index: "get.py",
+        index: "post.py",
         layers: this.commonPythonLayers,
         timeout: Duration.seconds(5),
         memorySize: 512,
@@ -334,6 +421,20 @@ export class ApiStack extends Stack {
         properties: {
           message: {
             type: JsonSchemaType.STRING,
+          },
+          items: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.OBJECT,
+              properties: {
+                integration: {
+                  type: JsonSchemaType.STRING,
+                },
+                id: {
+                  type: JsonSchemaType.STRING,
+                },
+              },
+            },
           },
         },
         required: ["message"],

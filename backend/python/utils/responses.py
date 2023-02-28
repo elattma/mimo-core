@@ -15,7 +15,7 @@ class Errors(Enum):
     AUTH_FAILED = "auth failed"
     DB_WRITE_FAILED = "db write failed"
 
-def to_response_error(error_message: str = "An error occurred"):
+def to_response_error(error_message: Errors = "An error occurred"):
     return {
         "statusCode": 400,
         "headers": HEADERS,

@@ -4,13 +4,16 @@ import time
 from typing import List
 
 import boto3
+import requests
 import ulid
-from db.pc import KeyNamespaces, ParentChildDB, UserMessageItem
+from db.pc import (KeyNamespaces, ParentChildDB, UserIntegrationItem,
+                   UserMessageItem)
 from langchain import LLMChain, OpenAI, PromptTemplate
 from langchain.chains.conversation.memory import \
     ConversationalBufferWindowMemory
 from utils.responses import Errors, to_response_error, to_response_success
 
+# TODO: update prompt or make easily configurable - use ssm?
 PROMPT_TEMPLATE = PromptTemplate(
     input_variables=["history", "human_input"], 
     template="""Assistant is a large language model trained by OpenAI.
@@ -38,10 +41,11 @@ def handler(event, context):
     stage = os.environ['STAGE']
     body = json.loads(event['body']) if event and event['body'] else None
     message = body['message'] if body else None
+    items = body['items'] if body else None
     user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
 
     if not body or not message or not user or not stage:
-        return to_response_error(Errors.MISSING_PARAMS)
+        return to_response_error(Errors.MISSING_PARAMS.value)
 
     if secrets is None:
         secrets_client = boto3.client('secretsmanager')
@@ -51,9 +55,10 @@ def handler(event, context):
     if llm_client is None:
         llm_client = OpenAI(temperature=0, openai_api_key=secrets['OPENAI_API_KEY'])
 
+    # fetch conversational history and use as memory
+    # TODO: experiment different strategies like spacy similarity, etc.
     if pc_db is None:
         pc_db = ParentChildDB("mimo-{stage}-pc".format(stage=stage))
-
     chat_history = []
     try:
         userMessageItems: List[UserMessageItem] = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value)
@@ -63,8 +68,29 @@ def handler(event, context):
     except Exception as e:
         print(e)
         print("empty history!")
-
     memory = ConversationalBufferWindowMemory(k=3, buffer=chat_history[0:3])
+
+    # TODO: fetch relevant context from selected items or knowledge base and use as context to prompt
+    if items is not None and len(items) > 0:
+        # load auth
+        user_integration_items: List[UserIntegrationItem] = pc_db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
+        for item in items:
+            print(item)
+            if item['integration'] and item['id']:
+                # TODO: hacky, move to other lambda/api under item. or somewhere else that's actually scalable enough to do this
+                # TODO: add refresh token logic for google, etc. in utils/auth.py
+                if item['integration'] == 'google':
+                    access_token = None
+                    for user_integration_item in user_integration_items:
+                        if user_integration_item.child == f'{KeyNamespaces.INTEGRATION}google':
+                            access_token = user_integration_item.access_token
+                    if not access_token:
+                        continue
+                    response = requests.get(f'https://docs.googleapis.com/v1/documents/{item["id"]}', headers={
+                        'Authorization': f'Bearer {access_token}'
+                    })
+
+
     chatgpt_chain = LLMChain(llm=llm_client, prompt=PROMPT_TEMPLATE, verbose=True, memory=memory)
     output = chatgpt_chain.predict(human_input=message)
 
