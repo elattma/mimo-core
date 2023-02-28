@@ -1,7 +1,9 @@
 "use client";
 
 import { useChatHistoryContext } from "@/contexts/chat-history-context";
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { UserContext, useUser } from "@auth0/nextjs-auth0/client";
+import Image from "next/image";
+import { inter } from "../../../../app/layout";
 
 const ChatHistory = () => {
   const { chatHistory } = useChatHistoryContext();
@@ -13,7 +15,7 @@ const ChatHistory = () => {
           return (
             <UserChat
               message={chat.message}
-              username={user.user?.nickname || user.user?.name || ""}
+              user={user}
               key={`chat-${index}`}
             />
           );
@@ -25,15 +27,29 @@ const ChatHistory = () => {
 };
 
 interface UserChatProps {
-  username: string;
   message: string;
+  user: UserContext | null;
 }
 
-const UserChat = ({ username, message }: UserChatProps) => {
+const UserChat = ({ message, user }: UserChatProps) => {
   return (
-    <div className="w-full p-6">
-      <p className="text-neutral-text-contrast">
-        {username}: {message}
+    <div className="flex w-full items-start space-x-theme-1/2 border-b border-neutral-border p-theme">
+      {user?.user?.picture ? (
+        <div className="shrink-0">
+          <Image
+            draggable={false}
+            className="rounded-theme"
+            src={user?.user?.picture}
+            alt="Your profile picture"
+            width={28}
+            height={28}
+          />
+        </div>
+      ) : (
+        <div>no picture</div>
+      )}
+      <p className={["text-gray-text-contrast", inter.className].join(" ")}>
+        {message}
       </p>
     </div>
   );
@@ -45,8 +61,13 @@ interface MimoChatProps {
 
 const MimoChat = ({ message }: MimoChatProps) => {
   return (
-    <div className="w-full border-y border-solid border-neutral-border bg-neutral-bg p-6">
-      <p className="text-gray-text-contrast">mimo: {message}</p>
+    <div className="flex w-full space-x-theme-1/2 border-b border-neutral-border bg-neutral-bg p-theme">
+      <div className="h-7 w-7 shrink-0 rounded-theme bg-gradient-to-br from-brand-6 via-brand-8 to-brand-11"></div>
+      <pre className="whitespace-pre-wrap">
+        <p className={["text-gray-text-contrast", inter.className].join(" ")}>
+          {message}
+        </p>
+      </pre>
     </div>
   );
 };

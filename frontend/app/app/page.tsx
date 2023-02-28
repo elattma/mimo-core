@@ -4,7 +4,7 @@ const Page = () => {
   return (
     <>
       App home page. Navigate to{" "}
-      <Link className="text-blue-500 underline" href="/app/chat">
+      <Link className="text-blue-500 underline" href="/chat">
         /chat
       </Link>{" "}
       for the time being.

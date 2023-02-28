@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
-const inter = Inter({
+export const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
