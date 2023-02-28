@@ -11,6 +11,7 @@ export const fetcher = async <JSON = any>(
   init?: RequestInit
 ): Promise<JSON> => {
   const res = await fetch(input, init);
+  console.log(res);
 
   if (!res.ok) {
     const json = await res.json();
