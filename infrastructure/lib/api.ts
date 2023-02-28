@@ -243,6 +243,66 @@ export class ApiStack extends Stack {
         },
       ],
     });
+
+    const authIntegrationHandler = new PythonFunction(
+      this,
+      "auth-integration-lambda",
+      {
+        runtime: Runtime.PYTHON_3_9,
+        handler: "handler",
+        entry: path.join(__dirname, "../../backend/integration"),
+        index: "get.py",
+        layers: this.commonPythonLayers,
+        timeout: Duration.seconds(5),
+        memorySize: 512,
+        environment: {
+          STAGE: stageId,
+        },
+        bundling: {
+          assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
+        },
+      }
+    );
+    mimoTable.grantWriteData(authIntegrationHandler);
+    this.integrationsSecret.grantRead(authIntegrationHandler);
+
+    const authIntegrationModel = this.api.addModel("AuthIntegrationModel", {
+      contentType: "application/json",
+      modelName: "AuthIntegration",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          code: {
+            type: JsonSchemaType.STRING,
+          },
+          redirect_uri: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["id", "code", "redirect_uri"],
+      },
+    });
+
+    integration.addMethod(
+      "POST",
+      new LambdaIntegration(authIntegrationHandler),
+      {
+        apiKeyRequired: true,
+        authorizer: this.authorizer,
+        requestModels: {
+          "application/json": authIntegrationModel,
+        },
+        methodResponses: [
+          {
+            statusCode: "200",
+            responseParameters: RESPONSE_PARAMS,
+          },
+        ],
+      }
+    );
   };
 
   createChatRoutes = (stageId: string, mimoTable: ITable) => {

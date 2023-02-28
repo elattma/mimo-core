@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from typing import List
 
 import boto3
 import ulid
@@ -8,6 +9,7 @@ from db.pc import KeyNamespaces, ParentChildDB, UserMessageItem
 from langchain import LLMChain, OpenAI, PromptTemplate
 from langchain.chains.conversation.memory import \
     ConversationalBufferWindowMemory
+from utils.responses import Errors, to_response_error, to_response_success
 
 PROMPT_TEMPLATE = PromptTemplate(
     input_variables=["history", "human_input"], 
@@ -28,13 +30,6 @@ secrets = None
 llm_client = None
 pc_db = None
 
-HEADERS = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
-}
-
 def handler(event, context):
     global secrets
     global llm_client
@@ -46,10 +41,7 @@ def handler(event, context):
     user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
 
     if not body or not message or not user or not stage:
-        return {
-            "statusCode": 400,
-            "headers": HEADERS,
-        }
+        return to_response_error(Errors.MISSING_PARAMS)
 
     if secrets is None:
         secrets_client = boto3.client('secretsmanager')
@@ -64,13 +56,10 @@ def handler(event, context):
 
     chat_history = []
     try:
-        userMessageItems = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value)
-        if not userMessageItems or len(userMessageItems) == 0:
-            print("empty history!")
-        else:
-            for item in userMessageItems:
-                if item and item.get_author() == user:
-                    chat_history.append(item.get_message())
+        userMessageItems: List[UserMessageItem] = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value)
+        for item in userMessageItems:
+            if item and item.author == user:
+                chat_history.append(item.message)
     except Exception as e:
         print(e)
         print("empty history!")
@@ -79,15 +68,14 @@ def handler(event, context):
     chatgpt_chain = LLMChain(llm=llm_client, prompt=PROMPT_TEMPLATE, verbose=True, memory=memory)
     output = chatgpt_chain.predict(human_input=message)
 
+    parent = f'{KeyNamespaces.USER.value}{user}'
+    in_child = f'{KeyNamespaces.MESSAGE.value}{ulid.new().str}'
+    out_child = f'{KeyNamespaces.MESSAGE.value}{ulid.new().str}'
     timestamp = int(time.time())
-    in_message = UserMessageItem(parent=user, child=ulid.new().str, author=user, message=message, timestamp=timestamp)
-    out_message = UserMessageItem(parent=user, child=ulid.new().str, author="0.0.1", message=output, timestamp=timestamp)
+    in_message = UserMessageItem(parent=parent, child=in_child, author=user, message=message, timestamp=timestamp)
+    out_message = UserMessageItem(parent=parent, child=out_child, author="0.0.1", message=output, timestamp=timestamp)
     pc_db.write([in_message, out_message])
 
-    return {
-        "statusCode": 200,
-        "headers": HEADERS,
-        "body": json.dumps({
-            "message": output
-        })
-    }
+    return to_response_success({
+        "message": output
+    })

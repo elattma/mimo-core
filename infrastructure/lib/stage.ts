@@ -15,7 +15,7 @@ export class MimoStage extends Stage {
 
     const dynamo = new DynamoStack(this, "dynamo");
 
-    const integrationsPath = `/${props.stageId}/mimo/sources/`;
+    const integrationsPath = `/${props.stageId}/mimo/integrations`;
     const ssm = new SsmStack(this, "ssm", {
       stageId: props.stageId,
       integrationsPath: integrationsPath,
@@ -27,5 +27,6 @@ export class MimoStage extends Stage {
       mimoTable: dynamo.mimoTable,
       integrationsPath: integrationsPath,
     });
+    api.addDependency(ssm);
   }
 }

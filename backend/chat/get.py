@@ -1,16 +1,10 @@
-import json
 import os
+from typing import List
 
-from db.pc import KeyNamespaces, ParentChildDB
+from db.pc import KeyNamespaces, ParentChildDB, UserMessageItem
+from utils.responses import Errors, to_response_error, to_response_success
 
 pc_db = None
-
-HEADERS = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
-}
 
 def handler(event, context):
     global pc_db
@@ -20,10 +14,7 @@ def handler(event, context):
     user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
 
     if not user or not stage:
-        return {
-            "statusCode": 400,
-            "headers": HEADERS,
-        }
+        return to_response_error(Errors.MISSING_PARAMS)
 
     if pc_db is None:
         pc_db = ParentChildDB("mimo-{stage}-pc".format(stage=stage))
@@ -31,13 +22,9 @@ def handler(event, context):
     query_args = {}
     if next_token:
         query_args['next_token'] = next_token
-    userMessageItems = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value, **query_args)
+    userMessageItems: List[UserMessageItem] = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value, **query_args)
 
-    response = [userMessageItem.to_dict() for userMessageItem in userMessageItems]
+    response = [userMessageItem.__dict__ for userMessageItem in userMessageItems]
     print(response)
 
-    return {
-        "statusCode": 200,
-        "headers": HEADERS,
-        "body": json.dumps(response)
-    }
+    return to_response_success(response)

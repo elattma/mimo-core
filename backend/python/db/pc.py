@@ -1,77 +1,36 @@
-from abc import ABC, abstractmethod
+import json
+from abc import ABC
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List
+from typing import List
 
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
-import json
 
 class KeyNamespaces(Enum):
     USER = "USER#"
     MESSAGE = "MESSAGE#"
     INTEGRATION = "INTEGRATION#"
 
+@dataclass
 class ParentChildItem(ABC):
-    def __init__(self, parent: str, child: str, parent_namespace: str, child_namespace: str):
-        self.parent = parent_namespace + parent
-        self.child = child_namespace + child
+    parent: str
+    child: str
 
-    @abstractmethod
-    def to_dict(self):
-        return {
-            'parent': self.parent,
-            'child': self.child
-        }
-
-    @staticmethod
-    @abstractmethod
-    def from_dict(d):
-        pass
-
+@dataclass
 class UserMessageItem(ParentChildItem):
-    def __init__(self, parent: str, child: str, author: str, message: str, timestamp: int):
-        super().__init__(parent, child, KeyNamespaces.USER.value, KeyNamespaces.MESSAGE.value)
-        self.author = author
-        self.message = message
-        self.timestamp = timestamp
+    author: str
+    message: str
+    timestamp: int
 
-    def to_dict(self):
-        d = super().to_dict()
-        d['author'] = str(self.author)
-        d['message'] = str(self.message)
-        d['timestamp'] = int(self.timestamp)
-        return d
-
-    def get_author(self):
-        return self.author
-    
-    def get_message(self):
-        return self.message
-
-    @staticmethod
-    def from_dict(d: Dict):
-        return UserMessageItem(d['parent'], d['child'], d['author'], d['message'], d['timestamp'])
-
+@dataclass
 class UserIntegrationItem(ParentChildItem):
-    def __init__(self, parent: str, child: str, access_token: str, refresh_token: str, timestamp: int):
-        super().__init__(parent, child, KeyNamespaces.USER.value, KeyNamespaces.MESSAGE.value)
-        self.access_token = access_token
-        self.refresh_token = refresh_token
-        self.timestamp = timestamp
-
-    def to_dict(self):
-        d = super().to_dict()
-        d['accessToken'] = str(self.access_token)
-        d['refreshToken'] = str(self.refresh_token)
-        d['timestamp'] = int(self.timestamp)
-        return d
-
-    @staticmethod
-    def from_dict(d: Dict):
-        return UserIntegrationItem(d['parent'], d['child'], d['accessToken'], d['refreshToken'], d['timestamp'])
-
+    access_token: str
+    refresh_token: str
+    timestamp: int
+    expiry_timestamp: int
 
 class ParentChildDB:
     def __init__(self, table_name: str):
@@ -90,7 +49,7 @@ class ParentChildDB:
         try:
             with self.table.batch_writer() as writer:
                 for item in items:
-                    writer.put_item(Item=item.to_dict())
+                    writer.put_item(Item=item.__dict__)
         except ClientError as err:
             print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
                 err.response['Error']['Code'], err.response['Error']['Message'])
@@ -113,9 +72,9 @@ class ParentChildDB:
             for item in response['Items']:
                 if item['child']:
                     if item['child'].startswith(KeyNamespaces.MESSAGE.value):
-                        items.append(UserMessageItem.from_dict(item))
+                        items.append(UserMessageItem(**item))
                     if item['child'].startswith(KeyNamespaces.INTEGRATION.value):
-                        items.append(UserIntegrationItem.from_dict(item))
+                        items.append(UserIntegrationItem(**item))
                 else:
                     print("invalid item!" + json.dumps(item))
             return items
