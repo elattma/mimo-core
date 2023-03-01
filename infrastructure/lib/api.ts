@@ -13,6 +13,7 @@ import {
   RestApi,
   TokenAuthorizer,
 } from "aws-cdk-lib/aws-apigateway";
+import { GraphqlApi } from "aws-cdk-lib/aws-appsync";
 import {
   Certificate,
   CertificateValidation,
@@ -31,6 +32,7 @@ export interface ApiStackProps extends StackProps {
   readonly domainName: string;
   readonly mimoTable: ITable;
   readonly integrationsPath: string;
+  readonly appsyncApi: GraphqlApi;
 }
 
 export class ApiStack extends Stack {
@@ -41,6 +43,7 @@ export class ApiStack extends Stack {
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
+    console.log(props.appsyncApi.graphqlUrl);
 
     const integrationSecretName = `${props.stageId}/Mimo/Integrations`;
     this.integrationsSecret = Secret.fromSecretNameV2(
@@ -54,7 +57,11 @@ export class ApiStack extends Stack {
     this.commonPythonLayers = this.createUtilsLayer();
     this.createDefaultApiKey();
 
-    this.createChatRoutes(props.stageId, props.mimoTable);
+    this.createChatRoutes(
+      props.stageId,
+      props.mimoTable,
+      props.appsyncApi.graphqlUrl
+    );
     this.createIntegrationRoutes(
       props.stageId,
       props.mimoTable,
@@ -392,7 +399,11 @@ export class ApiStack extends Stack {
     );
   };
 
-  createChatRoutes = (stageId: string, mimoTable: ITable) => {
+  createChatRoutes = (
+    stageId: string,
+    mimoTable: ITable,
+    graphqlUrl: string
+  ) => {
     // POST /chat
     const chat = this.api.root.addResource("chat");
     const chatHandler = new PythonFunction(this, "chat-lambda", {
@@ -405,6 +416,7 @@ export class ApiStack extends Stack {
       memorySize: 2048,
       environment: {
         STAGE: stageId,
+        APPSYNC_ENDPOINT: graphqlUrl,
       },
       bundling: {
         assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],

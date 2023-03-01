@@ -1,0 +1,17 @@
+type Query {
+}
+
+type Mutation {
+  proxyMessage(userId: ID!, messageId: ID!, message: String!, timestamp: Int!): Message @aws_oidc
+}
+
+type Subscription {
+  updatedMessage(userId: ID!, messageId: ID!): Message @aws_subscribe(mutations: ["proxyMessage"])
+}
+
+type Message @model {
+  userId: ID
+  messageId: ID
+  message: String
+  timestamp: Int
+}

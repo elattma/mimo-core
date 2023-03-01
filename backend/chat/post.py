@@ -1,19 +1,23 @@
 import json
 import os
 import time
-from typing import List
+from typing import Any, Dict, List, Union
 
 import boto3
+import requests
 import ulid
 from data.docs import Docs
 from data.fetcher import Fetcher
 from db.pc import (KeyNamespaces, ParentChildDB, UserIntegrationItem,
                    UserMessageItem)
 from langchain import LLMChain, OpenAI, PromptTemplate
+from langchain.callbacks.base import BaseCallbackHandler, CallbackManager
 from langchain.chains.conversation.memory import \
     ConversationalBufferWindowMemory
 from langchain.chains.summarize import load_summarize_chain
 from langchain.docstore.document import Document
+from langchain.llms import OpenAI
+from langchain.schema import AgentAction, AgentFinish, LLMResult
 from utils.auth import refresh_token
 from utils.responses import Errors, to_response_error, to_response_success
 
@@ -42,10 +46,12 @@ def handler(event, context):
 
     user = event['requestContext']['authorizer']['principalId'] if event and 'requestContext' in event and 'authorizer' in event['requestContext'] and 'principalId' in event['requestContext']['authorizer'] else None
     stage = os.environ['STAGE']
+    appsync_endpoint = os.environ['APPSYNC_ENDPOINT']
+    authorization = event['headers']['Authorization'] if event and 'headers' in event and 'Authorization' in event['headers'] else None
     body = json.loads(event['body']) if event and 'body' in event else None
     message = body['message'] if body and 'message' in body else None
     items = body['items'] if body and 'items' in body else None
-    if not user or not stage or not body or not message:
+    if not user or not stage or not appsync_endpoint or not authorization or not body or not message:
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if secrets is None:
@@ -57,7 +63,13 @@ def handler(event, context):
         openai_api_key = secrets['OPENAI_API_KEY'] if secrets and 'OPENAI_API_KEY' in secrets else None
         if not openai_api_key:
             return to_response_error(Errors.MISSING_SECRETS.value)
-        llm_client = OpenAI(temperature=0, openai_api_key=openai_api_key)
+        llm_client = OpenAI(
+            streaming=True, 
+            callback_manager=CallbackManager([StreamingWebsocketHandler(user_id=user, message_id=ulid.new().str, appsync_endpoint=appsync_endpoint, authorization=authorization)]), 
+            verbose=True, 
+            temperature=0,
+            openai_api_key=openai_api_key
+        )
 
     # fetch conversational history and use as memory
     # TODO: experiment different strategies like spacy similarity, etc.
@@ -134,7 +146,6 @@ def handler(event, context):
                     context_summary.append(summary)
             
     template = TEMPLATE.format(context_summary='; '.join(context_summary))
-    print(template)
     prompt_template = PromptTemplate(
         input_variables=["history", "human_input"], 
         template=template
@@ -153,3 +164,92 @@ def handler(event, context):
     return to_response_success({
         "message": output
     })
+
+class StreamingWebsocketHandler(BaseCallbackHandler):
+    def __init__(self, user_id: str, message_id: str, appsync_endpoint: str, authorization: str):
+        super().__init__()
+        self.user_id = user_id
+        self.message_id = message_id
+        self.message = ''
+        self.appsync_endpoint = appsync_endpoint
+        self.authorization = authorization
+
+    def send_message(self) -> None:
+        if not self.message:
+            return
+        
+        timestamp = int(time.time())
+        query = 'mutation($userId: ID!, $messageId: ID!, $message: String!, $timestamp: Int!) { proxyMessage(userId: $userId, messageId: $messageId, message: $message, timestamp: $timestamp) { userId, messageId, message, timestamp }}'
+        variables = json.dumps({
+            "userId": self.user_id,
+            "messageId": self.message_id,
+            "message": self.message,
+            "timestamp": timestamp
+        })
+        response = requests.post(
+            self.appsync_endpoint, 
+            headers={
+                'Authorization': self.authorization.replace('Bearer ', '')
+            },
+            data=json.dumps({
+                'query': query,
+                'variables': variables
+            })
+        )
+        appsync_response = response.json()
+
+    def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        self.message += token
+        if len(self.message) > 20:
+            print(self.message)
+            self.send_message()
+            self.message = ''
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        """Run when LLM starts running."""
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Run when LLM ends running."""
+
+    def on_llm_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Run when LLM errors."""
+
+    def on_chain_start(
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any
+    ) -> None:
+        """Run when chain starts running."""
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
+        """Run when chain ends running."""
+
+    def on_chain_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Run when chain errors."""
+
+    def on_tool_start(
+        self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
+    ) -> None:
+        """Run when tool starts running."""
+
+    def on_agent_action(self, action: AgentAction, **kwargs: Any) -> Any:
+        """Run on agent action."""
+        pass
+
+    def on_tool_end(self, output: str, **kwargs: Any) -> None:
+        """Run when tool ends running."""
+
+    def on_tool_error(
+        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+    ) -> None:
+        """Run when tool errors."""
+
+    def on_text(self, text: str, **kwargs: Any) -> None:
+        """Run on arbitrary text."""
+
+    def on_agent_finish(self, finish: AgentFinish, **kwargs: Any) -> None:
+        """Run on agent end."""
