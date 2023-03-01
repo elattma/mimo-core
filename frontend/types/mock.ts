@@ -4,3 +4,12 @@ export interface Item {
   title: string;
   preview: string;
 }
+
+export interface Integration {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  oauth2_link: string;
+  authorized: boolean;
+}

@@ -3,16 +3,15 @@ import { fetcherWithSession } from "@/lib/server-only-utils";
 
 const Page = async () => {
   const integrations = await fetcherWithSession(
-    `${process.env.BASE_URL}/api/proxy/integration`,
+    `${process.env.NEXT_PUBLIC_BASE_URL}/api/${process.env.NEXT_PUBLIC_MOCK_OR_PROXY}/integration`,
     {
       method: "GET",
     }
   );
-  console.log(integrations);
 
   return (
     <main className="p-theme">
-      <Integrations />
+      <Integrations integrations={integrations} />
     </main>
   );
 };
