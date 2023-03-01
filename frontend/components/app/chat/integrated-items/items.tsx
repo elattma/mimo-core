@@ -6,7 +6,7 @@ import Item from "./item";
 
 const Items = async () => {
   const items = (await fetcherWithSession(
-    "http://localhost:3000/api/mock/items",
+    "http://localhost:3000/api/mock/item",
     {
       method: "GET",
     }
