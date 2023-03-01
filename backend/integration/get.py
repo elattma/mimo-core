@@ -14,11 +14,11 @@ def handler(event, context):
     global pc_db
     global integrations
 
+    user = event['requestContext']['authorizer']['principalId'] if event and 'requestContext' in event and 'authorizer' in event['requestContext'] and 'principalId' in event['requestContext']['authorizer'] else None
     stage = os.environ['STAGE']
     integrations_path = os.environ['INTEGRATIONS_PATH']
-    user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
 
-    if not stage or not integrations_path or not user:
+    if not user or not stage or not integrations_path:
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if pc_db is None:

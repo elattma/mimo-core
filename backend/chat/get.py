@@ -9,9 +9,9 @@ pc_db = None
 def handler(event, context):
     global pc_db
 
+    user = event['requestContext']['authorizer']['principalId'] if event and 'requestContext' in event and 'authorizer' in event['requestContext'] and 'principalId' in event['requestContext']['authorizer'] else None
     stage = os.environ['STAGE']
-    next_token = event['queryStringParameters']['next_token'] if event and event['queryStringParameters'] else None
-    user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
+    next_token = event['queryStringParameters']['next_token'] if event and 'queryStringParameters' in event and 'next_token' in event['queryStringParameters'] else None
 
     if not user or not stage:
         return to_response_error(Errors.MISSING_PARAMS.value)

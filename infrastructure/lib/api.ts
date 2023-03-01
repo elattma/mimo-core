@@ -145,7 +145,7 @@ export class ApiStack extends Stack {
   createUtilsLayer = (): ILayerVersion[] => {
     return [
       new PythonLayerVersion(this, "utils-layer", {
-        entry: path.join(__dirname, "../../backend/python"),
+        entry: path.join(__dirname, "../../backend/layers"),
         compatibleRuntimes: [Runtime.PYTHON_3_9],
         bundling: {
           assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
@@ -430,8 +430,16 @@ export class ApiStack extends Stack {
                 integration: {
                   type: JsonSchemaType.STRING,
                 },
-                id: {
-                  type: JsonSchemaType.STRING,
+                params: {
+                  type: JsonSchemaType.ARRAY,
+                  items: {
+                    type: JsonSchemaType.OBJECT,
+                    properties: {
+                      id: {
+                        type: JsonSchemaType.STRING,
+                      },
+                    },
+                  },
                 },
               },
             },

@@ -30,7 +30,7 @@ def refresh_token(db: ParentChildDB, client_id: str, client_secret: str, item: U
         auth_response = response.json()
         print(auth_response)
 
-        if not response or not auth_response or not auth_response['access_token']:
+        if not response or not auth_response or 'access_token' not in auth_response or 'expires_in' not in auth_response:
             return None
         
         access_token = auth_response['access_token']

@@ -21,13 +21,13 @@ def handler(event, context):
     global pc_db
     global secrets
 
-    user = event['requestContext']['authorizer']['principalId'] if event and event['requestContext'] and event['requestContext']['authorizer'] else None
+    user = event['requestContext']['authorizer']['principalId'] if event and 'requestContext' in event and 'authorizer' in event['requestContext'] and 'principalId' in event['requestContext']['authorizer'] else None
     stage = os.environ['STAGE']
-    body = json.loads(event['body']) if event and event['body'] else None
-    id = body['id'] if body else None
-    code = body['code'] if body else None
-    redirect_uri = body['redirect_uri'] if body else None
-    integration_auth_uri: str = SOURCE_URI_MAP[id] if id else None
+    body = json.loads(event['body']) if event and 'body' in event else None
+    id = body['id'] if body and 'id' in body else None
+    code = body['code'] if body and 'code' in body else None
+    redirect_uri = body['redirect_uri'] if body and 'redirect_uri' in body else None
+    integration_auth_uri: str = SOURCE_URI_MAP[id] if id and id in SOURCE_URI_MAP else None
 
     if not user or not stage or not body or not id or not code or not redirect_uri or not integration_auth_uri:
         return to_response_error(Errors.MISSING_PARAMS.value)
