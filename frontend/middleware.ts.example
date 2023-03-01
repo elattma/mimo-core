@@ -5,9 +5,10 @@ export const middleware = (req: NextRequest) => {
   // See https://github.com/vercel/platforms/blob/main/middleware.ts for more
   // details on this implementation.
 
+  console.log(req.cookies.get("appSession"));
+
   const url = req.nextUrl;
   const hostname = req.headers.get("host") || "";
-  const pathname = url.pathname;
 
   const currentHost =
     process.env.NODE_ENV === "production"
@@ -16,17 +17,16 @@ export const middleware = (req: NextRequest) => {
 
   if (currentHost === "app") {
     if (url.pathname === "/login" && req.cookies.get("appSession")) {
-      url.pathname = "/";
+      url.pathname = "/app";
       return NextResponse.redirect(url);
     }
 
     url.pathname = `/app${url.pathname}`;
+    if (process.env.NODE_ENV === "development") {
+      console.log("Rewriting to:", url.toString());
+    }
     return NextResponse.rewrite(url);
   }
-
-  return NextResponse.rewrite(
-    new URL(`/_sites/${currentHost}${pathname}`, req.url)
-  );
 };
 
 export const config = {
