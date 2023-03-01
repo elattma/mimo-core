@@ -20,7 +20,7 @@ const RootLayout = ({ children }: Props) => {
         lang="en"
       >
         <head />
-        <body className="h-full w-full">{children}</body>
+        <body className="relative h-full w-full">{children}</body>
       </html>
     </UserProvider>
   );

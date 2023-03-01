@@ -1,12 +1,16 @@
-import { fetcher } from "@/lib/utils";
+fetcherWithSession;
+import { fetcherWithSession } from "@/lib/server-only-utils";
 import { Item as ItemType } from "@/types/mock";
 import Link from "next/link";
 import Item from "./item";
 
 const Items = async () => {
-  const items = (await fetcher("http://localhost:3000/api/mock/items", {
-    method: "GET",
-  })) as ItemType[];
+  const items = (await fetcherWithSession(
+    "http://localhost:3000/api/mock/items",
+    {
+      method: "GET",
+    }
+  )) as ItemType[];
 
   if (items.length < 1) {
     return (

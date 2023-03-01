@@ -1,3 +1,4 @@
+import AppHeader from "@/components/app/app-header";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -5,8 +6,12 @@ interface Props {
 }
 
 const Layout = ({ children }: Props) => {
-  // TODO: Add header
-  return <>{children}</>;
+  return (
+    <div className="flex h-full flex-col">
+      <AppHeader />
+      {children}
+    </div>
+  );
 };
 
 export default Layout;
