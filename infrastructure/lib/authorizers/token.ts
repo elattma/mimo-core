@@ -76,10 +76,7 @@ const generatePolicy = (
 };
 
 const decodeToken = async (authorizationToken: string) => {
-  if (
-    !authorizationToken ||
-    !authorizationToken.toLowerCase().match(/bearer (.+)/)
-  ) {
+  if (!authorizationToken || !authorizationToken.match(/Bearer (.+)/)) {
     return null;
   }
 
