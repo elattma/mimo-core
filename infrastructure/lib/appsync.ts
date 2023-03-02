@@ -37,28 +37,28 @@ export class AppsyncStack extends Stack {
       xrayEnabled: true,
     });
 
-    // proxyMessage()
-    new Resolver(this, "proxy-message-resolver", {
+    // proxyChat()
+    new Resolver(this, "proxy-chat-resolver", {
       api: this.gqlApi,
       typeName: "Mutation",
-      fieldName: "proxyMessage",
-      dataSource: this.gqlApi.addNoneDataSource("proxyMessageDS"),
+      fieldName: "proxyChat",
+      dataSource: this.gqlApi.addNoneDataSource("proxyChatDS"),
       requestMappingTemplate: MappingTemplate.fromString(
         `{ "version" : "2018-05-29" }`
       ),
       responseMappingTemplate: MappingTemplate.fromString(
-        "$util.toJson($context.arguments)"
+        "$util.toJson($context.arguments.input)"
       ),
     });
 
-    // updatedMessage()
-    new Resolver(this, "updated-message-resolver", {
+    // updatedChat()
+    new Resolver(this, "updated-chat-resolver", {
       api: this.gqlApi,
       typeName: "Subscription",
-      fieldName: "updatedMessage",
-      dataSource: this.gqlApi.addNoneDataSource("updatedMessageDS"),
+      fieldName: "updatedChat",
+      dataSource: this.gqlApi.addNoneDataSource("updatedChatDS"),
       requestMappingTemplate: MappingTemplate.fromString(
-        `{ "version": "2018-05-29", "payload": $util.toJson($context.arguments) }`
+        `{ "version": "2018-05-29", "payload": $util.toJson($context.arguments.input) }`
       ),
       responseMappingTemplate: MappingTemplate.fromString(
         "$util.toJson($context.result)"

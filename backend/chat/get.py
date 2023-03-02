@@ -1,17 +1,20 @@
 import os
 from typing import List
 
-from db.pc import KeyNamespaces, ParentChildDB, UserMessageItem
+from db.pc import KeyNamespaces, ParentChildDB, UserChatItem
 from utils.responses import Errors, to_response_error, to_response_success
 
 pc_db = None
 
-def handler(event, context):
+def handler(event: dict, context):
     global pc_db
 
-    user = event['requestContext']['authorizer']['principalId'] if event and 'requestContext' in event and 'authorizer' in event['requestContext'] and 'principalId' in event['requestContext']['authorizer'] else None
-    stage = os.environ['STAGE']
-    next_token = event['queryStringParameters']['next_token'] if event and 'queryStringParameters' in event and 'next_token' in event['queryStringParameters'] else None
+    request_context: dict = event.get('requestContext', None) if event else None
+    authorizer: dict = request_context.get('authorizer', None) if request_context else None
+    user: str = authorizer.get('principalId', None) if authorizer else None
+    stage: str = os.environ['STAGE']
+    query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
+    next_token: str = query_string_parameters.get('next_token', None) if query_string_parameters else None
 
     if not user or not stage:
         return to_response_error(Errors.MISSING_PARAMS.value)
@@ -22,9 +25,13 @@ def handler(event, context):
     query_args = {}
     if next_token:
         query_args['next_token'] = next_token
-    userMessageItems: List[UserMessageItem] = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.MESSAGE.value, **query_args)
+    user_chat_items: List[UserChatItem] = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value, **query_args)
+    user_chat_items.reverse()
 
-    response = [userMessageItem.__dict__ for userMessageItem in userMessageItems]
-    print(response)
-
-    return to_response_success(response)
+    return to_response_success([{
+        'id': user_chat_item.get_raw_child(),
+        'message': user_chat_item.message,
+        'author': user_chat_item.author,
+        'role': user_chat_item.role,
+        'timestamp': user_chat_item.timestamp,
+    } for user_chat_item in user_chat_items])

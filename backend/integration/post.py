@@ -21,13 +21,16 @@ def handler(event, context):
     global pc_db
     global secrets
 
-    user = event['requestContext']['authorizer']['principalId'] if event and 'requestContext' in event and 'authorizer' in event['requestContext'] and 'principalId' in event['requestContext']['authorizer'] else None
-    stage = os.environ['STAGE']
-    body = json.loads(event['body']) if event and 'body' in event else None
-    id = body['id'] if body and 'id' in body else None
-    code = body['code'] if body and 'code' in body else None
-    redirect_uri = body['redirect_uri'] if body and 'redirect_uri' in body else None
-    integration_auth_uri: str = SOURCE_URI_MAP[id] if id and id in SOURCE_URI_MAP else None
+    request_context: dict = event.get('requestContext', None) if event else None
+    authorizer: dict = request_context.get('authorizer', None) if request_context else None
+    user: str = authorizer.get('principalId', None) if authorizer else None
+    stage: str = os.environ['STAGE']
+    body: str = event.get('body', None) if event else None
+    body: dict = json.loads(body) if body else None
+    id = body.get('id', None) if body else None
+    code = body.get('code', None) if body else None
+    redirect_uri = body.get('redirect_uri', None) if body else None
+    integration_auth_uri: str = SOURCE_URI_MAP.get(id, None) if id else None
 
     if not user or not stage or not body or not id or not code or not redirect_uri or not integration_auth_uri:
         return to_response_error(Errors.MISSING_PARAMS.value)
@@ -57,7 +60,6 @@ def handler(event, context):
         },
         auth = (client_id, client_secret)
     )
-    print(response)
 
     auth_response = response.json() if response else None
     print(auth_response)

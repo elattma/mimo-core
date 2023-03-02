@@ -12,12 +12,14 @@ from utils.responses import Errors, to_response_error, to_response_success
 pc_db: ParentChildDB = None
 secrets: Mapping[str, str] = None
 
-def handler(event, context):
+def handler(event: dict, context):
     global pc_db
     global secrets
 
-    user = event['requestContext']['authorizer']['principalId'] if event and 'requestContext' in event and 'authorizer' in event['requestContext'] and 'principalId' in event['requestContext']['authorizer'] else None
-    stage = os.environ['STAGE']
+    request_context: dict = event.get('requestContext', None) if event else None
+    authorizer: dict = request_context.get('authorizer', None) if request_context else None
+    user: str = authorizer.get('principalId', None) if authorizer else None
+    stage: str = os.environ['STAGE']
 
     if not user or not stage:
         return to_response_error(Errors.MISSING_PARAMS.value)

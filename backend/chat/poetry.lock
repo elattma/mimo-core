@@ -577,14 +577,14 @@ xray = ["mypy-boto3-xray (>=1.26.0,<1.27.0)"]
 
 [[package]]
 name = "botocore-stubs"
-version = "1.29.79"
+version = "1.29.81"
 description = "Type annotations and code completion for botocore"
 category = "dev"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "botocore_stubs-1.29.79-py3-none-any.whl", hash = "sha256:d6f16d27cd3e2edafe72b6d3aa1fc8fe687feae1337753a67ceafc9a40670bc8"},
-    {file = "botocore_stubs-1.29.79.tar.gz", hash = "sha256:14ddd9c2d3368db7dcec01864dff04d93d26881d5d1368e4b6493f6a2e77f023"},
+    {file = "botocore_stubs-1.29.81-py3-none-any.whl", hash = "sha256:f351120e07115d34692d63a28d47a8867f2e8f43e1736e9a345ad3abb2a15843"},
+    {file = "botocore_stubs-1.29.81.tar.gz", hash = "sha256:4b2d6020aea659f92826d2ef778beb49179918989ff1383a186c6ef0f97afb5c"},
 ]
 
 [package.dependencies]
@@ -1208,13 +1208,14 @@ files = [
 
 [[package]]
 name = "openai"
-version = "0.26.5"
+version = "0.27.0"
 description = "Python client library for the OpenAI API"
 category = "main"
 optional = false
 python-versions = ">=3.7.1"
 files = [
-    {file = "openai-0.26.5.tar.gz", hash = "sha256:2882a59c67ae33c2716a04389a6e6680d061f073424953732f917fde219addfd"},
+    {file = "openai-0.27.0-py3-none-any.whl", hash = "sha256:7d4066ea529658a1f1696a8766912b3f3b7139faca860dc530bf102f0b19d42c"},
+    {file = "openai-0.27.0.tar.gz", hash = "sha256:0efa486016283607cb72c23eac346ac739a22613ff4bff101df72a138cb2de60"},
 ]
 
 [package.dependencies]
@@ -1225,7 +1226,7 @@ tqdm = "*"
 [package.extras]
 datalib = ["numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
 dev = ["black (>=21.6b0,<22.0)", "pytest (>=6.0.0,<7.0.0)", "pytest-asyncio", "pytest-mock"]
-embeddings = ["matplotlib", "numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)", "plotly", "scikit-learn (>=1.0.2)", "sklearn", "tenacity (>=8.0.1)"]
+embeddings = ["matplotlib", "numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)", "plotly", "scikit-learn (>=1.0.2)", "scipy", "tenacity (>=8.0.1)"]
 wandb = ["numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)", "wandb"]
 
 [[package]]
@@ -1522,14 +1523,14 @@ sqlcipher = ["sqlcipher3-binary"]
 
 [[package]]
 name = "tenacity"
-version = "8.2.1"
+version = "8.2.2"
 description = "Retry code until it succeeds"
 category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "tenacity-8.2.1-py3-none-any.whl", hash = "sha256:dd1b769ca7002fda992322939feca5bee4fa11f39146b0af14e0b8d9f27ea854"},
-    {file = "tenacity-8.2.1.tar.gz", hash = "sha256:c7bb4b86425b977726a7b49971542d4f67baf72096597d283f3ffd01f33b92df"},
+    {file = "tenacity-8.2.2-py3-none-any.whl", hash = "sha256:2f277afb21b851637e8f52e6a613ff08734c347dc19ade928e519d7d2d8569b0"},
+    {file = "tenacity-8.2.2.tar.gz", hash = "sha256:43af037822bd0029025877f3b2d97cc4d7bb0c2991000a3d59d71517c5c969e0"},
 ]
 
 [package.extras]
@@ -1786,4 +1787,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "3.9.16"
-content-hash = "c297430e2d7d7a04b0d49967288a338fe94f3890873b6c1632c323fb6ae1b849"
+content-hash = "642bb275137e567e1640825669b369e12644af9cf83508c3f4227448f6b53017"

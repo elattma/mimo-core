@@ -11,8 +11,12 @@ from botocore.exceptions import ClientError
 
 class KeyNamespaces(Enum):
     USER = "USER#"
-    MESSAGE = "MESSAGE#"
+    CHAT = "CHAT#"
     INTEGRATION = "INTEGRATION#"
+
+class Roles(Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
 
 @dataclass
 class ParentChildItem(ABC):
@@ -28,11 +32,13 @@ class ParentChildItem(ABC):
         if not self.child:
             return None
         return self.child.split('#')[-1]
+    
 
 @dataclass
-class UserMessageItem(ParentChildItem):
-    author: str
+class UserChatItem(ParentChildItem):
     message: str
+    author: str
+    role: str
     timestamp: int
 
 @dataclass
@@ -81,8 +87,8 @@ class ParentChildDB:
             items = []
             for item in response['Items']:
                 if item['child']:
-                    if item['child'].startswith(KeyNamespaces.MESSAGE.value):
-                        items.append(UserMessageItem(**item))
+                    if item['child'].startswith(KeyNamespaces.CHAT.value):
+                        items.append(UserChatItem(**item))
                     if item['child'].startswith(KeyNamespaces.INTEGRATION.value):
                         items.append(UserIntegrationItem(**item))
                 else:

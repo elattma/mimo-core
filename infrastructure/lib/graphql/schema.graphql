@@ -2,16 +2,27 @@ type Query {
 }
 
 type Mutation {
-  proxyMessage(userId: ID!, messageId: ID!, message: String!, timestamp: Int!): Message @aws_oidc
+  proxyChat(input: ChatInput!): Chat @aws_oidc
 }
 
 type Subscription {
-  updatedMessage(userId: ID!, messageId: ID!): Message @aws_subscribe(mutations: ["proxyMessage"])
+  updatedChat(userId: ID!, inputChatId: ID!): Chat @aws_subscribe(mutations: ["proxyChat"])
 }
 
-type Message @model {
-  userId: ID
-  messageId: ID
-  message: String
+input ChatInput {
+  userId: ID!,
+  inputChatId: ID!, 
+  outputChatId: ID!, 
+  message: String!, 
+  role: String!,
+  timestamp: Int
+}
+
+type Chat {
+  userId: ID!,
+  inputChatId: ID!, 
+  outputChatId: ID!, 
+  message: String!, 
+  role: String!,
   timestamp: Int
 }

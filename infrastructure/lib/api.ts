@@ -23,6 +23,7 @@ import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { ILayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
+import { IBucket } from "aws-cdk-lib/aws-s3";
 import { ISecret, Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import path = require("path");
@@ -33,6 +34,7 @@ export interface ApiStackProps extends StackProps {
   readonly mimoTable: ITable;
   readonly integrationsPath: string;
   readonly appsyncApi: GraphqlApi;
+  readonly uploadItemBucket: IBucket;
 }
 
 export class ApiStack extends Stack {
@@ -67,7 +69,11 @@ export class ApiStack extends Stack {
       props.mimoTable,
       props.integrationsPath
     );
-    this.createItemRoutes(props.stageId, props.mimoTable);
+    this.createItemRoutes(
+      props.stageId,
+      props.mimoTable,
+      props.uploadItemBucket
+    );
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -161,7 +167,11 @@ export class ApiStack extends Stack {
     ];
   };
 
-  createItemRoutes = (stageId: string, mimoTable: ITable) => {
+  createItemRoutes = (
+    stageId: string,
+    mimoTable: ITable,
+    uploadItemBucket: IBucket
+  ) => {
     const item = this.api.root.addResource("item");
     const getItemHandler = new PythonFunction(this, "get-item-lambda", {
       runtime: Runtime.PYTHON_3_9,
@@ -240,6 +250,73 @@ export class ApiStack extends Stack {
           statusCode: "200",
           responseModels: {
             "application/json": itemResponseModel,
+          },
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
+
+    const uploadItemHandler = new PythonFunction(this, "upload-item-lambda", {
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      entry: path.join(__dirname, "../../backend/item"),
+      index: "post.py",
+      layers: this.commonPythonLayers,
+      environment: {
+        STAGE: stageId,
+        UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
+      },
+      bundling: {
+        assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
+      },
+    });
+    uploadItemBucket.grantPut(uploadItemHandler);
+
+    const uploadItemRequestModel = this.api.addModel("UploadItemRequestModel", {
+      contentType: "application/json",
+      modelName: "UploadItemRequest",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          contentType: {
+            type: JsonSchemaType.STRING,
+          },
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["contentType"],
+      },
+    });
+
+    const uploadItemResponseModel = this.api.addModel(
+      "uploadItemResponseModel",
+      {
+        contentType: "application/json",
+        modelName: "uploadItemResponse",
+        schema: {
+          type: JsonSchemaType.OBJECT,
+          properties: {
+            signedUrl: {
+              type: JsonSchemaType.STRING,
+            },
+          },
+          required: ["contentType"],
+        },
+      }
+    );
+
+    item.addMethod("POST", new LambdaIntegration(uploadItemHandler), {
+      apiKeyRequired: true,
+      authorizer: this.authorizer,
+      requestModels: {
+        "application/json": uploadItemRequestModel,
+      },
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": uploadItemResponseModel,
           },
           responseParameters: RESPONSE_PARAMS,
         },
@@ -413,7 +490,7 @@ export class ApiStack extends Stack {
       index: "post.py",
       layers: this.commonPythonLayers,
       timeout: Duration.seconds(20),
-      memorySize: 2048,
+      memorySize: 512,
       environment: {
         STAGE: stageId,
         APPSYNC_ENDPOINT: graphqlUrl,
@@ -425,14 +502,40 @@ export class ApiStack extends Stack {
     this.integrationsSecret.grantRead(chatHandler);
     mimoTable.grantReadWriteData(chatHandler);
 
+    const chatModel = this.api.addModel("ChatModel", {
+      contentType: "application/json",
+      modelName: "Chat",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          message: {
+            type: JsonSchemaType.STRING,
+          },
+          author: {
+            type: JsonSchemaType.STRING,
+          },
+          role: {
+            type: JsonSchemaType.STRING,
+            enum: ["user", "assistant"],
+          },
+          timestamp: {
+            type: JsonSchemaType.INTEGER,
+          },
+        },
+      },
+    });
+
     const chatRequestModel = this.api.addModel("ChatRequestModel", {
       contentType: "application/json",
       modelName: "ChatRequest",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          message: {
-            type: JsonSchemaType.STRING,
+          chat: {
+            ref: getModelRef(this.api, chatModel),
           },
           items: {
             type: JsonSchemaType.ARRAY,
@@ -457,21 +560,6 @@ export class ApiStack extends Stack {
             },
           },
         },
-        required: ["message"],
-      },
-    });
-
-    const chatResponseModel = this.api.addModel("ChatResponseModel", {
-      contentType: "application/json",
-      modelName: "ChatResponse",
-      schema: {
-        type: JsonSchemaType.OBJECT,
-        properties: {
-          message: {
-            type: JsonSchemaType.STRING,
-          },
-        },
-        required: ["message"],
       },
     });
 
@@ -485,7 +573,7 @@ export class ApiStack extends Stack {
         {
           statusCode: "200",
           responseModels: {
-            "application/json": chatResponseModel,
+            "application/json": chatModel,
           },
           responseParameters: RESPONSE_PARAMS,
         },
@@ -516,19 +604,7 @@ export class ApiStack extends Stack {
       schema: {
         type: JsonSchemaType.ARRAY,
         items: {
-          type: JsonSchemaType.OBJECT,
-          properties: {
-            author: {
-              type: JsonSchemaType.STRING,
-            },
-            message: {
-              type: JsonSchemaType.STRING,
-            },
-            timestamp: {
-              type: JsonSchemaType.NUMBER,
-            },
-          },
-          required: ["author", "message", "timestamp"],
+          ref: getModelRef(this.api, chatModel),
         },
       },
     });
@@ -536,9 +612,6 @@ export class ApiStack extends Stack {
     chat.addMethod("GET", new LambdaIntegration(chatHistoryHandler), {
       apiKeyRequired: true,
       authorizer: this.authorizer,
-      requestParameters: {
-        "method.request.querystring.message": true,
-      },
       methodResponses: [
         {
           statusCode: "200",

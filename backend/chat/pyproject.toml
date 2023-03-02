@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "3.9.16"
 langchain = "^0.0.94"
-openai = "^0.26.5"
+openai = "^0.27"
 ulid-py = "^1.1.0"
 
 [tool.poetry.group.local]
