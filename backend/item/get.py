@@ -12,6 +12,7 @@ from utils.responses import Errors, to_response_error, to_response_success
 
 pc_db: ParentChildDB = None
 secrets: Mapping[str, str] = None
+s3_client = None
 
 def handler(event: dict, context):
     global pc_db
@@ -29,10 +30,13 @@ def handler(event: dict, context):
     if pc_db is None:
         pc_db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
 
-    if secrets is None:
+    if not secrets:
         secrets_client = boto3.client('secretsmanager')
         secrets = secrets_client.get_secret_value(SecretId='{stage}/Mimo/Integrations'.format(stage=stage))
         secrets = json.loads(secrets['SecretString'])
+
+    if not s3_client:
+        s3_client = boto3.client('s3')
 
     user_integration_items: List[UserIntegrationItem] = pc_db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
 
@@ -55,7 +59,7 @@ def handler(event: dict, context):
         if discovery_response:
             response_items.append(discovery_response)
 
-    upload_fetcher = Upload()
+    upload_fetcher = Upload(access_token=access_token, s3_client=s3_client, bucket=upload_item_bucket, prefix=user)
     upload_discovery_response = upload_fetcher.discover()
     if upload_discovery_response:
         response_items.append(upload_discovery_response)

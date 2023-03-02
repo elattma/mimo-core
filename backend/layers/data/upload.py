@@ -46,5 +46,12 @@ class Upload(Fetcher):
         )
 
     def fetch(self, id: str) -> FetchResponse:
+        response = self.s3_client.get_object(
+            Bucket=self.bucket,
+            Key=id
+        )
+
+        content = response.get('Body', None) if response else None
+        print(content)
         return FetchResponse(
         )
