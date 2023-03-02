@@ -183,6 +183,7 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         STAGE: stageId,
+        UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
       },
       bundling: {
         assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
@@ -190,6 +191,7 @@ export class ApiStack extends Stack {
     });
     mimoTable.grantReadWriteData(getItemHandler);
     this.integrationsSecret.grantRead(getItemHandler);
+    uploadItemBucket.grantRead(getItemHandler);
 
     const itemModel = this.api.addModel("ItemModel", {
       contentType: "application/json",

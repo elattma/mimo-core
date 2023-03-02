@@ -5,6 +5,7 @@ from typing import List, Mapping
 import boto3
 from data.docs import Docs
 from data.fetcher import DiscoveryResponse, Fetcher
+from data.upload import Upload
 from db.pc import KeyNamespaces, ParentChildDB, UserIntegrationItem
 from utils.auth import refresh_token
 from utils.responses import Errors, to_response_error, to_response_success
@@ -20,8 +21,9 @@ def handler(event: dict, context):
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
     stage: str = os.environ['STAGE']
+    upload_item_bucket: str = os.environ['UPLOAD_ITEM_BUCKET']
 
-    if not user or not stage:
+    if not (user and stage and upload_item_bucket):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if pc_db is None:
@@ -52,5 +54,10 @@ def handler(event: dict, context):
         discovery_response = data_fetcher.discover()
         if discovery_response:
             response_items.append(discovery_response)
+
+    upload_fetcher = Upload()
+    upload_discovery_response = upload_fetcher.discover()
+    if upload_discovery_response:
+        response_items.append(upload_discovery_response)
 
     return to_response_success([response_item.__dict__ for response_item in response_items])

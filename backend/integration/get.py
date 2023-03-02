@@ -20,7 +20,7 @@ def handler(event: dict, context):
     stage: str = os.environ['STAGE']
     integrations_path: str = os.environ['INTEGRATIONS_PATH']
 
-    if not user or not stage or not integrations_path:
+    if not (user and stage and integrations_path):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if pc_db is None:

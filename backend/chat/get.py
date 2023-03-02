@@ -16,7 +16,7 @@ def handler(event: dict, context):
     query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     next_token: str = query_string_parameters.get('next_token', None) if query_string_parameters else None
 
-    if not user or not stage:
+    if not (user and stage):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if pc_db is None:

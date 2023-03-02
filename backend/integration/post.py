@@ -32,7 +32,7 @@ def handler(event, context):
     redirect_uri = body.get('redirect_uri', None) if body else None
     integration_auth_uri: str = SOURCE_URI_MAP.get(id, None) if id else None
 
-    if not user or not stage or not body or not id or not code or not redirect_uri or not integration_auth_uri:
+    if not (user and stage and body and id and redirect_uri and integration_auth_uri):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if secrets is None:
