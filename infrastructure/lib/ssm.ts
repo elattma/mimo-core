@@ -27,9 +27,9 @@ const INTEGRATION_CONFIGS: IntegrationConfig[] = [
       "https://slack.com/oauth/v2/authorize?scope=groups:history&client_id=3857399127559.4690380022609",
   },
   {
-    id: "google",
-    name: "Google Drive",
-    description: "Some description for Google",
+    id: "google_docs",
+    name: "Google Docs",
+    description: "Some description for Google Docs",
     icon: Icons.Drive,
     oauth2_link:
       "https://accounts.google.com/o/oauth2/v2/auth?client_id=195189627384-2s7kncngrga0adasklb34d6v5hm8c1nu.apps.googleusercontent.com&scope=https://www.googleapis.com/auth/drive.readonly&response_type=code&access_type=offline&prompt=consent",

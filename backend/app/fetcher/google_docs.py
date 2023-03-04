@@ -1,19 +1,31 @@
+from chunk import Chunk
 from typing import Any, List
 
 import requests
-from data.fetcher import Chunk, DiscoveryResponse, Fetcher, FetchResponse
+from app.fetcher.base import DiscoveryResponse, Fetcher, FetchResponse
 
 
-class Docs(Fetcher):
+class GoogleDocs(Fetcher):
+    _INTEGRATION = 'google_docs'
+
+    def get_auth_type(self) -> str:
+        return 'oauth'
+    
+    def get_auth_attributes(self) -> dict:
+        return {
+            'auth_endpoint': 'https://oauth2.googleapis.com/token',
+            'refresh_endpoint': 'https://oauth2.googleapis.com/token',
+        }
+
     def discover(self, filter: Any = None) -> DiscoveryResponse:
-        print('google discovery!')
+        print('google_docs discovery!')
         response = requests.get(
             'https://www.googleapis.com/drive/v3/files',
             params={
                 'q': 'mimeType="application/vnd.google-apps.document" and trashed=false'
             },
             headers={
-                'Authorization': f'Bearer {self.access_token}'
+                'Authorization': f'Bearer {self.auth.access_token}'
             }
         )
         print(response)
@@ -28,7 +40,7 @@ class Docs(Fetcher):
         files = discovery_response['files']
 
         return DiscoveryResponse(
-            integration='google', 
+            integration='google_docs', 
             icon='https://www.gstatic.com/images/branding/product/1x/drive_512dp.png', 
             items=[{
                 'id': file['id'],
@@ -40,11 +52,11 @@ class Docs(Fetcher):
         )
 
     def fetch(self, id: str) -> FetchResponse:
-        print('google load!')
+        print('google_docs load!')
         response = requests.get(
             f'https://docs.googleapis.com/v1/documents/{id}',
             headers={
-                'Authorization': f'Bearer {self.access_token}'
+                'Authorization': f'Bearer {self.auth.access_token}'
             }
         )
         print(response)
@@ -80,7 +92,7 @@ class Docs(Fetcher):
                 content[0:0] = value['tableOfContents']['content']
 
         return FetchResponse(
-            integration='google',
+            integration='google_docs',
             icon='https://www.gstatic.com/images/branding/product/1x/drive_512dp.png',
             chunks=self.merge_split_chunks(chunks=chunks)
         )

@@ -1,14 +1,12 @@
 import json
 import os
 
-import boto3
-from utils.responses import Errors, to_response_error, to_response_success
+from app.fetcher.base import Fetcher
+from app.fetcher.upload import Upload
+from app.util.response import Errors, to_response_error, to_response_success
 
-s3_client = None
 
-def handler(event, context):
-    global s3_client
-
+def handler(event: dict, context):
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
@@ -22,17 +20,11 @@ def handler(event, context):
     if not (user and stage and upload_item_bucket and body and content_type and name):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
-    if not s3_client:
-        s3_client = boto3.client('s3')
-    
-    signed_url = s3_client.generate_presigned_url(
-        ClientMethod='put_object', 
-        Params={
-            'Bucket': upload_item_bucket,
-            'Key': f'{user}/{name}',
-            'ContentType': content_type      
-        },
-    )
+    upload: Upload = Fetcher.create('upload', {
+        'bucket': upload_item_bucket,
+        'prefix': user
+    })
+    signed_url = upload.generate_presigned_url(content_type=content_type, name=name)
 
     if not signed_url:
         return to_response_error(Errors.S3_ERROR.value)

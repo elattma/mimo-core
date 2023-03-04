@@ -1,10 +1,17 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List
+from typing import List
+
+from app.auth.base import Auth
 
 MAX_CHUNK_SIZE = 2000
 MAX_CHUNK_OVERLAP = 200
 
+@dataclass
+class Filter:
+    next_token: str = None
+    limit: int = 20
+    
 @dataclass
 class Item:
     id: str
@@ -32,17 +39,48 @@ class FetchResponse:
     next_token: str
 
 class Fetcher(ABC):
-    def __init__(self, access_token: str) -> None:
-        super().__init__()
-        self.access_token = access_token
+    _INTEGRATION = 'base'
+
+    subclasses = {}
+
+    @classmethod
+    def create(cls, integration, auth_params: dict):
+        if not cls.subclasses:
+            cls.subclasses = {subclass._INTEGRATION: subclass for subclass in cls.__subclasses__()}
+
+        print(integration)
+        print(cls.subclasses.get(integration, None))
+        if not integration or not cls.subclasses.get(integration, None):
+            print(f'integration auth not found for {integration}')
+            return None
+        
+        fetcher = cls.subclasses[integration]()
+        fetcher_auth_overrides = fetcher.get_auth_attributes()
+        if fetcher_auth_overrides:
+            auth_params.update(fetcher_auth_overrides)
+        fetcher.define_auth(fetcher.get_auth_type(), **auth_params)
+        
+        return fetcher
+
+    def define_auth(self, auth_type: str, **kwargs):
+        self.auth = Auth.create(auth_type, **kwargs)
+        self.auth.validate()
 
     @abstractmethod
-    def discover(self, filter: Any = None) -> DiscoveryResponse:
-        pass
+    def get_auth_type(self) -> str:
+        raise NotImplementedError('get_auth_type not implemented')
+
+    @abstractmethod
+    def get_auth_attributes(self) -> dict:
+        raise NotImplementedError('get_auth_attributes not implemented')
+
+    @abstractmethod
+    def discover(self, filter: Filter = None) -> DiscoveryResponse:
+        raise NotImplementedError('discover not implemented')
 
     @abstractmethod
     def fetch(self, id: str) -> FetchResponse:
-        pass
+        raise NotImplementedError('fetch not implemented')
 
     def __merge_chunks(self, chunks: List[Chunk]) -> Chunk:
         return Chunk(

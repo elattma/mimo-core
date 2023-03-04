@@ -49,17 +49,12 @@ class UserIntegrationItem(ParentChildItem):
     expiry_timestamp: int
 
 class ParentChildDB:
+    table = None
     def __init__(self, table_name: str):
-        try: 
-            table = boto3.resource('dynamodb').Table(table_name)
-            table.load()
-        except ClientError as err:
-            print("Couldn't check for existence of %s. Here's why: %s: %s",
-                table_name,
-                err.response['Error']['Code'], err.response['Error']['Message']) # TODO: switch to powertools logging
-            raise
-        else:
-            self.table = table
+        if not self.table:
+            print('loading db table...')
+            self.table = boto3.resource('dynamodb').Table(table_name)
+            self.table.load()
         
     def write(self, items: List[ParentChildItem]):
         try:

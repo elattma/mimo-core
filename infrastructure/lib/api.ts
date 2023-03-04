@@ -1,7 +1,3 @@
-import {
-  PythonFunction,
-  PythonLayerVersion,
-} from "@aws-cdk/aws-lambda-python-alpha";
 import { CfnOutput, Duration, Fn, Stack, StackProps } from "aws-cdk-lib";
 import {
   ApiKeySourceType,
@@ -19,8 +15,14 @@ import {
   CertificateValidation,
 } from "aws-cdk-lib/aws-certificatemanager";
 import { ITable } from "aws-cdk-lib/aws-dynamodb";
+import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
-import { ILayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
+import {
+  DockerImageCode,
+  DockerImageFunction,
+  ILayerVersion,
+  Runtime,
+} from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
 import { IBucket } from "aws-cdk-lib/aws-s3";
@@ -35,6 +37,13 @@ export interface ApiStackProps extends StackProps {
   readonly integrationsPath: string;
   readonly appsyncApi: GraphqlApi;
   readonly uploadItemBucket: IBucket;
+}
+
+interface LambdaParams {
+  readonly method: string;
+  readonly environment?: { [key: string]: string };
+  readonly memorySize?: number;
+  readonly timeout?: Duration;
 }
 
 export class ApiStack extends Stack {
@@ -56,7 +65,7 @@ export class ApiStack extends Stack {
 
     this.api = this.createRestApi(props.domainName);
     this.authorizer = this.createAuth0Authorizer(props.stageId);
-    this.commonPythonLayers = this.createUtilsLayer();
+    // this.commonPythonLayers = this.createUtilsLayer();
     this.createDefaultApiKey();
 
     this.createChatRoutes(
@@ -155,39 +164,20 @@ export class ApiStack extends Stack {
     return authorizer;
   };
 
-  createUtilsLayer = (): ILayerVersion[] => {
-    return [
-      new PythonLayerVersion(this, "utils-layer", {
-        entry: path.join(__dirname, "../../backend/layers"),
-        compatibleRuntimes: [Runtime.PYTHON_3_9],
-        bundling: {
-          assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
-        },
-      }),
-    ];
-  };
-
   createItemRoutes = (
     stageId: string,
     mimoTable: ITable,
     uploadItemBucket: IBucket
   ) => {
     const item = this.api.root.addResource("item");
-    const getItemHandler = new PythonFunction(this, "get-item-lambda", {
-      runtime: Runtime.PYTHON_3_9,
-      handler: "handler",
-      entry: path.join(__dirname, "../../backend/item"),
-      index: "get.py",
-      layers: this.commonPythonLayers,
-      timeout: Duration.seconds(5),
-      memorySize: 512,
+    const getItemHandler = this.getHandler({
+      method: "item_get",
       environment: {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
       },
-      bundling: {
-        assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
-      },
+      memorySize: 512,
+      timeout: Duration.seconds(5),
     });
     mimoTable.grantReadWriteData(getItemHandler);
     this.integrationsSecret.grantRead(getItemHandler);
@@ -258,18 +248,11 @@ export class ApiStack extends Stack {
       ],
     });
 
-    const uploadItemHandler = new PythonFunction(this, "upload-item-lambda", {
-      runtime: Runtime.PYTHON_3_9,
-      handler: "handler",
-      entry: path.join(__dirname, "../../backend/item"),
-      index: "post.py",
-      layers: this.commonPythonLayers,
+    const uploadItemHandler = this.getHandler({
+      method: "item_post",
       environment: {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
-      },
-      bundling: {
-        assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
       },
     });
     uploadItemBucket.grantPut(uploadItemHandler);
@@ -333,26 +316,15 @@ export class ApiStack extends Stack {
   ) => {
     // GET /integration
     const integration = this.api.root.addResource("integration");
-    const getIntegrationHandler = new PythonFunction(
-      this,
-      "get-integration-lambda",
-      {
-        runtime: Runtime.PYTHON_3_9,
-        handler: "handler",
-        entry: path.join(__dirname, "../../backend/integration"),
-        index: "get.py",
-        layers: this.commonPythonLayers,
-        timeout: Duration.seconds(5),
-        memorySize: 512,
-        environment: {
-          STAGE: stageId,
-          INTEGRATIONS_PATH: integrationsPath,
-        },
-        bundling: {
-          assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
-        },
-      }
-    );
+    const getIntegrationHandler = this.getHandler({
+      method: "integration_get",
+      environment: {
+        STAGE: stageId,
+        INTEGRATIONS_PATH: integrationsPath,
+      },
+      timeout: Duration.seconds(5),
+      memorySize: 512,
+    });
     mimoTable.grantReadData(getIntegrationHandler);
     getIntegrationHandler.addToRolePolicy(
       new PolicyStatement({
@@ -417,25 +389,14 @@ export class ApiStack extends Stack {
       ],
     });
 
-    const authIntegrationHandler = new PythonFunction(
-      this,
-      "auth-integration-lambda",
-      {
-        runtime: Runtime.PYTHON_3_9,
-        handler: "handler",
-        entry: path.join(__dirname, "../../backend/integration"),
-        index: "post.py",
-        layers: this.commonPythonLayers,
-        timeout: Duration.seconds(5),
-        memorySize: 512,
-        environment: {
-          STAGE: stageId,
-        },
-        bundling: {
-          assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
-        },
-      }
-    );
+    const authIntegrationHandler = this.getHandler({
+      method: "integration_post",
+      environment: {
+        STAGE: stageId,
+      },
+      timeout: Duration.seconds(5),
+      memorySize: 512,
+    });
     mimoTable.grantWriteData(authIntegrationHandler);
     this.integrationsSecret.grantRead(authIntegrationHandler);
 
@@ -485,22 +446,16 @@ export class ApiStack extends Stack {
   ) => {
     // POST /chat
     const chat = this.api.root.addResource("chat");
-    const chatHandler = new PythonFunction(this, "chat-lambda", {
-      runtime: Runtime.PYTHON_3_9,
-      handler: "handler",
-      entry: path.join(__dirname, "../../backend/chat"),
-      index: "post.py",
-      layers: this.commonPythonLayers,
-      timeout: Duration.seconds(20),
-      memorySize: 512,
+    const chatHandler = this.getHandler({
+      method: "chat_post",
       environment: {
         STAGE: stageId,
         APPSYNC_ENDPOINT: graphqlUrl,
       },
-      bundling: {
-        assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
-      },
+      memorySize: 1024,
+      timeout: Duration.seconds(20),
     });
+
     this.integrationsSecret.grantRead(chatHandler);
     mimoTable.grantReadWriteData(chatHandler);
 
@@ -583,20 +538,14 @@ export class ApiStack extends Stack {
     });
 
     // GET /chat
-    const chatHistoryHandler = new PythonFunction(this, "chat-history-lambda", {
-      runtime: Runtime.PYTHON_3_9,
-      handler: "handler",
-      entry: path.join(__dirname, "../../backend/chat"),
-      index: "get.py",
-      layers: this.commonPythonLayers,
-      timeout: Duration.seconds(10),
-      memorySize: 512,
+    const chatHistoryHandler = this.getHandler({
+      method: "chat_get",
       environment: {
         STAGE: stageId,
+        APPSYNC_ENDPOINT: graphqlUrl,
       },
-      bundling: {
-        assetExcludes: ["**.venv**", "**.git**", "**.vscode**"],
-      },
+      memorySize: 1024,
+      timeout: Duration.seconds(20),
     });
     mimoTable.grantReadData(chatHistoryHandler);
 
@@ -623,6 +572,20 @@ export class ApiStack extends Stack {
           responseParameters: RESPONSE_PARAMS,
         },
       ],
+    });
+  };
+
+  getHandler = (params: LambdaParams) => {
+    const dockerfile = path.join(__dirname, "../../backend/");
+    return new DockerImageFunction(this, `${params.method}-lambda`, {
+      code: DockerImageCode.fromImageAsset(dockerfile, {
+        file: "lambda.Dockerfile",
+        cmd: [`app.handlers.${params.method}`],
+        platform: Platform.LINUX_AMD64,
+      }),
+      timeout: params.timeout,
+      memorySize: params.memorySize,
+      environment: params.environment,
     });
   };
 }

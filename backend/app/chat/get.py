@@ -1,14 +1,11 @@
 import os
 from typing import List
 
-from db.pc import KeyNamespaces, ParentChildDB, UserChatItem
-from utils.responses import Errors, to_response_error, to_response_success
+from app.db.pc import KeyNamespaces, ParentChildDB, UserChatItem
+from app.util.response import Errors, to_response_error, to_response_success
 
-pc_db = None
 
 def handler(event: dict, context):
-    global pc_db
-
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
@@ -19,13 +16,12 @@ def handler(event: dict, context):
     if not (user and stage):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
-    if pc_db is None:
-        pc_db = ParentChildDB("mimo-{stage}-pc".format(stage=stage))
+    db = ParentChildDB("mimo-{stage}-pc".format(stage=stage))
 
     query_args = {}
     if next_token:
         query_args['next_token'] = next_token
-    user_chat_items: List[UserChatItem] = pc_db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value, **query_args)
+    user_chat_items: List[UserChatItem] = db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value, **query_args)
     user_chat_items.reverse()
 
     return to_response_success([{
