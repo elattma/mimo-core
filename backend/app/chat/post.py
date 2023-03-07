@@ -23,6 +23,7 @@ def handler(event: dict, context):
 
     stage: str = os.environ['STAGE']
     appsync_endpoint: str = os.environ['APPSYNC_ENDPOINT']
+    upload_item_bucket: str = os.environ['UPLOAD_ITEM_BUCKET']
 
     headers: dict = event.get('headers', None) if event else None
     authorization: str = headers.get('Authorization', None) if headers else None
@@ -50,7 +51,6 @@ def handler(event: dict, context):
     chat_history: List[UserChatItem] = []
     try:
         chat_history = db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value)
-        chat_history.reverse()
     except Exception as e:
         print(e)
         print("empty history!")
@@ -62,7 +62,6 @@ def handler(event: dict, context):
         user_integration_items: List[UserIntegrationItem] = db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
 
         for item in items:
-            print(item)
             item_integration: str = item.get('integration', None) if item else None
             item_params: dict = item.get('params', None) if item else None
             if not (item_integration and item_params):
@@ -73,17 +72,25 @@ def handler(event: dict, context):
             client_secret = secrets.get(f'{item_integration}/CLIENT_SECRET')
 
             fetcher: Fetcher = None
-            for user_integration_item in user_integration_items:
-                if user_integration_item.get_raw_child() == item_integration:
-                    fetcher = Fetcher.create(item_integration, {
-                        'client_id': client_id,
-                        'client_secret': client_secret,
-                        'access_token': user_integration_item.access_token,
-                        'refresh_token': user_integration_item.refresh_token,
-                        'expiry_timestamp': user_integration_item.expiry_timestamp
-                    })
-                    break
-                
+
+            # TODO: optimize
+            if item_integration == 'upload':
+                fetcher = Fetcher.create(item_integration, {
+                    'bucket': upload_item_bucket,
+                    'prefix': f'{user}/'
+                })
+            else: 
+                for user_integration_item in user_integration_items:
+                    if user_integration_item.get_raw_child() == item_integration:
+                        fetcher = Fetcher.create(item_integration, {
+                            'client_id': client_id,
+                            'client_secret': client_secret,
+                            'access_token': user_integration_item.access_token,
+                            'refresh_token': user_integration_item.refresh_token,
+                            'expiry_timestamp': user_integration_item.expiry_timestamp
+                        })
+                        break
+            
             if not fetcher:
                 print('no fetcher found.. skipping!')
                 continue
@@ -104,13 +111,21 @@ def handler(event: dict, context):
     if len(context_summary) > 0:
         while len(context_summary) > 1:
             slice_index = min(5, len(context_summary))
-            context_summary.append(Edit.create(
+            messages = [{ 'role': 'system', 'content': 'You are an assistant who summarizes.' }]
+            messages.extend([{ 'role': 'user', 'content': context } for context in context_summary[:slice_index]])
+            messages.append({ 'role': 'user', 'content': 'Summarize the above context in a few sentences.'})
+            response = ChatCompletion.create(
                 api_key=openai_api_key,
-                model="text-davinci-edit-001",
-                input=';\n'.join(context_summary[:slice_index]),
-                instruction="Summarize",
-                temperature=0 
-            ))
+                model=MODEL,
+                messages=messages,
+                temperature=0
+            )
+            choices = response.get('choices', None) if response else None
+            choice = choices[0] if choices and len(choices) > 0 else None
+            choice_message = choice.get('message', None) if choice else None
+            content = choice_message.get('content', None) if choice_message else None
+            if content:
+                context_summary.append(content)
             context_summary = context_summary[slice_index:]
         summary = context_summary[0]
 

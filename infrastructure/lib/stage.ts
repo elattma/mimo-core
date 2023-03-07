@@ -2,6 +2,7 @@ import { Stage, StageProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { ApiStack } from "./api";
 import { AppsyncStack } from "./appsync";
+import { CdnStack } from "./cdn";
 import { DynamoStack } from "./dynamo";
 import { S3Stack } from "./s3";
 import { SsmStack } from "./ssm";
@@ -21,10 +22,18 @@ export class MimoStage extends Stage {
       stageId: props.stageId,
     });
 
+    const assetsPrefixPath = `assets.${props.domainName}`;
+    new CdnStack(this, "cdn", {
+      stageId: props.stageId,
+      assetsBucket: s3.assetsBucket,
+      domainName: assetsPrefixPath,
+    });
+
     const integrationsPath = `/${props.stageId}/mimo/integrations`;
     const ssm = new SsmStack(this, "ssm", {
       stageId: props.stageId,
       integrationsPath: integrationsPath,
+      prefixIconPath: `${assetsPrefixPath}/icons`,
     });
 
     // TODO: refactor to split between common and based on api route

@@ -20,7 +20,6 @@ import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import {
   DockerImageCode,
   DockerImageFunction,
-  ILayerVersion,
   Runtime,
 } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -49,7 +48,6 @@ interface LambdaParams {
 export class ApiStack extends Stack {
   readonly api: RestApi;
   readonly authorizer: IAuthorizer;
-  readonly commonPythonLayers: ILayerVersion[];
   readonly integrationsSecret: ISecret;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
@@ -65,13 +63,13 @@ export class ApiStack extends Stack {
 
     this.api = this.createRestApi(props.domainName);
     this.authorizer = this.createAuth0Authorizer(props.stageId);
-    // this.commonPythonLayers = this.createUtilsLayer();
     this.createDefaultApiKey();
 
     this.createChatRoutes(
       props.stageId,
       props.mimoTable,
-      props.appsyncApi.graphqlUrl
+      props.appsyncApi.graphqlUrl,
+      props.uploadItemBucket
     );
     this.createIntegrationRoutes(
       props.stageId,
@@ -176,8 +174,8 @@ export class ApiStack extends Stack {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
       },
-      memorySize: 512,
-      timeout: Duration.seconds(5),
+      memorySize: 2048,
+      timeout: Duration.seconds(30),
     });
     mimoTable.grantReadWriteData(getItemHandler);
     this.integrationsSecret.grantRead(getItemHandler);
@@ -442,7 +440,8 @@ export class ApiStack extends Stack {
   createChatRoutes = (
     stageId: string,
     mimoTable: ITable,
-    graphqlUrl: string
+    graphqlUrl: string,
+    uploadItemBucket: IBucket
   ) => {
     // POST /chat
     const chat = this.api.root.addResource("chat");
@@ -451,13 +450,14 @@ export class ApiStack extends Stack {
       environment: {
         STAGE: stageId,
         APPSYNC_ENDPOINT: graphqlUrl,
+        UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
       },
       memorySize: 1024,
       timeout: Duration.seconds(20),
     });
-
     this.integrationsSecret.grantRead(chatHandler);
     mimoTable.grantReadWriteData(chatHandler);
+    uploadItemBucket.grantRead(chatHandler);
 
     const chatModel = this.api.addModel("ChatModel", {
       contentType: "application/json",

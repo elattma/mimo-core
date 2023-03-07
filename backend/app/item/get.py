@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
 from app.db.pc import KeyNamespaces, ParentChildDB, UserIntegrationItem
@@ -31,21 +32,22 @@ def handler(event: dict, context):
                 'refresh_token': item.refresh_token,
                 'expiry_timestamp': item.expiry_timestamp
             })
-            print(fetcher)
             fetchers.append(fetcher)
     fetcher = Fetcher.create('upload', {
         'bucket': upload_item_bucket,
-        'prefix': user
+        'prefix': f'{user}/'
     })
-    print(fetcher)
-    print(fetcher.auth)
-    print(fetcher)
     fetchers.append(fetcher)
 
     response_items: List[DiscoveryResponse] = []
-    for fetcher in fetchers:
-        response = fetcher.discover()
-        if response:
-            response_items.append(response)
-    
+    futures = None
+    with ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
+        futures = [executor.submit(fetcher.discover) for fetcher in fetchers]
+
+    if futures:
+        for future in as_completed(futures):
+            response_item = future.result()
+            if response_item:
+                response_items.append(response_item)
+
     return to_response_success([response_item.__dict__ for response_item in response_items])

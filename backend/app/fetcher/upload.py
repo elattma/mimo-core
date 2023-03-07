@@ -44,21 +44,26 @@ class Upload(Fetcher):
             print('empty uploads!')
             return None
         
-        next_token = response.get('NextContinuationToken')
+        next_token = response.get('NextContinuationToken', None)
+        items = []
+        for file in files:
+            if file.get('Key', None) and not file.get('Key', '').endswith('/'):
+                items.append({
+                    'id': file.get('Key', None),
+                    'title': file.get('Key', '').replace(f'{self.auth.prefix}/', ''),
+                    'link': '', #TODO: make the links clickable?
+                    'preview': None # TODO: add preview?
+                })
+
         return DiscoveryResponse(
-            integration='upload', 
+            integration=self._INTEGRATION, 
             icon='', #TODO: add mimo icon or whatever file type icon
-            items=[{
-                'id': file.get('Key', None),
-                'title': file.get('Key', '').replace(f'{self.auth.prefix}/', ''),
-                'link': '', #TODO: make the links clickable?
-                'preview': None # TODO: add preview?
-            } for file in files],
+            items=items,
             next_token=next_token
         )
 
     def fetch(self, id: str) -> FetchResponse:
-        with tempfile.NamedTemporaryFile() as temporary_file:
+        with tempfile.NamedTemporaryFile(mode='w') as temporary_file:
             self.s3_client.download_fileobj(
                 Bucket=self.auth.bucket,
                 Key=id,
@@ -71,7 +76,6 @@ class Upload(Fetcher):
 
         return FetchResponse(
             integration=self._INTEGRATION,
-            icon='',
             chunks=self.merge_split_chunks(chunks=chunks)
         )
 

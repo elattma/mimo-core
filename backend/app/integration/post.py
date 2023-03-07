@@ -1,6 +1,6 @@
 import json
 import os
-import time
+from time import time
 
 from app.db.pc import KeyNamespaces, ParentChildDB, UserIntegrationItem
 from app.fetcher.base import Fetcher
@@ -40,7 +40,7 @@ def handler(event: dict, context):
         parent = f'{KeyNamespaces.USER.value}{user}'
         child = f'{KeyNamespaces.INTEGRATION.value}{id}'
         try:
-            db.write([UserIntegrationItem(parent, child, fetcher.auth.access_token, fetcher.auth.refresh_token, time(), fetcher.auth.expiry_timestamp)])
+            db.write([UserIntegrationItem(parent, child, fetcher.auth.access_token, fetcher.auth.refresh_token, int(time()), fetcher.auth.expiry_timestamp)])
         except Exception as e:
             print(e)
             return to_response_error(Errors.DB_WRITE_FAILED.value)

@@ -36,20 +36,20 @@ class Chunk:
 class FetchResponse:
     integration: str
     chunks: List[Chunk]
-    next_token: str
+    next_token: str = None
 
 class Fetcher(ABC):
     _INTEGRATION = 'base'
 
     subclasses = {}
 
+    # TODO: add last sync time to filter only updated documents
+
     @classmethod
     def create(cls, integration, auth_params: dict):
         if not cls.subclasses:
             cls.subclasses = {subclass._INTEGRATION: subclass for subclass in cls.__subclasses__()}
 
-        print(integration)
-        print(cls.subclasses.get(integration, None))
         if not integration or not cls.subclasses.get(integration, None):
             print(f'integration auth not found for {integration}')
             return None
@@ -65,6 +65,9 @@ class Fetcher(ABC):
     def define_auth(self, auth_type: str, **kwargs):
         self.auth = Auth.create(auth_type, **kwargs)
         self.auth.validate()
+
+    def get_icon(self) -> str:
+        return f'assets.mimo.team/icons/{self._INTEGRATION}.svg'
 
     @abstractmethod
     def get_auth_type(self) -> str:
