@@ -806,6 +806,24 @@ files = [
 ]
 
 [[package]]
+name = "neo4j"
+version = "5.6.0"
+description = "Neo4j Bolt driver for Python"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "neo4j-5.6.0.tar.gz", hash = "sha256:99ba8321195a114a870704dd00463a0429c364c97dde603b39841e78ac05b97c"},
+]
+
+[package.dependencies]
+pytz = "*"
+
+[package.extras]
+numpy = ["numpy (>=1.7.0,<2.0.0)"]
+pandas = ["numpy (>=1.7.0,<2.0.0)", "pandas (>=1.1.0,<2.0.0)"]
+
+[[package]]
 name = "nltk"
 version = "3.8.1"
 description = "Natural Language Toolkit"
@@ -1628,4 +1646,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "3.10.9"
-content-hash = "928252b53d7c7343a7cfff3f017291dcca44cce67a9956d18045e0433ffac164"
+content-hash = "3977a5245c966d55bf51ec49dc7a77e0a933597ff34050aab115b0a2f7c415b5"
