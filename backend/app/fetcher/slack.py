@@ -3,7 +3,7 @@ from typing import List
 
 import requests
 from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
-                              Filter)
+                              Filter, Item)
 
 
 @dataclass
@@ -52,12 +52,12 @@ class Slack(Fetcher):
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
             icon=self.get_icon(),
-            items=[{
-                'id': channel['id'],
-                'title': channel['name'],
-                'link': f'https://slack.com/channels/{channel.id}',
-                'preview': None
-            } for channel in channels],
+            items=[Item(
+                id=channel['id'],
+                title=channel['name'],
+                link=f'https://slack.com/channels/{channel.id}',
+                preview=None
+            ) for channel in channels],
             next_token=next_token
         )
     

@@ -36,5 +36,5 @@ def to_response_success(body: dict):
     return {
         'statusCode': 200,
         'headers': HEADERS,
-        'body': json.dumps(body, cls=DecimalEncoder)
+        'body': json.dumps(body, cls=DecimalEncoder, default=lambda o: o.__dict__)
     }

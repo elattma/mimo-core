@@ -81,6 +81,11 @@ export class ApiStack extends Stack {
       props.mimoTable,
       props.uploadItemBucket
     );
+    this.createBlackboxRoutes(
+      props.stageId,
+      props.mimoTable,
+      props.uploadItemBucket
+    );
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -160,6 +165,57 @@ export class ApiStack extends Stack {
     auth0Secret.grantRead(authorizerLambda);
     authorizer._attachToApi(this.api);
     return authorizer;
+  };
+
+  createBlackboxRoutes = (
+    stageId: string,
+    mimoTable: ITable,
+    uploadItemBucket: IBucket
+  ) => {
+    const blackbox = this.api.root.addResource("blackbox");
+    const refreshBlackboxHandler = this.getHandler({
+      method: "blackbox_post",
+      environment: {
+        STAGE: stageId,
+        UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
+        GRAPH_DB_URI: "neo4j+s://67eff9a1.databases.neo4j.io",
+      },
+      memorySize: 2048,
+      timeout: Duration.minutes(10),
+    });
+    mimoTable.grantReadWriteData(refreshBlackboxHandler);
+    this.integrationsSecret.grantRead(refreshBlackboxHandler);
+    uploadItemBucket.grantRead(refreshBlackboxHandler);
+
+    const refreshBlackboxResponseModel = this.api.addModel(
+      "RefreshBlackboxResponseModel",
+      {
+        contentType: "application/json",
+        modelName: "RefreshBlackboxResponse",
+        schema: {
+          type: JsonSchemaType.OBJECT,
+          properties: {
+            id: {
+              type: JsonSchemaType.STRING,
+            },
+          },
+        },
+      }
+    );
+
+    blackbox.addMethod("POST", new LambdaIntegration(refreshBlackboxHandler), {
+      apiKeyRequired: true,
+      authorizer: this.authorizer,
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": refreshBlackboxResponseModel,
+          },
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
   };
 
   createItemRoutes = (

@@ -3,7 +3,7 @@ from typing import Any, List
 
 import requests
 from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
-                              Filter)
+                              Filter, Item)
 
 
 @dataclass
@@ -55,12 +55,12 @@ class Notion(Fetcher):
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
             icon=self.get_icon(),
-            items=[{
-                'id': result.get('id', None),
-                'title': result.get('id', None),
-                'link': result.get('url', None),
-                'preview': None
-            } for result in results],
+            items=[Item(
+                id=result.get('id', None),
+                title=result.get('id', None),
+                link=result.get('url', None),
+                preview=None
+            ) for result in results],
             next_token=discovery_response.get('next_cursor', None) if discovery_response else None
         )
     

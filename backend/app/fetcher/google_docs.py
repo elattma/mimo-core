@@ -2,7 +2,7 @@ from typing import Any, List
 
 import requests
 from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
-                              Filter)
+                              Filter, Item)
 
 
 class GoogleDocs(Fetcher):
@@ -44,12 +44,12 @@ class GoogleDocs(Fetcher):
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
             icon=self.get_icon(),
-            items=[{
-                'id': file['id'],
-                'title': file['name'],
-                'link': f'https://docs.google.com/document/d/{file["id"]}',
-                'preview': file['thumbnailLink'] if 'thumbnailLink' in file else None
-            } for file in files],
+            items=[Item(
+                id=file.get('id', None), 
+                title=file.get('name', None), 
+                link=f'https://docs.google.com/document/d/{file.get("id", None)}', 
+                preview=file.get('thumbnailLink', None)) 
+            for file in files],
             next_token=next_token
         )
 
@@ -63,10 +63,8 @@ class GoogleDocs(Fetcher):
             }
         )
         load_response = response.json() if response else None
-        print(load_response)
         body = load_response.get('body', None) if load_response else None
         content = body.get('content', None) if body else None
-        print(content)
         if not content:
             print('failed to get doc')
             return None

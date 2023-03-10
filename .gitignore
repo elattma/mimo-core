@@ -2,6 +2,7 @@ node_modules
 .vscode/**/*
 !.vscode/settings.json.default
 .DS_Store
+/backend/dist*
 
 /infrastructure/*.js
 /infrastructure/!jest.config.js

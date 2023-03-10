@@ -23,7 +23,9 @@ RUN poetry config virtualenvs.create false \
   && poetry install $(test "$YOUR_ENV" == production && echo "--no-dev") --no-interaction --no-ansi
 
 RUN python -m nltk.downloader -d ./nltk_data punkt averaged_perceptron_tagger
+RUN python -m spacy download en_core_web_sm
 
 # Run your app
 COPY . ${LAMBDA_TASK_ROOT}
+
 CMD ["app.handlers.unknown"]

@@ -9,7 +9,7 @@ from app.db.pc import (KeyNamespaces, ParentChildDB, Roles, UserChatItem,
 from app.fetcher.base import Fetcher
 from app.util.response import Errors, to_response_error, to_response_success
 from app.util.secret import Secret
-from openai import ChatCompletion, Edit
+from openai import ChatCompletion
 from openai.openai_object import OpenAIObject
 from ulid import ulid
 

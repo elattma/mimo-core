@@ -3,7 +3,7 @@ from typing import List
 
 import requests
 from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
-                              Filter)
+                              Filter, Item)
 
 
 class GoogleMail(Fetcher):
@@ -52,12 +52,12 @@ class GoogleMail(Fetcher):
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
             icon=self.get_icon(),
-            items=[{
-                'id': message.get('id', None),
-                'title': message.get('snippet', None),
-                'link': f'https://mail.google.com/mail/u/0/#search/rfc822msgid:{message["id"]}',
-                'preview': None
-            } for message in messages],
+            items=[Item(
+                id=message.get('id', None),
+                title=message.get('snippet', None),
+                link=f'https://mail.google.com/mail/u/0/#search/rfc822msgid:{message["id"]}',
+                preview=None
+            ) for message in messages],
             next_token=next_token
         )
 

@@ -25,19 +25,17 @@ def handler(event: dict, context):
     fetchers: List[Fetcher] = []
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
-            fetcher = Fetcher.create(item.get_raw_child(), {
+            fetchers.append(Fetcher.create(item.get_raw_child(), {
                 'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
                 'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
                 'access_token': item.access_token,
                 'refresh_token': item.refresh_token,
                 'expiry_timestamp': item.expiry_timestamp
-            })
-            fetchers.append(fetcher)
-    fetcher = Fetcher.create('upload', {
+            }))
+    fetchers.append(Fetcher.create('upload', {
         'bucket': upload_item_bucket,
         'prefix': f'{user}/'
-    })
-    fetchers.append(fetcher)
+    }))
 
     response_items: List[DiscoveryResponse] = []
     futures = None

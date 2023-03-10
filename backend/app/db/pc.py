@@ -52,7 +52,6 @@ class ParentChildDB:
     table = None
     def __init__(self, table_name: str):
         if not self.table:
-            print('loading db table...')
             self.table = boto3.resource('dynamodb').Table(table_name)
             self.table.load()
         

@@ -3,7 +3,8 @@ from typing import List
 
 import boto3
 import nltk
-from app.fetcher.base import DiscoveryResponse, Fetcher, FetchResponse, Filter
+from app.fetcher.base import (DiscoveryResponse, Fetcher, FetchResponse,
+                              Filter, Item)
 
 nltk.data.path.append('./nltk_data/')
 from unstructured.partition.auto import partition
@@ -48,12 +49,12 @@ class Upload(Fetcher):
         items = []
         for file in files:
             if file.get('Key', None) and not file.get('Key', '').endswith('/'):
-                items.append({
-                    'id': file.get('Key', None),
-                    'title': file.get('Key', '').replace(f'{self.auth.prefix}/', ''),
-                    'link': '', #TODO: make the links clickable?
-                    'preview': None # TODO: add preview?
-                })
+                items.append(Item(
+                    id=file.get('Key', None),
+                    title=file.get('Key', '').replace(f'{self.auth.prefix}/', ''),
+                    link='', #TODO: make the links clickable?
+                    preview=None # TODO: add preview?
+                ))
 
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
