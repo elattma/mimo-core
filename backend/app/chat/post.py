@@ -7,6 +7,8 @@ import requests
 from app.db.pc import (KeyNamespaces, ParentChildDB, Roles, UserChatItem,
                        UserIntegrationItem)
 from app.fetcher.base import Fetcher
+from app.mrkl.agent import Agent
+from app.mrkl.tool import Tool, Toolkit
 from app.util.response import Errors, to_response_error, to_response_success
 from app.util.secret import Secret
 from openai import ChatCompletion
@@ -16,9 +18,12 @@ from ulid import ulid
 # TODO: update prompt or make easily configurable - use ssm?
 MODEL = "gpt-3.5-turbo"
 
+
 def handler(event: dict, context):
-    request_context: dict = event.get('requestContext', None) if event else None
-    authorizer: dict = request_context.get('authorizer', None) if request_context else None
+    request_context: dict = event.get(
+        'requestContext', None) if event else None
+    authorizer: dict = request_context.get(
+        'authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
 
     stage: str = os.environ['STAGE']
@@ -26,7 +31,8 @@ def handler(event: dict, context):
     upload_item_bucket: str = os.environ['UPLOAD_ITEM_BUCKET']
 
     headers: dict = event.get('headers', None) if event else None
-    authorization: str = headers.get('Authorization', None) if headers else None
+    authorization: str = headers.get(
+        'Authorization', None) if headers else None
 
     body: str = event.get('body', None) if event else None
     body: dict = json.loads(body) if body else None
@@ -50,7 +56,8 @@ def handler(event: dict, context):
     db = ParentChildDB("mimo-{stage}-pc".format(stage=stage))
     chat_history: List[UserChatItem] = []
     try:
-        chat_history = db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value)
+        chat_history = db.query("{namespace}{user}".format(
+            namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value)
     except Exception as e:
         print(e)
         print("empty history!")
@@ -58,6 +65,33 @@ def handler(event: dict, context):
     # TODO: fetch relevant context from selected items or knowledge base and use as context to prompt
     # TODO: hacky, move to other lambda/api under item. or somewhere else that's actually scalable enough to do this
     summary: str = None
+
+    orchestration_toolkit = Toolkit([
+        # Data layer agent's run function
+        Tool(
+            name="Fetch Context",
+            description=(
+                "Used to fetch any company data needed to properly answer a question. "
+                "Input should be a description of the needed data. "
+                "Output will be that data. "
+            ),
+            func=data_layer_agent.run
+        ),
+        # Executor agent's run function
+        Tool(
+            name="Task Execution",
+            description=(
+                "Used to produce the final answer to the question. "
+                "Input should be the question, the memory, and additional context. "
+                "Output will be the answer to the question. "
+            ),
+            func=executor_agent.run,
+        )
+    ])
+
+    orchestrator_agent.run(message)
+
+    """
     if items is not None and len(items) > 0:
         pass # query KG/vdb for context
                 
@@ -131,20 +165,21 @@ def handler(event: dict, context):
 
     if not output:
         return to_response_error(Errors.OPENAI_ERROR.value)
+    """
 
     parent = f'{KeyNamespaces.USER.value}{user}'
     input_chat = UserChatItem(
-        parent=parent, 
-        child=f'{KeyNamespaces.CHAT.value}{chat_id}', 
-        message=message, 
-        author=user, 
-        role=Roles.USER.value, 
+        parent=parent,
+        child=f'{KeyNamespaces.CHAT.value}{chat_id}',
+        message=message,
+        author=user,
+        role=Roles.USER.value,
         timestamp=timestamp
     )
     output_chat = UserChatItem(
-        parent=parent, 
-        child=f'{KeyNamespaces.CHAT.value}{output_chat_id}', 
-        message=output, 
+        parent=parent,
+        child=f'{KeyNamespaces.CHAT.value}{output_chat_id}',
+        message=output,
         author=MODEL,
         role=output_role,
         timestamp=output_timestamp
@@ -159,10 +194,11 @@ def handler(event: dict, context):
         'timestamp': output_timestamp
     })
 
+
 def send_chat(appsync_endpoint: str, authorization: str, user_id: str, input_chat_id: str, output_chat_id: str, message: str, role: str, timestamp: int) -> None:
     if not message:
         return
-        
+
     query = 'mutation($input: ChatInput!) { proxyChat(input: $input) { userId, inputChatId, outputChatId, message, role, timestamp }}'
     variables = json.dumps({
         "input": {
@@ -175,8 +211,8 @@ def send_chat(appsync_endpoint: str, authorization: str, user_id: str, input_cha
         }
     })
     response = requests.post(
-        appsync_endpoint, 
-            headers={
+        appsync_endpoint,
+        headers={
             'Authorization': authorization.replace('Bearer ', '')
         },
         data=json.dumps({

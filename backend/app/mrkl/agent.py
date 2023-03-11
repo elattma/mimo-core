@@ -101,7 +101,7 @@ class Agent(ABC):
         """
         while self._should_continue():
             prompt = self._construct_prompt(query)
-            llm_output = self._llm.predict(prompt)
+            llm_output = self._llm.predict(prompt, self._stop)
             action_or_final_answer = self._parse_llm_output(llm_output)
             if isinstance(action_or_final_answer, FinalAnswer):
                 final_answer = action_or_final_answer
