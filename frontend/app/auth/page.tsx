@@ -1,6 +1,6 @@
 "use client";
 
-import { fetcher } from "@/lib/utils";
+import { clientPost } from "@/lib/client-fetchers";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const Page = () => {
@@ -13,8 +13,7 @@ const Page = () => {
         "utf-8"
       )
     );
-    fetcher(`/api/${process.env.NEXT_PUBLIC_MOCK_OR_PROXY}/integration`, {
-      method: "POST",
+    clientPost("/integration", {
       body: JSON.stringify({
         id: state.integrationId,
         code: searchParams.get("code"),

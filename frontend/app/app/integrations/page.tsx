@@ -1,17 +1,15 @@
 import Integrations from "@/components/app/integrations/integrations";
-import { fetcherWithSession } from "@/lib/server-only-utils";
+import { serverGet } from "@/lib/server-fetchers";
 
 const Page = async () => {
-  const integrations = await fetcherWithSession(
-    `${process.env.NEXT_PUBLIC_BASE_URL}/api/${process.env.NEXT_PUBLIC_MOCK_OR_PROXY}/integration`,
-    {
-      method: "GET",
-    }
-  );
+  const integrationData = await serverGet("/integration");
 
   return (
-    <main className="p-theme">
-      <Integrations integrations={integrations} />
+    <main className="flex flex-col space-y-theme p-theme">
+      <h1 className="text-lg font-medium text-gray-text-contrast">
+        Integrations
+      </h1>
+      <Integrations integrationData={integrationData} />
     </main>
   );
 };

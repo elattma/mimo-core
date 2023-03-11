@@ -1,24 +1,31 @@
-import ChatInterface from "@/components/app/chat/chat-interface";
+import ChatDisplay from "@/components/chat-display";
+import ChatInput from "@/components/chat-input";
 import { ChatHistoryProvider } from "@/contexts/chat-history-context";
+import { serverGet } from "@/lib/server-fetchers";
 import type { ReactNode } from "react";
 
-interface Props {
-  children: ReactNode;
-}
+type ChatLayoutProps = {
+  children?: ReactNode;
+};
 
-const Layout = ({ children }: Props) => {
+const ChatLayout = async ({ children }: ChatLayoutProps) => {
+  const chatHistoryData = await serverGet("/chat");
+
   return (
-    <ChatHistoryProvider>
-      <div className="flex w-full grow flex-col-reverse lg:flex-row">
-        <main className="grow lg:w-[calc(100%_-_20rem)] xl:w-[calc(100%_-_32rem)]">
-          <ChatInterface />
-        </main>
-        <aside className="shrink-0 space-y-theme border-solid border-neutral-border py-theme px-theme-1/2 max-lg:h-64 max-lg:border-b lg:w-80 lg:border-l xl:w-96">
+    <ChatHistoryProvider initialChatHistory={chatHistoryData}>
+      <div className="container flex min-h-0 grow flex-col gap-theme pb-theme md:flex-row">
+        <aside className="flex h-64 w-full shrink-0 sm:w-64 md:h-fit md:flex-col lg:w-80">
           {children}
         </aside>
+        <main className="relative flex w-full min-w-0 grow-0 flex-col">
+          <ChatDisplay />
+          <div className="relative mb-theme flex w-full max-w-full grow-0 items-center justify-center">
+            <ChatInput />
+          </div>
+        </main>
       </div>
     </ChatHistoryProvider>
   );
 };
 
-export default Layout;
+export default ChatLayout;

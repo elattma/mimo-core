@@ -53,6 +53,8 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     updateSession(request, response, refreshSession);
   }
 
+  console.log(session.accessToken);
+
   // Reform the URL
   const { slug, ...query } = request.query;
   if (slug === undefined || typeof slug === "string")

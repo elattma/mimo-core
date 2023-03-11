@@ -1,3 +1,11 @@
+export interface Chat {
+  parent: string;
+  child: string;
+  author: string;
+  message: string;
+  timestamp: string;
+}
+
 export interface Item {
   source: string;
   type: string;

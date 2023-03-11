@@ -1,3 +1,4 @@
+import { mock_logRequest, mock_logResponse } from "@/lib/logs";
 import { NextRequest } from "next/server";
 
 const GET = async (request: NextRequest) => {
@@ -7,6 +8,7 @@ const GET = async (request: NextRequest) => {
       statusText: "This endpoint is only available in development",
     });
   }
+  mock_logRequest(request);
   const response = new Response(
     JSON.stringify([
       {
@@ -51,6 +53,7 @@ const GET = async (request: NextRequest) => {
       statusText: "OK",
     }
   );
+  mock_logResponse(response);
   return response;
 };
 
@@ -61,10 +64,12 @@ const POST = async (request: NextRequest) => {
       statusText: "This endpoint is only available in development",
     });
   }
+  mock_logRequest(request);
   const response = new Response(JSON.stringify({ message: "OK" }), {
     status: 200,
     statusText: "OK",
   });
+  mock_logResponse(response);
   return response;
 };
 

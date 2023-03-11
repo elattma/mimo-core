@@ -1,9 +1,19 @@
 /** @type {import('tailwindcss').Config} */
+
 const colors = require("tailwindcss/colors");
+const { fontFamily } = require("tailwindcss/defaultTheme");
+const plugin = require("tailwindcss/plugin");
 
 module.exports = {
   content: ["./app/**/*.{js,ts,jsx,tsx}", "./components/**/*.{js,ts,jsx,tsx}"],
   theme: {
+    container: {
+      center: true,
+      padding: "1.5rem",
+      screens: {
+        "2xl": "1440px",
+      },
+    },
     extend: {
       borderRadius: {
         theme: "4px",
@@ -225,6 +235,27 @@ module.exports = {
           "text-contrast": "hsl(var(--danger-12) / <alpha-value>)",
           "on-solid": colors.white,
         },
+        neutralA: {
+          1: "hsla(var(--neutralA-1))",
+          2: "hsla(var(--neutralA-2))",
+          3: "hsla(var(--neutralA-3))",
+          4: "hsla(var(--neutralA-4))",
+          5: "hsla(var(--neutralA-5))",
+          6: "hsla(var(--neutralA-6))",
+          7: "hsla(var(--neutralA-7))",
+          8: "hsla(var(--neutralA-8))",
+          9: "hsla(var(--neutralA-9))",
+          10: "hsla(var(--neutralA-10))",
+          11: "hsla(var(--neutralA-11))",
+          12: "hsla(var(--neutralA-12))",
+        },
+        overlay: {
+          hover: "hsla(var(--grayA-3))",
+          active: "hsla(var(--grayA-5))",
+        },
+      },
+      fontFamily: {
+        sans: ["var(--font-inter)", ...fontFamily.sans],
       },
       spacing: {
         128: "32rem",
@@ -237,5 +268,10 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require("tailwindcss-animate"),
+    plugin(function ({ addVariant }) {
+      addVariant("hocus", ["&:hover", "&:focus"]);
+    }),
+  ],
 };

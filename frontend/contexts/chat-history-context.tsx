@@ -1,31 +1,31 @@
 "use client";
 
+import { Chat } from "@/models";
+import { GetChatResponse } from "@/types/responses";
 import { ReactNode, createContext, useContext, useState } from "react";
 
-type User = "mimo" | "user";
-type Chat = {
-  message: string;
-  user: User;
-};
-type ChatHistory = Chat[];
+type ChatHistoryType = Chat[];
 type ChatHistoryContextType = {
-  chatHistory: ChatHistory;
-  addToChatHistory: (message: string, user: User) => void;
+  chatHistory: ChatHistoryType;
+  addToChatHistory: (chat: Chat) => void;
 };
 
 const ChatHistoryContext = createContext<ChatHistoryContextType | undefined>(
   undefined
 );
 
-interface Props {
+type Props = {
   children: ReactNode;
-}
+  initialChatHistory: GetChatResponse;
+};
 
-const ChatHistoryProvider = ({ children }: Props) => {
-  const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
+const ChatHistoryProvider = ({ children, initialChatHistory }: Props) => {
+  const [chatHistory, setChatHistory] = useState<ChatHistoryType>(
+    initialChatHistory.map((chat) => Chat.fromJSON(chat))
+  );
 
-  const addToChatHistory = (message: string, user: User) => {
-    setChatHistory((prev) => [...prev, { message, user }]);
+  const addToChatHistory = (chat: Chat) => {
+    setChatHistory((prev) => [...prev, chat]);
   };
 
   return (
@@ -44,4 +44,3 @@ const useChatHistoryContext = () => {
 };
 
 export { ChatHistoryProvider, useChatHistoryContext };
-export type { Chat };

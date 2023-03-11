@@ -1,27 +1,54 @@
-import type { Integration } from "@/types/mock";
+"use client";
 
-interface Props {
-  integrations: Integration[];
-}
+import { Integration } from "@/models";
+import { GetIntegrationResponse } from "@/types/responses";
+import { useEffect, useState } from "react";
+import IntegrationFilters from "./integration-filters";
+import IntegrationPanel from "./integration-panel";
 
-const Integrations = ({ integrations }: Props) => {
+type Props = {
+  integrationData: GetIntegrationResponse;
+};
+
+const Integrations = ({ integrationData }: Props) => {
+  const allIntegrations = integrationData.map((integration) => {
+    return Integration.fromJSON(integration);
+  });
+  const [integrations, setIntegrations] =
+    useState<Integration[]>(allIntegrations);
+  const [filterUnauthorized, setFilterUnauthorized] = useState<boolean>(true);
+  const [filterAuthorized, setFilterAuthorized] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (filterUnauthorized && filterAuthorized) {
+      setIntegrations(allIntegrations);
+    } else if (filterUnauthorized) {
+      setIntegrations(
+        allIntegrations.filter((integration) => !integration.authorized)
+      );
+    } else if (filterAuthorized) {
+      setIntegrations(
+        allIntegrations.filter((integration) => integration.authorized)
+      );
+    } else {
+      setIntegrations([]);
+    }
+  }, [filterUnauthorized, filterAuthorized]);
+
   return (
-    <div>
-      {integrations.map((integration, index) => {
-        const state = Buffer.from(
-          JSON.stringify({
-            integrationId: integration.id,
-          })
-        ).toString("base64");
-        const href = `${integration.oauth2_link}&redirect_uri=${process.env.NEXT_PUBLIC_BASE_URL}/auth&state=${state}`;
-        return (
-          <div key={`integration-${index}`}>
-            <p>{integration.name}</p>
-            <p>{integration.description}</p>
-            <a href={href}>Click to connect</a>
-          </div>
-        );
-      })}
+    <div className="flex space-x-theme">
+      <IntegrationFilters
+        setFilterUnauthorized={setFilterUnauthorized}
+        setFilterAuthorized={setFilterAuthorized}
+      />
+      <div className="flex grow gap-theme">
+        {integrations.map((integration, index) => (
+          <IntegrationPanel
+            integration={integration}
+            key={`integration-${index}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

@@ -1,3 +1,7 @@
+[virtualenvs]
+create = true
+in-project = true
+
 [tool.poetry]
 name = "app"
 version = "0.1.0"
