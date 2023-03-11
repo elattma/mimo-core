@@ -57,77 +57,32 @@ def handler(event: dict, context):
 
     # TODO: fetch relevant context from selected items or knowledge base and use as context to prompt
     # TODO: hacky, move to other lambda/api under item. or somewhere else that's actually scalable enough to do this
-    context_summary: List[str] = []
+    summary: str = None
     if items is not None and len(items) > 0:
-        user_integration_items: List[UserIntegrationItem] = db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
-
-        for item in items:
-            item_integration: str = item.get('integration', None) if item else None
-            item_params: dict = item.get('params', None) if item else None
-            if not (item_integration and item_params):
-                print('missing integration or params.. skipping!')
-                continue
-
-            client_id = secrets.get(f'{item_integration}/CLIENT_ID')
-            client_secret = secrets.get(f'{item_integration}/CLIENT_SECRET')
-
-            fetcher: Fetcher = None
-
-            # TODO: optimize
-            if item_integration == 'upload':
-                fetcher = Fetcher.create(item_integration, {
-                    'bucket': upload_item_bucket,
-                    'prefix': f'{user}/'
-                })
-            else: 
-                for user_integration_item in user_integration_items:
-                    if user_integration_item.get_raw_child() == item_integration:
-                        fetcher = Fetcher.create(item_integration, {
-                            'client_id': client_id,
-                            'client_secret': client_secret,
-                            'access_token': user_integration_item.access_token,
-                            'refresh_token': user_integration_item.refresh_token,
-                            'expiry_timestamp': user_integration_item.expiry_timestamp
-                        })
-                        break
-            
-            if not fetcher:
-                print('no fetcher found.. skipping!')
-                continue
-
-            for param in item_params:
-                if not (param or param.get('id', None)):
-                    print('missing id.. skipping!')
-                    continue
+        pass # query KG/vdb for context
                 
-                data = fetcher.fetch(id=param['id'])
-                if not data:
-                    print(f'no data found for {item_integration}.. skipping!')
-                    continue
-
-                context_summary.extend([chunk.content for chunk in data.chunks])
-                
-    summary: str = ''
-    if len(context_summary) > 0:
-        while len(context_summary) > 1:
-            slice_index = min(5, len(context_summary))
-            messages = [{ 'role': 'system', 'content': 'You are an assistant who summarizes.' }]
-            messages.extend([{ 'role': 'user', 'content': context } for context in context_summary[:slice_index]])
-            messages.append({ 'role': 'user', 'content': 'Summarize the above context in a few sentences.'})
-            response = ChatCompletion.create(
-                api_key=openai_api_key,
-                model=MODEL,
-                messages=messages,
-                temperature=0
-            )
-            choices = response.get('choices', None) if response else None
-            choice = choices[0] if choices and len(choices) > 0 else None
-            choice_message = choice.get('message', None) if choice else None
-            content = choice_message.get('content', None) if choice_message else None
-            if content:
-                context_summary.append(content)
-            context_summary = context_summary[slice_index:]
-        summary = context_summary[0]
+        # transform context meaningfully
+        # summary: str = ''
+        # if len(context_summary) > 0:
+        #     while len(context_summary) > 1:
+        #         slice_index = min(5, len(context_summary))
+        #         messages = [{ 'role': 'system', 'content': 'You are an assistant who summarizes.' }]
+        #         messages.extend([{ 'role': 'user', 'content': context } for context in context_summary[:slice_index]])
+        #         messages.append({ 'role': 'user', 'content': 'Summarize the above context in a few sentences.'})
+        #         response = ChatCompletion.create(
+        #             api_key=openai_api_key,
+        #             model=MODEL,
+        #             messages=messages,
+        #             temperature=0
+        #         )
+        #         choices = response.get('choices', None) if response else None
+        #         choice = choices[0] if choices and len(choices) > 0 else None
+        #         choice_message = choice.get('message', None) if choice else None
+        #         content = choice_message.get('content', None) if choice_message else None
+        #         if content:
+        #             context_summary.append(content)
+        #         context_summary = context_summary[slice_index:]
+        #     summary = context_summary[0]
 
     messages = [{ 'role': 'system', 'content': 'You are a helpful assistant.' }]
     if summary:

@@ -46,7 +46,7 @@ class Fetcher(ABC):
     # TODO: add last sync time to filter only updated documents
 
     @classmethod
-    def create(cls, integration, auth_params: dict):
+    def create(cls, integration, auth_params: dict, **kwargs):
         if not cls.subclasses:
             cls.subclasses = {subclass._INTEGRATION: subclass for subclass in cls.__subclasses__()}
 
@@ -59,8 +59,12 @@ class Fetcher(ABC):
         if fetcher_auth_overrides:
             auth_params.update(fetcher_auth_overrides)
         fetcher.define_auth(fetcher.get_auth_type(), **auth_params)
+        fetcher.init(**kwargs)
         
         return fetcher
+
+    def init(self, last_fetch_timestamp: int = None):
+        self.last_fetch_timestamp = last_fetch_timestamp
 
     def define_auth(self, auth_type: str, **kwargs):
         self.auth = Auth.create(auth_type, **kwargs)

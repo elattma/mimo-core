@@ -46,16 +46,16 @@ class GoogleMail(Fetcher):
             print('failed to get google mail')
             return None
         
-        next_token = discovery_response.get('nextPageToken')
-        messages = discovery_response['messages']
+        next_token = discovery_response.get('nextPageToken', None) if discovery_response else None
+        messages = discovery_response.get('messages', None) if discovery_response else None
 
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
             icon=self.get_icon(),
             items=[Item(
-                id=message.get('id', None),
-                title=message.get('snippet', None),
-                link=f'https://mail.google.com/mail/u/0/#search/rfc822msgid:{message["id"]}',
+                id=message.get('id', None) if message else None,
+                title=message.get('snippet', None) if message else None,
+                link=f'https://mail.google.com/mail/u/0/#search/rfc822msgid:{message["id"]}' if ,
                 preview=None
             ) for message in messages],
             next_token=next_token
@@ -90,7 +90,8 @@ class GoogleMail(Fetcher):
             text = base64.urlsafe_b64decode(data + '=' * (4 - len(data) % 4)) if data else None
             if text:
                 print(text)
-                chunks.append(Chunk(content=data))
+                print(body.get('mimeType', None) if body else 'no body')
+                chunks.append(Chunk(content=text))
 
             parts = part.get('parts', None)
             if parts:

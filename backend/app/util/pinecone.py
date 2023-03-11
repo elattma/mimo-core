@@ -1,4 +1,3 @@
-from time import time
 from typing import List
 
 import pinecone
@@ -51,11 +50,10 @@ class Pinecone:
                 return False
         return True
 
-    def upsert(self, documents: List[Document], user: str, index_name: str = None):
+    def upsert(self, documents: List[Document], user: str, timestamp: str):
         if not (self.index and user and documents and len(documents) > 0):
             return None
         vectors = []
-        timestamp = int(time())
         for document in documents:
             for consists_of in document.consists_of:
                 vectors.append({
@@ -71,3 +69,19 @@ class Pinecone:
         deleted = self._delete_old_vectors(user=user, document_ids=[document.id for document in documents])
         upserted = self._batched_upsert(vectors=vectors)
         return upserted and deleted
+    
+    def query(self, embedding: List[float], user: str, k: int = 5):
+        if not (self.index and embedding and len(embedding) > 0):
+            return None
+        query_response = self.index.query(
+            vector=embedding,
+            top_k=k,
+            filter={
+                'user': user,
+            },
+            include_metadata=True,
+            include_values=True
+        )
+
+        print(query_response)
+        return query_response

@@ -1,7 +1,6 @@
-from time import time
-from typing import List
+from typing import Any, List
 
-from app.graph.blocks import Document
+from app.graph.blocks import Chunk, Document, QueryFilter
 from neo4j import GraphDatabase
 
 
@@ -14,13 +13,13 @@ class GraphDB:
     def close(self):
         self.driver.close()
 
-    def create_documents(self, documents: List[Document]):
+    def create_documents(self, documents: List[Document], user: str, timestamp: int):
         with self.driver.session(database='neo4j') as session:
-            result = session.execute_write(self._create_document, documents, timestamp=int(time()))
+            result = session.execute_write(self._create_document, documents, user, timestamp=timestamp)
         print(result)
 
     @staticmethod
-    def _create_document(tx, documents: List[Document], timestamp: int):
+    def _create_document(tx, documents: List[Document], user: str, timestamp: int):
         if not documents or len(documents) < 1:
             return None
         
@@ -29,9 +28,9 @@ class GraphDB:
 
         query = (
             'UNWIND $documents as document '
-            'MERGE (d: Document {id: document.id}) '
+            'MERGE (d: Document {id: document.id, integration: document.integration, user: $user}) '
             'ON CREATE '
-                'SET d.integration = document.integration, d.timestamp = $timestamp '
+                'SET d.timestamp = $timestamp '
             'ON MATCH '
                 'SET d.timestamp = $timestamp '
                 'WITH d, document '
@@ -42,7 +41,7 @@ class GraphDB:
                 '} ' 
             'WITH document, d '
             'UNWIND document.chunks as chunk '
-            'MERGE (c: Chunk {id: chunk.id}) '
+            'MERGE (c: Chunk {id: chunk.id, user: $user}) '
             'ON CREATE '
                 'SET c.content = chunk.content, c.type = chunk.type, c.timestamp = $timestamp '
             'ON MATCH '
@@ -51,7 +50,7 @@ class GraphDB:
             'MERGE (c)<-[:CONSISTS_OF]-(d) '
             'WITH chunk, c '
             'UNWIND chunk.propernouns as propernoun '
-            'MERGE (p: ProperNoun {id: propernoun.id}) '
+            'MERGE (p: ProperNoun {id: propernoun.id, user: $user}) '
             'ON CREATE '
                 'SET p.type = propernoun.type, p.timestamp = $timestamp '
             'ON MATCH '
@@ -60,30 +59,48 @@ class GraphDB:
             'MERGE (p)<-[:REFERENCES]-(c) '
         )
 
-        result = tx.run(query, documents=neo4j_documents, timestamp=timestamp)
+        result = tx.run(query, documents=neo4j_documents, timestamp=timestamp, user=user)
         print(result)
         return result
+
+    def get_chunks(self, query_filter: QueryFilter) -> Any:
+        with self.driver.session(database='neo4j') as session:
+            result = session.read_transaction(self._get_chunks_by_filter, query_filter)
+        return result
+
+    @staticmethod
+    def _get_chunks_by_filter(tx, query_filter: QueryFilter) -> List[Chunk]:
+        if not query_filter or not query_filter.user:
+            return None
         
+        query_wheres = []
+        if query_filter.user:
+            query_wheres.append('d.user = user, c.user = user, p.user = user')
         
-    
-    CONSTRAINTS = '''
-    CREATE CONSTRAINT document_uniqueness IF NOT EXISTS
-    FOR (d:Document) 
-    REQUIRE (d.id) IS UNIQUE;
+        if query_filter.document_filter:
+            if query_filter.document_filter.ids:
+                query_wheres.append(f'd.id IN {query_filter.document_filter.ids}')
+            if query_filter.document_filter.integrations:
+                query_wheres.append(f'd.integration IN {query_filter.document_filter.integrations}')
 
-    CREATE CONSTRAINT chunk_uniqueness IF NOT EXISTS
-    FOR (c:Chunk)
-    REQUIRE (c.id) IS UNIQUE;
+        if query_filter.chunk_filter:
+            if query_filter.chunk_filter.ids:
+                query_wheres.append(f'c.id IN {query_filter.chunk_filter.ids}')
+            if query_filter.chunk_filter.types:
+                query_wheres.append(f'c.type IN {query_filter.chunk_filter.types}')
+                
+        if query_filter.propernoun_filter:
+            if query_filter.propernoun_filter.ids:
+                query_wheres.append(f'p.id IN {query_filter.propernoun_filter.ids}')
+            if query_filter.propernoun_filter.types:
+                query_wheres.append(f'p.type IN {query_filter.propernoun_filter.types}')
 
-    CREATE CONSTRAINT document_id_existence IF NOT EXISTS
-    FOR (d:Document)
-    REQUIRE (d.id) IS NOT NULL;
+        if len(query_wheres) < 1:
+            return None
 
-    CREATE CONSTRAINT document_integration_existence IF NOT EXISTS
-    FOR (d:Document)
-    REQUIRE (d.integration) IS NOT NULL;
-
-    CREATE CONSTRAINT document_timestamp_existence IF NOT EXISTS
-    FOR (d:Document)
-    REQUIRE (d.timestamp) IS NOT NULL;
-    '''
+        query = (
+            'MATCH (d: Document)-[co:CONSISTS_OF]->(c: Chunk)-[r:REFERENCES]->(p: ProperNoun) '
+            f'WHERE {", ".join(query_wheres)} '
+            'RETURN d, c, p, co, r '
+        )
+        return tx.run(query, user=query_filter.user)

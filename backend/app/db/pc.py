@@ -1,5 +1,4 @@
 import json
-from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
@@ -19,7 +18,7 @@ class Roles(Enum):
     ASSISTANT = "assistant"
 
 @dataclass
-class ParentChildItem(ABC):
+class ParentChildItem:
     parent: str
     child: str
 
@@ -47,6 +46,7 @@ class UserIntegrationItem(ParentChildItem):
     refresh_token: str
     timestamp: int
     expiry_timestamp: int
+    last_fetch_timestamp: int = None
 
 class ParentChildDB:
     table = None
@@ -64,6 +64,27 @@ class ParentChildDB:
             print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
+
+    # TODO: generalize
+    def update(self, items: List[ParentChildItem], **kwargs):
+        if not kwargs or len(kwargs) < 1:
+            return
+        update_expression = ', '.join([f'{key} = :{key}' for key in kwargs.keys()])
+        expression_attribute_values = {f':{key}': value for key, value in kwargs.items()}
+        for item in items:
+            try:
+                self.table.update_item(
+                    Key={
+                        'parent': item.parent,
+                        'child': item.child
+                    },
+                    UpdateExpression=f'set {update_expression}',
+                    ExpressionAttributeValues=expression_attribute_values
+                )
+            except ClientError as err:
+                print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
+                    err.response['Error']['Code'], err.response['Error']['Message'])
+                raise
 
     def query(self, parent: str, child_namespace: str, **kwargs):
         try:

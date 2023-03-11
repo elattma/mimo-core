@@ -1,6 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any, List, Set
 
 
 @dataclass
@@ -42,7 +42,7 @@ class Chunk(Node):
     embedding: List[float]
     content: str
     type: str
-    references: List[REFERENCES]
+    references: List[REFERENCES]  
 
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
@@ -69,4 +69,26 @@ class Document(Node):
             'chunks': [chunk.target.to_neo4j_map() for chunk in self.consists_of]
         })
         return map
-    
+
+@dataclass
+class DocumentFilter:
+    ids: Set[str] = None
+    integrations: Set[str] = None
+
+@dataclass
+class ChunkFilter:
+    ids: Set[str] = None
+    types: Set[str] = None
+
+@dataclass
+class ProperNounFilter:
+    ids: Set[str] = None
+    types: Set[str] = None
+
+@dataclass
+class QueryFilter():
+    user: str
+    document_filter: DocumentFilter
+    chunk_filter: ChunkFilter
+    propernoun_filter: ProperNounFilter
+    #TODO add edge filters

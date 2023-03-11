@@ -1,4 +1,5 @@
-from typing import Any, List
+from datetime import datetime
+from typing import List
 
 import requests
 from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
@@ -23,11 +24,22 @@ class GoogleDocs(Fetcher):
         if not succeeded:
             print('failed to refresh google docs token')
             return None
+        discover_filters = ['mimeType="application/vnd.google-apps.document"', 'trashed=false']
+        if self.last_fetch_timestamp:
+            date = datetime.fromtimestamp(self.last_fetch_timestamp)
+            formatted_time = date.strftime('%Y-%m-%dT%H:%M:%S')
+            discover_filters.append(f'(modifiedTime > "{formatted_time}" or sharedWithMeTime > "{formatted_time}")')
+        params = {
+            'q': ' and '.join(discover_filters)
+        }
+        if filter:
+            if filter.next_token:
+                params.update({
+                    'pageToken': filter.next_token,
+                })
         response = requests.get(
             'https://www.googleapis.com/drive/v3/files',
-            params={
-                'q': 'mimeType="application/vnd.google-apps.document" and trashed=false'
-            },
+            params=params,
             headers={
                 'Authorization': f'Bearer {self.auth.access_token}'
             }
@@ -38,18 +50,19 @@ class GoogleDocs(Fetcher):
             print('failed to get google docs')
             return None
         
-        next_token = discovery_response.get('nextPageToken')
-        files = discovery_response['files']
+        next_token = discovery_response.get('nextPageToken', None)
+        files = discovery_response.get('files', None)
+        items = [Item(
+            id=file.get('id', None) if file else None,
+            title=file.get('name', None) if file else None,
+            link=f'https://docs.google.com/document/d/{file.get("id", None)}' if file else None,
+            preview=file.get('thumbnailLink', None)) if file else None
+        for file in files] if files else []
 
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
             icon=self.get_icon(),
-            items=[Item(
-                id=file.get('id', None), 
-                title=file.get('name', None), 
-                link=f'https://docs.google.com/document/d/{file.get("id", None)}', 
-                preview=file.get('thumbnailLink', None)) 
-            for file in files],
+            items=items,
             next_token=next_token
         )
 
