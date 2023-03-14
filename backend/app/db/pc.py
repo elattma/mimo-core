@@ -42,10 +42,10 @@ class UserChatItem(ParentChildItem):
 
 @dataclass
 class UserIntegrationItem(ParentChildItem):
-    access_token: str
-    refresh_token: str
-    timestamp: int
-    expiry_timestamp: int
+    access_token: str = None
+    refresh_token: str = None
+    timestamp: int = None
+    expiry_timestamp: int = None
     last_fetch_timestamp: int = None
 
 class ParentChildDB:
@@ -69,7 +69,8 @@ class ParentChildDB:
     def update(self, items: List[ParentChildItem], **kwargs):
         if not kwargs or len(kwargs) < 1:
             return
-        update_expression = ', '.join([f'{key} = :{key}' for key in kwargs.keys()])
+        update_expression = ', '.join([f'#{key} = :{key}' for key in kwargs.keys()])
+        expression_attribute_names = {f'#{key}': key for key in kwargs.keys()}
         expression_attribute_values = {f':{key}': value for key, value in kwargs.items()}
         for item in items:
             try:
@@ -79,7 +80,8 @@ class ParentChildDB:
                         'child': item.child
                     },
                     UpdateExpression=f'set {update_expression}',
-                    ExpressionAttributeValues=expression_attribute_values
+                    ExpressionAttributeNames=expression_attribute_names,
+                    ExpressionAttributeValues=expression_attribute_values,
                 )
             except ClientError as err:
                 print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,

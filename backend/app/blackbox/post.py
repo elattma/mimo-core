@@ -34,19 +34,24 @@ def handler(event: dict, context):
 
     user_integration_items: List[UserIntegrationItem] = db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
     fetchers: List[Fetcher] = []
+    upload_item = None
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
-            fetchers.append(Fetcher.create(item.get_raw_child(), {
-                'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
-                'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
-                'access_token': item.access_token,
-                'refresh_token': item.refresh_token,
-                'expiry_timestamp': item.expiry_timestamp
-            }), last_fetch_timestamp=item.last_fetch_timestamp)
+            integration = item.get_raw_child()
+            if integration and integration == 'upload':
+                upload_item = item
+            else:
+                fetchers.append(Fetcher.create(item.get_raw_child(), {
+                    'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
+                    'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
+                    'access_token': item.access_token,
+                    'refresh_token': item.refresh_token,
+                    'expiry_timestamp': item.expiry_timestamp
+                }, last_fetch_timestamp=item.last_fetch_timestamp))
     fetchers.append(Fetcher.create('upload', {
         'bucket': upload_item_bucket,
         'prefix': f'{user}/'
-    }))
+    }, last_fetch_timestamp=upload_item.last_fetch_timestamp if upload_item else None))
 
     timestamp = int(time())
     graph_db = GraphDB(uri=graph_db_uri, user=secrets.get('GRAPH_DB_KEY'), password=secrets.get('GRAPH_DB_SECRET'))
@@ -63,6 +68,7 @@ def handler(event: dict, context):
             response_item = future.result()
             if response_item:
                 index_responses.append(response_item)
+    graph_db.close()
     
     if len(index_responses) > 0:
         db_update_items = []
@@ -72,7 +78,7 @@ def handler(event: dict, context):
                     parent=f'{KeyNamespaces.USER.value}{user}',
                     child=f'{KeyNamespaces.INTEGRATION.value}{response.integration}',
                 ))
-        db.update(db_update_items, timestamp=timestamp)
+        db.update(db_update_items, timestamp=timestamp, last_fetch_timestamp=timestamp)
 
     return to_response_success({})
 
@@ -91,10 +97,10 @@ def discover_fetch_embed_load(user: str, fetcher: Fetcher, db: GraphDB, pinecone
         while True:
             # TODO: add pagination
             discovery_response = fetcher.discover()
-            next_token = discovery_response.next_token
             documents: List[Document] = []
             if not (discovery_response and discovery_response.items):
                 return False
+            next_token = discovery_response.next_token
             for item in discovery_response.items:
                 fetch_response: FetchResponse = fetcher.fetch(item.id)
                 if fetch_response:
@@ -118,9 +124,14 @@ def discover_fetch_embed_load(user: str, fetcher: Fetcher, db: GraphDB, pinecone
                     consists_of=[CONSISTS_OF(target=chunk) for chunk in chunks]
                 )
                 documents.append(document)
+                break
 
             pinecone_response = pinecone.upsert(documents=documents, user=user, timestamp=timestamp)
             response = db.create_documents(documents=documents, user=user, timestamp=timestamp)
+            if not (pinecone_response and response):
+                print('failed write response!')
+                print(response)
+                print(pinecone_response)
             if not next_token:
                 break
     except Exception as e:

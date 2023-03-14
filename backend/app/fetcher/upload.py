@@ -3,7 +3,7 @@ from typing import List
 
 import boto3
 import nltk
-from app.fetcher.base import (DiscoveryResponse, Fetcher, FetchResponse,
+from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
                               Filter, Item)
 
 nltk.data.path.append('./nltk_data/')
@@ -64,16 +64,16 @@ class Upload(Fetcher):
         )
 
     def fetch(self, id: str) -> FetchResponse:
-        with tempfile.NamedTemporaryFile(mode='w') as temporary_file:
+        with tempfile.NamedTemporaryFile() as temporary_file:
             self.s3_client.download_fileobj(
                 Bucket=self.auth.bucket,
                 Key=id,
-                Fileobj=temporary_file
+                Fileobj=temporary_file,
             )
             temporary_file.seek(0)
             elements = partition(file=temporary_file)
-            
-        chunks = self.merge_split_chunks([str(element) for element in elements])
+        
+        chunks = self.merge_split_chunks([Chunk(content=str(element)) for element in elements])
 
         return FetchResponse(
             integration=self._INTEGRATION,

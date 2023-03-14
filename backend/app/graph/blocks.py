@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, List, Set
 
@@ -13,6 +13,15 @@ class Node(ABC):
     id: Any
     user: str
 
+    @staticmethod
+    @abstractmethod
+    def get_index_properties():
+        pass
+
+    @staticmethod
+    def get_index_keys():
+        return ['id']
+
     def to_neo4j_map(self):
         return {
             'id': self.id,
@@ -25,6 +34,10 @@ class Edge(ABC):
 @dataclass
 class ProperNoun(Node):
     type: str
+
+    @staticmethod
+    def get_index_properties():
+        return ['type']
 
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
@@ -42,7 +55,11 @@ class Chunk(Node):
     embedding: List[float]
     content: str
     type: str
-    references: List[REFERENCES]  
+    references: List[REFERENCES]
+
+    @staticmethod
+    def get_index_properties():
+        return ['content', 'type']
 
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
@@ -61,6 +78,14 @@ class CONSISTS_OF(Edge):
 class Document(Node):
     integration: str
     consists_of: List[CONSISTS_OF]
+
+    @staticmethod
+    def get_index_keys():
+        return super(Document, Document).get_index_keys() + ['integration']
+    
+    @staticmethod
+    def get_index_properties():
+        return []
 
     def to_neo4j_map(self):
         map = super().to_neo4j_map()

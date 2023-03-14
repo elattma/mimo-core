@@ -1,6 +1,6 @@
 from typing import Any, List
 
-from app.graph.blocks import Chunk, Document, QueryFilter
+from app.graph.blocks import Chunk, Document, ProperNoun, QueryFilter
 from neo4j import GraphDatabase
 
 
@@ -15,52 +15,77 @@ class GraphDB:
 
     def create_documents(self, documents: List[Document], user: str, timestamp: int):
         with self.driver.session(database='neo4j') as session:
-            result = session.execute_write(self._create_document, documents, user, timestamp=timestamp)
-        print(result)
-
+            result = session.execute_write(self._create_documents, documents, user, timestamp=timestamp)
+        return result
+    
     @staticmethod
-    def _create_document(tx, documents: List[Document], user: str, timestamp: int):
-        if not documents or len(documents) < 1:
-            return None
-        
-        neo4j_documents = [document.to_neo4j_map() for document in documents]
-        print(neo4j_documents)
-
-        query = (
-            'UNWIND $documents as document '
-            'MERGE (d: Document {id: document.id, integration: document.integration, user: $user}) '
+    def _get_document_merge(document: Document):
+        merge_object = ', '.join([f'{key}: document.{key}' for key in (document.get_index_keys())]) + ', user: $user'
+        index_properties = document.get_index_properties()
+        if index_properties and len(index_properties) > 0:
+            set_object = ', '.join([f'd.{key} = document.{key}' for key in (document.get_index_properties())]) + ', d.timestamp = $timestamp'
+        else:
+            set_object = 'd.timestamp = $timestamp'
+        return (
+            f'MERGE (d: Document {{{merge_object}}}) '
             'ON CREATE '
-                'SET d.timestamp = $timestamp '
+                f'SET {set_object} '
             'ON MATCH '
-                'SET d.timestamp = $timestamp '
+                f'SET {set_object} '
                 'WITH d, document '
                 'CALL { '
                     'WITH d '
                     'MATCH (d)-[]-(dc: Chunk) '
                     'DETACH DELETE dc '
                 '} ' 
-            'WITH document, d '
-            'UNWIND document.chunks as chunk '
-            'MERGE (c: Chunk {id: chunk.id, user: $user}) '
+        )
+    
+    @staticmethod
+    def _get_chunk_merge():
+        merge_object = ', '.join([f'{key}: chunk.{key}' for key in (Chunk.get_index_keys())]) + ', user: $user'
+        set_object = ', '.join([f'c.{key} = chunk.{key}' for key in (Chunk.get_index_properties())]) + ', c.timestamp = $timestamp'
+        return (
+            f'MERGE (c: Chunk {{{merge_object}}}) '
             'ON CREATE '
-                'SET c.content = chunk.content, c.type = chunk.type, c.timestamp = $timestamp '
+                f'SET {set_object} '
             'ON MATCH '
-                'SET c.content = chunk.content, c.type = chunk.type, c.timestamp = $timestamp '
+                f'SET {set_object} '
             'WITH c, d, chunk '
             'MERGE (c)<-[:CONSISTS_OF]-(d) '
-            'WITH chunk, c '
-            'UNWIND chunk.propernouns as propernoun '
-            'MERGE (p: ProperNoun {id: propernoun.id, user: $user}) '
+        )
+    
+    @staticmethod
+    def _get_propernoun_merge():
+        merge_object = ', '.join([f'{key}: propernoun.{key}' for key in (ProperNoun.get_index_keys())]) + ', user: $user'
+        set_object = ', '.join([f'p.{key} = propernoun.{key}' for key in (ProperNoun.get_index_properties())]) + ', p.timestamp = $timestamp'
+        return (
+            f'MERGE (p: ProperNoun {{{merge_object}}}) '
             'ON CREATE '
-                'SET p.type = propernoun.type, p.timestamp = $timestamp '
+                f'SET {set_object} '
             'ON MATCH '
-                'SET p.type = propernoun.type, p.timestamp = $timestamp '
+                f'SET {set_object} '
             'WITH c, p '
             'MERGE (p)<-[:REFERENCES]-(c) '
         )
 
+    @staticmethod
+    def _create_documents(tx, documents: List[Document], user: str, timestamp: int):
+        if not documents or len(documents) < 1:
+            return None
+        
+        query = (
+            'UNWIND $documents as document '
+            f'{GraphDB._get_document_merge(documents[0])}'
+            'WITH document, d '
+            'UNWIND document.chunks as chunk '
+            f'{GraphDB._get_chunk_merge()}'
+            'WITH chunk, c '
+            'UNWIND chunk.propernouns as propernoun '
+            f'{GraphDB._get_propernoun_merge()}'
+        )
+
+        neo4j_documents = [document.to_neo4j_map() for document in documents]
         result = tx.run(query, documents=neo4j_documents, timestamp=timestamp, user=user)
-        print(result)
         return result
 
     def get_chunks(self, query_filter: QueryFilter) -> Any:

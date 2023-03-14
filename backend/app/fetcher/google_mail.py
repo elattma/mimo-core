@@ -1,9 +1,11 @@
 import base64
+import re
 from typing import List
 
 import requests
 from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
                               Filter, Item)
+from unstructured.partition.email import partition_email
 
 
 class GoogleMail(Fetcher):
@@ -55,7 +57,7 @@ class GoogleMail(Fetcher):
             items=[Item(
                 id=message.get('id', None) if message else None,
                 title=message.get('snippet', None) if message else None,
-                link=f'https://mail.google.com/mail/u/0/#search/rfc822msgid:{message["id"]}' if ,
+                link=f'https://mail.google.com/mail/u//#inbox/{message["id"]}' if message else None,
                 preview=None
             ) for message in messages],
             next_token=next_token
@@ -88,10 +90,11 @@ class GoogleMail(Fetcher):
             body = part.get('body', None)
             data = body.get('data', None) if body else None
             text = base64.urlsafe_b64decode(data + '=' * (4 - len(data) % 4)) if data else None
+            text = text.decode('utf-8') if text else None
             if text:
-                print(text)
-                print(body.get('mimeType', None) if body else 'no body')
-                chunks.append(Chunk(content=text))
+                mime_type = part.get('mimeType', None) if part else None
+                if mime_type and mime_type.startswith('text/plain'):
+                    chunks.append(Chunk(content=text))
 
             parts = part.get('parts', None)
             if parts:
@@ -101,5 +104,6 @@ class GoogleMail(Fetcher):
 
         return FetchResponse(
             integration=self._INTEGRATION,
-            chunks=self.merge_split_chunks(chunks=chunks)
+            chunks=self.merge_split_chunks(chunks)
         )
+    

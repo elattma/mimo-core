@@ -3,6 +3,7 @@ node_modules
 !.vscode/settings.json.default
 .DS_Store
 /backend/dist*
+**pycache**
 
 /infrastructure/*.js
 /infrastructure/!jest.config.js
