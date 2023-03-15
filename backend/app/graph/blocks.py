@@ -1,17 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, Set
+from typing import List, Set
 
-
-@dataclass
-class Access:
-    id: str
-    type: str
 
 @dataclass
 class Node(ABC):
-    id: Any
-    user: str
+    id: str
 
     @staticmethod
     @abstractmethod
@@ -30,44 +24,21 @@ class Node(ABC):
 @dataclass
 class Edge(ABC):
     pass
- 
-@dataclass
-class ProperNoun(Node):
-    type: str
-
-    @staticmethod
-    def get_index_properties():
-        return ['type']
-
-    def to_neo4j_map(self):
-        map = super().to_neo4j_map()
-        map.update({
-            'type': self.type
-        })
-        return map
-
-@dataclass
-class REFERENCES(Edge):
-    target: ProperNoun
 
 @dataclass
 class Chunk(Node):
     embedding: List[float]
     content: str
-    type: str
-    references: List[REFERENCES]
+    height: int
 
     @staticmethod
     def get_index_properties():
-        return ['content', 'type']
+        return ['content', 'height']
 
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
-        map.update({
-            'content': self.content,
-            'type': self.type,
-            'propernouns': [ref.target.to_neo4j_map() for ref in self.references]
-        })
+        map['content'] = self.content
+        map['height'] = self.height
         return map
 
 @dataclass
@@ -89,31 +60,74 @@ class Document(Node):
 
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
-        map.update({
-            'integration': self.integration,
-            'chunks': [chunk.target.to_neo4j_map() for chunk in self.consists_of]
-        })
+        map['integration'] = self.integration
+        map['chunks'] = [consist_of.target.to_neo4j_map() for consist_of in self.consists_of]
         return map
 
 @dataclass
 class DocumentFilter:
     ids: Set[str] = None
     integrations: Set[str] = None
+    time_range: tuple[int, int] = None
 
 @dataclass
 class ChunkFilter:
     ids: Set[str] = None
-    types: Set[str] = None
+    height: Set[str] = None
+    time_range: tuple[int, int] = None
 
 @dataclass
-class ProperNounFilter:
+class EntityFilter:
     ids: Set[str] = None
     types: Set[str] = None
 
 @dataclass
+class PredicateFilter:
+    ids: Set[str] = None
+    texts: Set[str] = None
+
+@dataclass
 class QueryFilter():
-    user: str
-    document_filter: DocumentFilter
-    chunk_filter: ChunkFilter
-    propernoun_filter: ProperNounFilter
-    #TODO add edge filters
+    owner: str
+    document_filter: DocumentFilter = None
+    chunk_filter: ChunkFilter = None
+    entity_filter: EntityFilter = None
+    predicate_filter: PredicateFilter = None
+
+@dataclass
+class PREDICATES(Edge):
+    id: str
+    embedding: List[float]
+    text: str
+    chunk: str
+    document: str
+    target: Node
+
+    def to_neo4j_map(self):
+        return {
+            'id': self.id,
+            'text': self.text,
+            'chunk': self.chunk,
+            'document': self.document,
+            'target': self.target.to_neo4j_map(),
+        }
+    
+@dataclass
+class Entity(Node):
+    type: str
+    predicates: List[PREDICATES] = None
+
+    @staticmethod
+    def get_index_keys():
+        return super(Document, Document).get_index_keys() + ['type']
+
+    @staticmethod
+    def get_index_properties():
+        return ['type']
+
+    def to_neo4j_map(self):
+        map = super().to_neo4j_map()
+        map['type'] = self.type
+        if self.predicates:
+            map['predicates'] = [predicate.to_neo4j_map() for predicate in self.predicates]
+        return map

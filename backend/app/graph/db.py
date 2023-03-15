@@ -1,6 +1,6 @@
 from typing import Any, List
 
-from app.graph.blocks import Chunk, Document, ProperNoun, QueryFilter
+from app.graph.blocks import Chunk, Document, Entity, QueryFilter
 from neo4j import GraphDatabase
 
 
@@ -13,17 +13,17 @@ class GraphDB:
     def close(self):
         self.driver.close()
 
-    def create_documents(self, documents: List[Document], user: str, timestamp: int):
+    def create_entities(self, entities: List[Entity], documents: List[Document], owner: str, timestamp: int):
         with self.driver.session(database='neo4j') as session:
-            result = session.execute_write(self._create_documents, documents, user, timestamp=timestamp)
+            result = session.execute_write(self._create_entities, entities, documents, owner, timestamp=timestamp)
         return result
     
     @staticmethod
-    def _get_document_merge(document: Document):
-        merge_object = ', '.join([f'{key}: document.{key}' for key in (document.get_index_keys())]) + ', user: $user'
-        index_properties = document.get_index_properties()
+    def _get_document_merge():
+        merge_object = ', '.join([f'{key}: document.{key}' for key in (Document.get_index_keys())]) + ', owner: $owner'
+        index_properties = Document.get_index_properties()
         if index_properties and len(index_properties) > 0:
-            set_object = ', '.join([f'd.{key} = document.{key}' for key in (document.get_index_properties())]) + ', d.timestamp = $timestamp'
+            set_object = ', '.join([f'd.{key} = document.{key}' for key in (Document.get_index_properties())]) + ', d.timestamp = $timestamp'
         else:
             set_object = 'd.timestamp = $timestamp'
         return (
@@ -35,14 +35,14 @@ class GraphDB:
                 'WITH d, document '
                 'CALL { '
                     'WITH d '
-                    'MATCH (d)-[]-(dc: Chunk) '
-                    'DETACH DELETE dc '
+                    'MATCH (d)-[]-(c: Chunk) '
+                    'DETACH DELETE c '
                 '} ' 
         )
     
     @staticmethod
     def _get_chunk_merge():
-        merge_object = ', '.join([f'{key}: chunk.{key}' for key in (Chunk.get_index_keys())]) + ', user: $user'
+        merge_object = ', '.join([f'{key}: chunk.{key}' for key in (Chunk.get_index_keys())]) + ', owner: $owner'
         set_object = ', '.join([f'c.{key} = chunk.{key}' for key in (Chunk.get_index_properties())]) + ', c.timestamp = $timestamp'
         return (
             f'MERGE (c: Chunk {{{merge_object}}}) '
@@ -55,38 +55,54 @@ class GraphDB:
         )
     
     @staticmethod
-    def _get_propernoun_merge():
-        merge_object = ', '.join([f'{key}: propernoun.{key}' for key in (ProperNoun.get_index_keys())]) + ', user: $user'
-        set_object = ', '.join([f'p.{key} = propernoun.{key}' for key in (ProperNoun.get_index_properties())]) + ', p.timestamp = $timestamp'
+    def _get_entity_merge():
+        predicate_merge = 'text: predicate.text, document: predicate.document'
+        subject_merge = ', '.join([f'{key}: entity.{key}' for key in (Entity.get_index_keys())]) + ', owner: $owner'
+        object_merge = ', '.join([f'{key}: predicate.target.{key}' for key in (Entity.get_index_keys())]) + ', owner: $owner'
+        set_object = 'p.chunk=predicate.chunk, p.id=predicate.id'
         return (
-            f'MERGE (p: ProperNoun {{{merge_object}}}) '
+            'UNWIND $entities as entity '
+            'WITH entity '
+            'UNWIND entity.predicates as predicate '
+            f'MERGE (s:Entity {{{subject_merge}}}) '
+            'WITH s, predicate '
+            f'MERGE (o:Entity {{{object_merge}}}) '
+            'WITH s, o, predicate '
+            f'MERGE (s)-[p:Predicate {{{predicate_merge}}}]->(o) '
             'ON CREATE '
                 f'SET {set_object} '
             'ON MATCH '
                 f'SET {set_object} '
-            'WITH c, p '
-            'MERGE (p)<-[:REFERENCES]-(c) '
         )
 
     @staticmethod
-    def _create_documents(tx, documents: List[Document], user: str, timestamp: int):
-        if not documents or len(documents) < 1:
+    def _create_entities(tx, entities: List[Entity], documents: List[Document], owner: str, timestamp: int):
+        if not (entities and len(entities) > 0 and documents and len(documents) > 0):
             return None
         
-        query = (
-            'UNWIND $documents as document '
-            f'{GraphDB._get_document_merge(documents[0])}'
-            'WITH document, d '
-            'UNWIND document.chunks as chunk '
-            f'{GraphDB._get_chunk_merge()}'
-            'WITH chunk, c '
-            'UNWIND chunk.propernouns as propernoun '
-            f'{GraphDB._get_propernoun_merge()}'
-        )
-
         neo4j_documents = [document.to_neo4j_map() for document in documents]
-        result = tx.run(query, documents=neo4j_documents, timestamp=timestamp, user=user)
-        return result
+        documents_query = (
+            'UNWIND $documents as document '
+            f'{GraphDB._get_document_merge()}'
+            'WITH document, d '
+            'CALL { '
+                'WITH d '
+                'MATCH ()-[p:Predicate {document: d.id}]-() '
+                'DELETE p '
+            '} '
+            'UNWIND document.chunks as chunk '
+            f'{GraphDB._get_chunk_merge()} '
+        )
+        documents_result = tx.run(documents_query, documents=neo4j_documents,timestamp=timestamp, owner=owner)
+        print(documents_result)
+
+        print('hey')
+        print(entities)
+        neo4j_entities = [entity.to_neo4j_map() for entity in entities]
+        print(neo4j_entities)
+        entities_result = tx.run(GraphDB._get_entity_merge(), entities=neo4j_entities, timestamp=timestamp, owner=owner)
+        print(entities_result)
+        return entities_result
 
     def get_chunks(self, query_filter: QueryFilter) -> Any:
         with self.driver.session(database='neo4j') as session:
@@ -95,12 +111,12 @@ class GraphDB:
 
     @staticmethod
     def _get_chunks_by_filter(tx, query_filter: QueryFilter) -> List[Chunk]:
-        if not query_filter or not query_filter.user:
+        if not query_filter or not query_filter.owner:
             return None
         
         query_wheres = []
-        if query_filter.user:
-            query_wheres.append('d.user = user, c.user = user, p.user = user')
+        if query_filter.owner:
+            query_wheres.append('d.owner = owner, c.owner = owner, p.owner = owner')
         
         if query_filter.document_filter:
             if query_filter.document_filter.ids:
@@ -128,4 +144,4 @@ class GraphDB:
             f'WHERE {", ".join(query_wheres)} '
             'RETURN d, c, p, co, r '
         )
-        return tx.run(query, user=query_filter.user)
+        return tx.run(query, owner=query_filter.owner)

@@ -1,7 +1,22 @@
+from dataclasses import dataclass
+from enum import Enum
 from typing import List
 
 import pinecone
 from app.graph.blocks import Document
+
+
+class RowType(Enum):
+    CHUNK = 'chunk'
+    TRIPLET = 'triplet'
+
+@dataclass
+class Row:
+    id: str
+    embedding: List[float]
+    owner: str
+    document_id: str
+    type: RowType
 
 
 class Pinecone:
@@ -15,18 +30,20 @@ class Pinecone:
                 name=index_name, 
                 dimension=1536, 
                 metadata_config={
-                    'indexed': ['user', 'documentId']
+                    'indexed': ['owner', 'document_id', 'type']
                 }
             )
             self.index = pinecone.Index(index_name=index_name)
         
-    def _delete_old_vectors(self, user: str, document_ids: List[str]) -> bool:
-        if not (self.index and user and document_ids and len(document_ids) > 0):
+    def _delete_old_vectors(self, owners: List[str], document_ids: List[str]) -> bool:
+        if not (self.index and owners and len(owners) > 0 and document_ids and len(document_ids) > 0):
             return False
         delete_response = self.index.delete(
             filter={
-                'user': user,
-                'documentId': {
+                'owner': {
+                    '$in': owners
+                },
+                'document_id': {
                     '$in': document_ids
                 }
             }
@@ -50,34 +67,38 @@ class Pinecone:
                 return False
         return True
 
-    def upsert(self, documents: List[Document], user: str, timestamp: str):
-        if not (self.index and user and documents and len(documents) > 0):
+    def upsert(self, rows: List[Row]):
+        if not (self.index and rows and len(rows) > 0):
             return None
         vectors = []
-        for document in documents:
-            for consists_of in document.consists_of:
-                vectors.append({
-                    'id': consists_of.target.id,
-                    'values': consists_of.target.embedding,
-                    'metadata': {
-                        'user': user,
-                        'documentId': document.id,
-                        'timestamp': timestamp
-                    }
-                })
+        owners = set()
+        document_ids = set()
+        for row in rows:
+            owners.add(row.owner)
+            document_ids.add(row.document_id)
+
+            vectors.append({
+                'id': row.id,
+                'values': row.embedding,
+                'metadata': {
+                    'owner': row.owner,
+                    'document_id': row.document_id,
+                    'type': row.type.value,
+                }
+            })
         
-        deleted = self._delete_old_vectors(user=user, document_ids=[document.id for document in documents])
+        deleted = self._delete_old_vectors(owners=list(owners), document_ids=list(document_ids))
         upserted = self._batched_upsert(vectors=vectors)
-        return upserted and deleted
+        return deleted and upserted
     
-    def query(self, embedding: List[float], user: str, k: int = 5):
+    def query(self, embedding: List[float], owner: str, k: int = 5):
         if not (self.index and embedding and len(embedding) > 0):
             return None
         query_response = self.index.query(
             vector=embedding,
             top_k=k,
             filter={
-                'user': user,
+                'owner': owner,
             },
             include_metadata=True,
             include_values=True

@@ -4,8 +4,8 @@ from typing import List
 
 from app.auth.base import Auth
 
-MAX_CHUNK_SIZE = 2000
-MAX_CHUNK_OVERLAP = 200
+MAX_CHUNK_SIZE = 600
+MAX_CHUNK_OVERLAP = 50
 
 @dataclass
 class Filter:
