@@ -266,6 +266,9 @@ module.exports = {
         "theme-3/2": "2.25rem",
         "theme-2": "3rem",
       },
+      transitionProperty: {
+        height: "height",
+      },
     },
   },
   plugins: [

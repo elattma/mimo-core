@@ -7,7 +7,7 @@ class Tool:
         name: str,
         description: str,
         func: Callable,
-        parser: Optional[Union[Callable, None]] = None
+        parser: Optional[Callable] = None
     ) -> None:
         """Creates a new tool.
 

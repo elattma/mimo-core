@@ -1,73 +1,108 @@
 import os
-from typing import Optional, Union
 
-from app.graph.blocks import ChunkFilter, ProperNounFilter
 from mrkl_agent import MRKLAgent
-from openaillm import OpenAILLM
+from open_ai import OpenAIChat, OpenAIText
+from prompt import (ChatPrompt, ChatPromptMessage, ChatPromptMessageRole,
+                    TextPrompt)
 from tool import Tool, Toolkit
 
-from backend.app.graph.blocks import QueryFilter
-from backend.app.graph.db import GraphDB
+MAX_STEPS = 2
 
-os.environ["OPENAI_API_KEY"] = (
-    "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"
-)
+os.environ["OPENAI_API_KEY"] = ""
 
-llm = OpenAILLM(temperature=0)
+text_llm = OpenAIText()
+chat_llm = OpenAIChat()
 
-
-def fetch_chunks(
-        chunk_filter: ChunkFilter = None,
-        propernoun_filter: ProperNounFilter = None
-) -> str:
-    user = None
-    document_filter = None
-    graph_db: GraphDB = None
-    graph_db.get_chunks(query_filter=QueryFilter(
-        user=user,
-        document_filter=document_filter,
-        chunk_filter=chunk_filter,
-        propernoun_filter=propernoun_filter
-    ))
-    pass
-
-
-fetch_chunks_tool = Tool(
-    name="Fetch Chunks",
-    description=(
-        "Used to fetch information as chunks of text  "
+def get_advice_chat(s: str) -> str:
+    system_message = ChatPromptMessage(
+        role=ChatPromptMessageRole.SYSTEM.value,
+        content=(
+          "You are a helpful assistant whose job is to give life advice.\n"
+          "You should always begin your responses with 'I am here to advise!'"
+        )
     )
-)
+    user_message = ChatPromptMessage(
+        role=ChatPromptMessageRole.USER.value,
+        content=s
+    )
+    prompt = ChatPrompt([system_message, user_message])
+    return chat_llm.predict(prompt)
 
-orchestration_toolkit = Toolkit([
+def get_advice_text(s: str) -> str:
+    prompt = TextPrompt((
+        "You are a helpful assistant whose job is to give life advice.\n"
+        "You should always begin your responses with \"I am here to advise!\""
+        f"{s}"
+    ))
+    return text_llm.predict(prompt)
+
+
+def get_motivation_chat(s: str) -> str:
+    system_message = ChatPromptMessage(
+        role=ChatPromptMessageRole.SYSTEM.value,
+        content=(
+          "You are a motivating assistant whose job is to give encouragement.\n"
+          "You should always begin your responses with 'I am here to motivate!'"
+        )
+    )
+    user_message = ChatPromptMessage(
+        role=ChatPromptMessageRole.USER.value,
+        content=s
+    )
+    prompt = ChatPrompt([system_message, user_message])
+    return chat_llm.predict(prompt)
+
+def get_motivation_text(s: str) -> str:
+    prompt = TextPrompt((
+        "You are a helpful assistant whose job is to give encouragement.\n"
+        "You should always begin your responses with \"I am here to motivate!\""
+        f"{s}"
+    ))
+    return text_llm.predict(prompt)
+
+toolkit = Toolkit([
     Tool(
-        name="Fetch Context",
-        description=(
-            "Used to fetch any company data needed to properly answer a question. "
-            "Input should be a description of the needed data. "
-            "Output will be that data. "
-        ),
-        func=data_layer_agent.run,
+      name="Advice",
+      description=(
+        "Used when advice is needed. "
+        "Input should be a request for advice. "
+        "Output will be the answer."
+      ),
+      func=get_advice_chat
     ),
     Tool(
-        name="Task Execution",
-        description=(
-            "Used to produce the final answer to the question. "
-            "Input should be the question, the memory, and additional context. "
-            "Output will be the answer to the question. "
-        ),
-        func=executor_agent.run
-    )
+      name="Motivation",
+      description=(
+        "Used when motivation is needed. "
+        "Input should be a request for motivation. "
+        "Output will be text."
+      ),
+      func=get_motivation_chat
+    ),
 ])
 
-orchestrator_prompt_template = MRKLAgent.create_prompt_template(
-    orchestration_toolkit
+prefix = (
+    "You are a helpful assistant whose job is to respond to an input to the "
+    "best of your ability using the tools that you have access to.\n"
+    "You have access to the following tools:"
+)
+suffix = (
+    "Remember that you should address each part of the original input in "
+    "your final answer.\n"
+    "Begin!"
 )
 
-orchestrator_agent = MRKLAgent(
-    llm=llm,
-    toolkit=orchestration_toolkit,
-    prompt_template=orchestrator_prompt_template,
+prompt_template = MRKLAgent.create_text_prompt_template(
+    toolkit,
+    prefix=prefix,
+    suffix=suffix
 )
 
-print(orchestrator_agent.run("Respond to my most recent email from Alex."))
+agent = MRKLAgent(
+    llm=text_llm,
+    toolkit=toolkit,
+    prompt_template=prompt_template,
+    max_steps=MAX_STEPS
+)
+
+agent.run("How do I improve my grades? And, how do I stop feeling lazy always?")

@@ -3,7 +3,9 @@ from typing import List, Optional, Union
 
 from agent import Action, Agent, FinalAnswer
 from llm import LLM
-from prompt import Prompt, PromptTemplate
+from prompt import (ChatPromptMessage, ChatPromptMessageRole,
+                    ChatPromptTemplate, Prompt, PromptTemplate,
+                    TextPromptTemplate)
 from tool import Toolkit
 
 DEFAULT_PREFIX = (
@@ -11,18 +13,16 @@ DEFAULT_PREFIX = (
     "access to the following tools:"
 )
 DEFAULT_FORMAT_INSTRUCTIONS = """Use the following format:
-Question: the input question you must answer
+Question: the input you must answer
 Thought: you should always think about what to do
 Action: the action to take, should be one of [{tool_names}]
 Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
-Final Answer: the final answer to the original input question"""
-DEFAULT_SUFFIX = """Begin!
-
-Question: {query}
-Thought: {scratchpad}"""
+Final Answer: the final answer to the original input"""
+DEFAULT_SUFFIX = """Begin!"""
+DEFAULT_SCRATCHPAD_START="""Question: {query}\nThought: {scratchpad}"""
 DEFAULT_INPUT_VARIABLES = ["query", "scratchpad"]
 
 FINAL_ANSWER_PATTERN = "Final Answer:"
@@ -38,7 +38,7 @@ class MRKLAgent(Agent):
         self,
         llm: LLM,
         toolkit: Toolkit,
-        prompt_template: Optional[Union[PromptTemplate, None]] = None,
+        prompt_template: Optional[PromptTemplate] = None,
         max_steps: Optional[int] = DEFAULT_MAX_STEPS
     ) -> None:
         if prompt_template is None:
@@ -73,14 +73,15 @@ class MRKLAgent(Agent):
 
     # Utility/convenience methods
     @classmethod
-    def create_prompt_template(
+    def create_text_prompt_template(
         cls,
         toolkit: Toolkit,
         prefix: Optional[str] = DEFAULT_PREFIX,
         format_instructions: Optional[str] = DEFAULT_FORMAT_INSTRUCTIONS,
         suffix: Optional[str] = DEFAULT_SUFFIX,
+        scratchpad_start: Optional[str] = DEFAULT_SCRATCHPAD_START,
         input_variables: Optional[str] = DEFAULT_INPUT_VARIABLES,
-    ) -> PromptTemplate:
+    ) -> TextPromptTemplate:
         tool_descriptions = "\n".join(
             [f"{tool.name}: {tool.description}" for tool in toolkit.tools]
         )
@@ -88,17 +89,54 @@ class MRKLAgent(Agent):
         formatted_format_instructions = format_instructions.format(
             tool_names=tool_names
         )
-        return PromptTemplate(
+        return TextPromptTemplate(
             "\n\n".join(
                 [
                     prefix,
                     tool_descriptions,
                     formatted_format_instructions,
-                    suffix
+                    suffix,
+                    scratchpad_start
                 ],
             ),
             input_variables
         )
+    
+    @classmethod
+    def create_chat_prompt_template(
+        cls,
+        toolkit: Toolkit,
+        prefix: Optional[str] = DEFAULT_PREFIX,
+        format_instructions: Optional[str] = DEFAULT_FORMAT_INSTRUCTIONS,
+        suffix: Optional[str] = DEFAULT_SUFFIX,
+        scratchpad_start: Optional[str] = DEFAULT_SCRATCHPAD_START,
+        input_variables: Optional[str] = DEFAULT_INPUT_VARIABLES,
+    ) -> ChatPromptTemplate:
+        tool_descriptions = "\n".join(
+            [f"{tool.name}: {tool.description}" for tool in toolkit.tools]
+        )
+        tool_names = ", ".join(toolkit.names)
+        formatted_format_instructions = format_instructions.format(
+            tool_names=tool_names
+        )
+        system_message = ChatPromptMessage(
+            role=ChatPromptMessageRole.SYSTEM.value,
+            content="\n\n".join([
+                prefix,
+                tool_descriptions,
+                formatted_format_instructions,
+                suffix
+            ])
+        )
+        assistant_message = ChatPromptMessage(
+            role=ChatPromptMessageRole.ASSISTANT.value,
+            content=scratchpad_start
+        )
+        return ChatPromptTemplate(
+            template=[system_message, assistant_message],
+            input_variables=input_variables
+        )
+
 
     # Private methods
     def _prepare_for_new_lifecycle(self) -> None:

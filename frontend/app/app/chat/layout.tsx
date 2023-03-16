@@ -13,15 +13,13 @@ const ChatLayout = async ({ children }: ChatLayoutProps) => {
 
   return (
     <ChatHistoryProvider initialChatHistory={chatHistoryData}>
-      <div className="container flex min-h-0 grow flex-col gap-theme pb-theme md:flex-row">
-        <aside className="flex h-64 w-full shrink-0 sm:w-64 md:h-fit md:flex-col lg:w-80">
+      <div className="container relative flex min-h-0 grow flex-col gap-theme pb-theme md:flex-row md:pt-theme">
+        <aside className="flex h-fit max-h-64 shrink-0 overflow-hidden rounded-b-theme border-x border-b border-neutral-border p-theme-1/2 md:max-h-full md:w-64 md:shrink-0 md:grow-0 md:flex-col md:border-none xl:w-80">
           {children}
         </aside>
-        <main className="relative flex w-full min-w-0 grow-0 flex-col">
+        <main className="relative flex min-h-0 flex-1 flex-col items-center gap-theme-1/4">
           <ChatDisplay />
-          <div className="relative mb-theme flex w-full max-w-full grow-0 items-center justify-center">
-            <ChatInput />
-          </div>
+          <ChatInput />
         </main>
       </div>
     </ChatHistoryProvider>

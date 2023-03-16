@@ -5,7 +5,6 @@ import { serverGet } from "@/lib/server-fetchers";
 
 const Page = async () => {
   const initialData = await serverGet("/item");
-  console.log(initialData);
 
   return (
     <>

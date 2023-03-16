@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadingDots } from "@/components/ui/loading-dots";
 import { clientPost } from "@/lib/client-fetchers";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -27,7 +28,11 @@ const Page = () => {
     // TODO: Proper error handling here too
   }
 
-  return <>Auth</>;
+  return (
+    <div className="flex grow items-center justify-center">
+      <LoadingDots />
+    </div>
+  );
 };
 
 export default Page;

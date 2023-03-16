@@ -24,7 +24,7 @@ export default function UploadedItems({ items }: UploadedItemsProps) {
         <Dialog>
           <DialogTrigger asChild>
             <button
-              className="rounded-theme p-theme-1/4 text-neutral-text outline-none transition-colors active:bg-neutral-bg-active hocus:bg-neutral-bg-hover hocus:text-neutral-text-contrast"
+              className="rounded-theme p-[2px] text-neutral-text outline-none transition-colors active:bg-neutral-bg-active hocus:bg-neutral-bg-hover hocus:text-neutral-text-contrast"
               aria-label="Open interface to upload an item"
             >
               <Plus className="h-4 w-4" />

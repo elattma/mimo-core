@@ -44,10 +44,22 @@ export default function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/app/settings">Settings</Link>
+            <Link className="hover:cursor-default" href="/app/settings">
+              Settings
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/app/settings">Profile</Link>
+            <Link className="hover:cursor-default" href="/app/settings">
+              Profile
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem asChild>
+            <a className="hover:cursor-default" href="/api/auth/logout">
+              Log out
+            </a>
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

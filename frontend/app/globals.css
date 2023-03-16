@@ -290,4 +290,8 @@
   .overflow-y-overlay {
     overflow-y: overlay;
   }
+
+  .prevent-default-focus {
+    @apply outline-none;
+  }
 }

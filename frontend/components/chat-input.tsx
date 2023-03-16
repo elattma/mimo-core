@@ -30,7 +30,7 @@ export default function ChatInput() {
 
   return (
     <form
-      className="absolute -bottom-theme-1/2 h-fit w-full rounded-theme lg:w-fit"
+      className="relative h-fit w-full rounded-theme lg:w-fit"
       onSubmit={handleSubmit}
       autoComplete="off"
     >

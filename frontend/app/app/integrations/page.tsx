@@ -5,7 +5,7 @@ const Page = async () => {
   const integrationData = await serverGet("/integration");
 
   return (
-    <main className="flex flex-col space-y-theme p-theme">
+    <main className="container flex flex-col space-y-theme p-theme">
       <h1 className="text-lg font-medium text-gray-text-contrast">
         Integrations
       </h1>

@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useChatHistoryContext } from "@/contexts/chat-history-context";
 import { Chat } from "@/models";
 import { ArrowDown } from "lucide-react";
@@ -14,7 +15,6 @@ function userIsAtBottomOfChat(container: HTMLDivElement) {
 }
 
 export default function ChatDisplay() {
-  const containerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { chatHistory } = useChatHistoryContext();
   const [showArrow, setShowArrow] = useState<boolean>(false);
@@ -24,8 +24,9 @@ export default function ChatDisplay() {
   }, [chatHistory]);
 
   return (
-    <div
-      className="scrollbar-track-hidden overflow-y-overlay flex max-h-full w-full grow flex-col items-center"
+    <ScrollArea
+      className="relative flex w-full flex-1 flex-col items-center"
+      innerClassName="w-fit"
       onScroll={(event) => {
         if (userIsAtBottomOfChat(event.currentTarget)) setShowArrow(false);
         else setShowArrow(true);
@@ -38,19 +39,19 @@ export default function ChatDisplay() {
           else if (chat.role === Chat.Role.USER)
             return <UserChatItem chat={chat} key={index} />;
         })}
-        <div className="h-theme w-full bg-transparent"></div>
-        <div ref={chatEndRef} className="h-theme-2 w-full bg-transparent"></div>
+        <div ref={chatEndRef}></div>
         {showArrow && (
           <button
-            className="absolute bottom-28 left-0 right-0 mx-auto w-fit rounded-full border border-neutralA-8 bg-neutralA-7 p-theme-1/4"
+            className="absolute bottom-0 left-0 right-0 mx-auto w-fit rounded-full border border-neutralA-8 bg-neutralA-6 p-theme-1/4"
+            aria-label="Scroll to bottom"
             onClick={() =>
               chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
             }
           >
-            <ArrowDown className="h-4 w-4 text-neutralA-9" />
+            <ArrowDown className="h-3 w-3 text-neutralA-9" />
           </button>
         )}
       </div>
-    </div>
+    </ScrollArea>
   );
 }

@@ -100,13 +100,20 @@ class Agent(ABC):
                 (str) The derived response to the query.
         """
         while self._should_continue():
+            print(f"[{len(self._steps)}] Running...")
             prompt = self._construct_prompt(query)
             llm_output = self._llm.predict(prompt, self._stop)
             action_or_final_answer = self._parse_llm_output(llm_output)
             if isinstance(action_or_final_answer, FinalAnswer):
                 final_answer = action_or_final_answer
-                print(query + str(self._steps))
-                print(final_answer.log)
+                print(f"Question: {query}")
+                for step in self._steps:
+                    thought = step.action.log.split("Thought:")[-1]
+                    print(f"Thought: {thought}")
+                    print(f"Observation: {step.observation}")
+                thought = final_answer.log.split("Thought:")[-1]
+                print(f"Thought: {thought}")
+                print()
                 return final_answer.output
             action: Action = action_or_final_answer
             tool = self._toolkit.get_tool_by_name(action.tool_name)
@@ -115,13 +122,6 @@ class Agent(ABC):
             observation = tool.use(action.tool_input)
             self._steps.append(Step(action=action, observation=observation))
         return "AGENT FINISHED WITHOUT REACHING A FINAL ANSWER"
-
-    # Utility/convenience methods
-    @classmethod
-    @abstractmethod
-    def create_prompt_template(cls, *args, **kwargs) -> PromptTemplate:
-        """Create a prompt that conforms to this agent's expectations."""
-        raise NotImplementedError
 
     # Private methods
     @abstractmethod
