@@ -1,6 +1,6 @@
 from typing import Any, List
 
-from app.graph.blocks import Chunk, Document, Entity, QueryFilter
+from app.graph.blocks import Chunk, Document, Entity, EntityFilter, QueryFilter
 from neo4j import GraphDatabase
 
 
@@ -16,7 +16,7 @@ class GraphDB:
     def create_entities(self, entities: List[Entity], documents: List[Document], owner: str, timestamp: int):
         with self.driver.session(database='neo4j') as session:
             result = session.execute_write(self._create_entities, entities, documents, owner, timestamp=timestamp)
-        return result
+            return result
     
     @staticmethod
     def _get_document_merge():
@@ -94,54 +94,87 @@ class GraphDB:
             f'{GraphDB._get_chunk_merge()} '
         )
         documents_result = tx.run(documents_query, documents=neo4j_documents,timestamp=timestamp, owner=owner)
-        print(documents_result)
-
-        print('hey')
-        print(entities)
         neo4j_entities = [entity.to_neo4j_map() for entity in entities]
-        print(neo4j_entities)
         entities_result = tx.run(GraphDB._get_entity_merge(), entities=neo4j_entities, timestamp=timestamp, owner=owner)
-        print(entities_result)
-        return entities_result
+        return list(entities_result) + list(documents_result)
 
-    def get_chunks(self, query_filter: QueryFilter) -> Any:
+    def get_by_filter(self, query_filter: QueryFilter) -> Any:
         with self.driver.session(database='neo4j') as session:
-            result = session.read_transaction(self._get_chunks_by_filter, query_filter)
-        return result
+            result = session.execute_read(self._get_by_filter, query_filter)
+            return result
 
     @staticmethod
-    def _get_chunks_by_filter(tx, query_filter: QueryFilter) -> List[Chunk]:
+    def _get_by_filter(tx, query_filter: QueryFilter) -> List[Chunk]:
         if not query_filter or not query_filter.owner:
             return None
         
-        query_wheres = []
+        document_query_wheres = []
+        entity_query_wheres = []
         if query_filter.owner:
-            query_wheres.append('d.owner = owner, c.owner = owner, p.owner = owner')
+            document_query_wheres.append('d.owner = $owner AND c.owner = $owner')
+            entity_query_wheres.append('s.owner = $owner AND o.owner = $owner')
         
         if query_filter.document_filter:
-            if query_filter.document_filter.ids:
-                query_wheres.append(f'd.id IN {query_filter.document_filter.ids}')
-            if query_filter.document_filter.integrations:
-                query_wheres.append(f'd.integration IN {query_filter.document_filter.integrations}')
+            document_filter = query_filter.document_filter
+            if document_filter.ids:
+                document_query_wheres.append(f'd.id IN {list(document_filter.ids)}')
+            if document_filter.integrations:
+                document_query_wheres.append(f'(d.integration IN {list(document_filter.integrations)})')
+            if document_filter.time_range:
+                document_query_wheres.append(f'(d.timestamp >= {document_filter.time_range[0]} AND d.timestamp <= {document_filter.time_range[1]})')
 
         if query_filter.chunk_filter:
-            if query_filter.chunk_filter.ids:
-                query_wheres.append(f'c.id IN {query_filter.chunk_filter.ids}')
-            if query_filter.chunk_filter.types:
-                query_wheres.append(f'c.type IN {query_filter.chunk_filter.types}')
-                
-        if query_filter.propernoun_filter:
-            if query_filter.propernoun_filter.ids:
-                query_wheres.append(f'p.id IN {query_filter.propernoun_filter.ids}')
-            if query_filter.propernoun_filter.types:
-                query_wheres.append(f'p.type IN {query_filter.propernoun_filter.types}')
+            chunk_filter = query_filter.chunk_filter
+            if chunk_filter.ids:
+                document_query_wheres.append(f'(c.id IN {list(chunk_filter.ids)})')
+            if chunk_filter.heights:
+                document_query_wheres.append(f'(c.height IN {list(chunk_filter.heights)})')
+            if chunk_filter.time_range:
+                document_query_wheres.append(f'(d.timestamp >= {chunk_filter.time_range[0]} AND d.timestamp <= {chunk_filter.time_range[1]})')
 
-        if len(query_wheres) < 1:
+        if query_filter.entity_filter:
+            entity_filter = query_filter.entity_filter
+            if entity_filter.ids:
+                entity_query_wheres.append(f'(s.id IN {list(entity_filter.ids)} OR o.id IN {list(entity_filter.ids)})')
+            if entity_filter.types:
+                entity_query_wheres.append(f'(s.types IN {list(entity_filter.types)} OR o.types IN {list(entity_filter.types)})')
+
+        if query_filter.predicate_filter:
+            predicate_filter = query_filter.predicate_filter
+            if predicate_filter.ids:
+                entity_query_wheres.append(f'(p.id IN {list(predicate_filter.ids)})')
+            if predicate_filter.texts:
+                entity_query_wheres.append(f'(p.types IN {list(predicate_filter.texts)})')
+                
+        if len(document_query_wheres) + len(entity_query_wheres) < 1:
             return None
 
-        query = (
-            'MATCH (d: Document)-[co:CONSISTS_OF]->(c: Chunk)-[r:REFERENCES]->(p: ProperNoun) '
-            f'WHERE {", ".join(query_wheres)} '
-            'RETURN d, c, p, co, r '
-        )
-        return tx.run(query, owner=query_filter.owner)
+        query = ''
+        has_document_query = len(document_query_wheres) > 1
+        has_entity_query = len(entity_query_wheres) > 1
+        if has_document_query:
+            query += (
+                'MATCH (d: Document)-[co:CONSISTS_OF]->(c: Chunk) '
+                f'WHERE {"AND ".join(document_query_wheres)} '
+            )
+            if has_entity_query:
+                query += 'WITH d, co, c '
+        
+        if has_entity_query:
+            query += (
+                'MATCH (s: Entity)-[p:Predicate]->(o: Entity) '
+                f'WHERE {" AND ".join(entity_query_wheres)} '
+            )
+        if not query:
+            return None
+
+        query += 'RETURN '
+        if has_document_query:
+            query += 'd, co, c'
+            if has_entity_query:
+                query += ', '
+        if has_entity_query:
+            query += 's, p, o'
+        print(query)
+        result = tx.run(query, owner=query_filter.owner)
+        return list(result)

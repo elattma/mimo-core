@@ -73,7 +73,7 @@ class DocumentFilter:
 @dataclass
 class ChunkFilter:
     ids: Set[str] = None
-    height: Set[str] = None
+    heights: Set[int] = None
     time_range: tuple[int, int] = None
 
 @dataclass

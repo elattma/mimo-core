@@ -11,9 +11,9 @@ from app.graph.blocks import CONSISTS_OF, PREDICATES, Chunk, Document, Entity
 from app.graph.db import GraphDB
 from app.util.llm import get_embedding, get_knowledge_triplets, summarize
 from app.util.ner import NER
-from app.util.pinecone import Pinecone, Row, RowType
 from app.util.response import Errors, to_response_error, to_response_success
 from app.util.secret import Secret
+from app.util.vectordb import Pinecone, Row, RowType
 from ulid import ulid
 
 ner = NER()

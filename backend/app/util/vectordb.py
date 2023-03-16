@@ -3,7 +3,6 @@ from enum import Enum
 from typing import List
 
 import pinecone
-from app.graph.blocks import Document
 
 
 class RowType(Enum):
@@ -104,5 +103,4 @@ class Pinecone:
             include_values=True
         )
 
-        print(query_response)
-        return query_response
+        return query_response.get('matches', None) if query_response else None

@@ -10,7 +10,7 @@ class KnowledgeTriplet:
     predicate: str
     object: str
 
-def get_embedding(api_key: str, text: str) -> str:
+def get_embedding(api_key: str, text: str) -> List[float]:
     if not (api_key and text):
         return None
     
