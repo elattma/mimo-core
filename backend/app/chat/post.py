@@ -18,7 +18,6 @@ from ulid import ulid
 # TODO: update prompt or make easily configurable - use ssm?
 MODEL = "gpt-3.5-turbo"
 
-
 def handler(event: dict, context):
     request_context: dict = event.get(
         'requestContext', None) if event else None

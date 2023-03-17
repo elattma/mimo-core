@@ -2,7 +2,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union
 
-import openai
+from app.util.open_ai import OpenAIClient
 from llm import LLM
 from prompt import ChatPrompt, Prompt, TextPrompt
 
@@ -20,6 +20,7 @@ class OpenAIBase(LLM, ABC):
 
     def __init__(
         self,
+        client: OpenAIClient,
         model: Optional[str] = None,
         max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
         temperature: Optional[int] = DEFAULT_TEMPERATURE,
@@ -47,19 +48,13 @@ class OpenAIBase(LLM, ABC):
             Returns:
                 `None`
         """
+        self._client = client
         self._model: str = model
         self._max_tokens: int = max_tokens
         self._temperature: Union[int, None] = temperature
         self._top_p: Union[int, None] = top_p
         self._n: int = n
         self._stop: Union[str, List[str], None] = stop
-        try:
-            openai.api_key = os.getenv("OPENAI_API_KEY")
-        except Exception:
-            raise RuntimeError((
-                "Failed to connect to OpenAI's sdk. "
-                "Make sure that `OPENAI_API_KEY` environment variable is set."
-            ))
         
     @abstractmethod
     def predict(
@@ -76,6 +71,7 @@ class OpenAIText(OpenAIBase):
 
     def __init__(
         self,
+        client: OpenAIClient,
         model: Optional[str] = DEFAULT_TEXT_MODEL,
         max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
         temperature: Optional[int] = DEFAULT_TEMPERATURE,
@@ -84,6 +80,7 @@ class OpenAIText(OpenAIBase):
         stop: Optional[Union[str, List[str]]] = DEFAULT_STOP,
     ) -> None:
         super().__init__(
+            client=client,
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -98,15 +95,15 @@ class OpenAIText(OpenAIBase):
         prompt: TextPrompt,
         stop: Optional[Union[str, List[str]]] = None
     ) -> str:
-        return openai.Completion.create(
-            model=self._model,
+        return self._client.completion(
             prompt=prompt.prompt,
+            model=self._model,
             max_tokens=self._max_tokens,
             temperature=self._temperature,
             top_p=self._top_p,
             n=self._n,
             stop=stop if stop else self._stop
-        )["choices"][0]["text"]
+        )
 
 
 class OpenAIChat(OpenAIBase):
@@ -114,6 +111,7 @@ class OpenAIChat(OpenAIBase):
 
     def __init__(
         self,
+        client: OpenAIClient,
         model: Optional[str] = DEFAULT_CHAT_MODEL,
         max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
         temperature: Optional[int] = DEFAULT_TEMPERATURE,
@@ -122,6 +120,7 @@ class OpenAIChat(OpenAIBase):
         stop: Optional[Union[str, List[str]]] = DEFAULT_STOP,
     ) -> None:
         super().__init__(
+            client=client,
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -142,12 +141,12 @@ class OpenAIChat(OpenAIBase):
                 "content": message.content
             } for message in prompt.prompt
         ]
-        return openai.ChatCompletion.create(
-            model=self._model,
+        return self._client.chat_completion(
             messages=messages,
+            model=self._model,
             max_tokens=self._max_tokens,
             temperature=self._temperature,
             top_p=self._top_p,
             n=self._n,
             stop=stop if stop else self._stop
-        )["choices"][0]["message"]["content"]
+        )

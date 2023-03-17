@@ -90,7 +90,7 @@ class Pinecone:
         upserted = self._batched_upsert(vectors=vectors)
         return deleted and upserted
     
-    def query(self, embedding: List[float], owner: str, k: int = 5):
+    def query(self, embedding: List[float], owner: str, types: List[RowType], k: int = 5):
         if not (self.index and embedding and len(embedding) > 0):
             return None
         query_response = self.index.query(
@@ -98,6 +98,9 @@ class Pinecone:
             top_k=k,
             filter={
                 'owner': owner,
+                'type': {
+                    '$in': [type.value for type in types]
+                }
             },
             include_metadata=True,
             include_values=True

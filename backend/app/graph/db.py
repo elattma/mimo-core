@@ -155,7 +155,7 @@ class GraphDB:
         if has_document_query:
             query += (
                 'MATCH (d: Document)-[co:CONSISTS_OF]->(c: Chunk) '
-                f'WHERE {"AND ".join(document_query_wheres)} '
+                f'WHERE {" AND ".join(document_query_wheres)} '
             )
             if has_entity_query:
                 query += 'WITH d, co, c '
