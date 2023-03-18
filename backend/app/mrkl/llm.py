@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union
 
-from prompt import Prompt
+from app.mrkl.prompt import Prompt
 
 
 class LLM(ABC):

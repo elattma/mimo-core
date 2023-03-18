@@ -7,29 +7,29 @@ def unknown(event, context):
     }
 
 def chat_get(event, context):
-    from app.chat.get import handler
+    from app.api.chat.get import handler
     return handler(event, context)
 
 def chat_post(event, context):
-    from app.chat.post import handler
+    from app.api.chat.post import handler
     return handler(event, context)
 
 def integration_get(event, context):
-    from app.integration.get import handler
+    from app.api.integration.get import handler
     return handler(event, context)
 
 def integration_post(event, context):
-    from app.integration.post import handler
+    from app.api.integration.post import handler
     return handler(event, context)
 
 def item_get(event, context):
-    from app.item.get import handler
+    from app.api.item.get import handler
     return handler(event, context)
 
 def item_post(event, context):
-    from app.item.post import handler
+    from app.api.item.post import handler
     return handler(event, context)
 
-def blackbox_post(event, context):
-    from app.blackbox.post import handler
+def mysterybox_post(event, context):
+    from app.api.mysterybox.post import handler
     return handler(event, context)

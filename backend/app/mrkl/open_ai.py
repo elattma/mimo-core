@@ -1,10 +1,9 @@
-import os
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union
 
-from app.util.open_ai import OpenAIClient
-from llm import LLM
-from prompt import ChatPrompt, Prompt, TextPrompt
+from app.client.open_ai import OpenAI
+from app.mrkl.llm import LLM
+from app.mrkl.prompt import ChatPrompt, Prompt, TextPrompt
 
 DEFAULT_TEXT_MODEL = "text-davinci-003"
 DEFAULT_CHAT_MODEL = "gpt-3.5-turbo"
@@ -20,7 +19,7 @@ class OpenAIBase(LLM, ABC):
 
     def __init__(
         self,
-        client: OpenAIClient,
+        client: OpenAI,
         model: Optional[str] = None,
         max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
         temperature: Optional[int] = DEFAULT_TEMPERATURE,
@@ -71,7 +70,7 @@ class OpenAIText(OpenAIBase):
 
     def __init__(
         self,
-        client: OpenAIClient,
+        client: OpenAI,
         model: Optional[str] = DEFAULT_TEXT_MODEL,
         max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
         temperature: Optional[int] = DEFAULT_TEMPERATURE,
@@ -111,7 +110,7 @@ class OpenAIChat(OpenAIBase):
 
     def __init__(
         self,
-        client: OpenAIClient,
+        client: OpenAI,
         model: Optional[str] = DEFAULT_CHAT_MODEL,
         max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
         temperature: Optional[int] = DEFAULT_TEMPERATURE,

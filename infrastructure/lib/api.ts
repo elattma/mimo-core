@@ -81,7 +81,7 @@ export class ApiStack extends Stack {
       props.mimoTable,
       props.uploadItemBucket
     );
-    this.createBlackboxRoutes(
+    this.createMysteryboxRoutes(
       props.stageId,
       props.mimoTable,
       props.uploadItemBucket
@@ -167,14 +167,14 @@ export class ApiStack extends Stack {
     return authorizer;
   };
 
-  createBlackboxRoutes = (
+  createMysteryboxRoutes = (
     stageId: string,
     mimoTable: ITable,
     uploadItemBucket: IBucket
   ) => {
-    const blackbox = this.api.root.addResource("blackbox");
-    const refreshBlackboxHandler = this.getHandler({
-      method: "blackbox_post",
+    const mysterybox = this.api.root.addResource("mysterybox");
+    const refreshMysteryboxHandler = this.getHandler({
+      method: "mysterybox_post",
       environment: {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
@@ -183,15 +183,15 @@ export class ApiStack extends Stack {
       memorySize: 2048,
       timeout: Duration.minutes(10),
     });
-    mimoTable.grantReadWriteData(refreshBlackboxHandler);
-    this.integrationsSecret.grantRead(refreshBlackboxHandler);
-    uploadItemBucket.grantRead(refreshBlackboxHandler);
+    mimoTable.grantReadWriteData(refreshMysteryboxHandler);
+    this.integrationsSecret.grantRead(refreshMysteryboxHandler);
+    uploadItemBucket.grantRead(refreshMysteryboxHandler);
 
-    const refreshBlackboxResponseModel = this.api.addModel(
-      "RefreshBlackboxResponseModel",
+    const refreshMysteryboxResponseModel = this.api.addModel(
+      "RefreshMysteryboxResponseModel",
       {
         contentType: "application/json",
-        modelName: "RefreshBlackboxResponse",
+        modelName: "RefreshMysteryboxResponse",
         schema: {
           type: JsonSchemaType.OBJECT,
           properties: {
@@ -203,19 +203,23 @@ export class ApiStack extends Stack {
       }
     );
 
-    blackbox.addMethod("POST", new LambdaIntegration(refreshBlackboxHandler), {
-      apiKeyRequired: true,
-      authorizer: this.authorizer,
-      methodResponses: [
-        {
-          statusCode: "200",
-          responseModels: {
-            "application/json": refreshBlackboxResponseModel,
+    mysterybox.addMethod(
+      "POST",
+      new LambdaIntegration(refreshMysteryboxHandler),
+      {
+        apiKeyRequired: true,
+        authorizer: this.authorizer,
+        methodResponses: [
+          {
+            statusCode: "200",
+            responseModels: {
+              "application/json": refreshMysteryboxResponseModel,
+            },
+            responseParameters: RESPONSE_PARAMS,
           },
-          responseParameters: RESPONSE_PARAMS,
-        },
-      ],
-    });
+        ],
+      }
+    );
   };
 
   createItemRoutes = (

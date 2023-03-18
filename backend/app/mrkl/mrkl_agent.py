@@ -1,12 +1,12 @@
 import re
 from typing import List, Optional, Union
 
-from agent import Action, Agent, FinalAnswer
-from llm import LLM
-from prompt import (ChatPromptMessage, ChatPromptMessageRole,
-                    ChatPromptTemplate, Prompt, PromptTemplate,
-                    TextPromptTemplate)
-from tool import Toolkit
+from app.mrkl.agent import Action, Agent, FinalAnswer
+from app.mrkl.llm import LLM
+from app.mrkl.prompt import (ChatPromptMessage, ChatPromptMessageRole,
+                             ChatPromptTemplate, Prompt, PromptTemplate,
+                             TextPromptTemplate)
+from app.mrkl.tool import Toolkit
 
 DEFAULT_PREFIX = (
     'Answer the following questions to the best of your ability. You have '

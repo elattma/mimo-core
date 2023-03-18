@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import List, NamedTuple, Optional, Union
 
-from llm import LLM
-from prompt import Prompt, PromptTemplate
-from tool import Toolkit
+from app.mrkl.llm import LLM
+from app.mrkl.prompt import Prompt, PromptTemplate
+from app.mrkl.tool import Toolkit
 
 
 class Action(NamedTuple):
