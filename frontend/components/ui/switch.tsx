@@ -10,7 +10,7 @@ const Switch = forwardRef<
   <Primitive.Root
     ref={forwardedRef}
     className={[
-      "flex h-[18px] w-9 items-center justify-center rounded-full bg-neutralA-8 transition-colors focus:ring data-[state=checked]:bg-brand-9",
+      "flex h-[18px] w-9 items-center justify-center rounded-full bg-neutralA-8 transition-colors data-[state=checked]:bg-brand-9",
       className,
     ].join(" ")}
     {...props}

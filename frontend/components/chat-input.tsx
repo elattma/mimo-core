@@ -1,5 +1,6 @@
 "use client";
 
+import { Switch, SwitchThumb } from "@/components/ui/switch";
 import { useChatHistoryContext } from "@/contexts/chat-history-context";
 import { clientPost } from "@/lib/client-fetchers";
 import { Chat } from "@/models";
@@ -30,31 +31,40 @@ export default function ChatInput() {
 
   return (
     <form
-      className="relative h-fit w-full rounded-theme lg:w-fit"
+      className="h-fit w-full rounded-theme lg:w-[600px] xl:w-[800px] flex flex-col border border-neutralA-3 bg-neutral-base shadow-2xl focus-within:ring-2 focus-within:ring-brand-line transition-[box-shadow] group divide-y divide-y-neutralA-3"
       onSubmit={handleSubmit}
       autoComplete="off"
     >
-      <TextareaAutosize
-        className="scrollbar-track-hidden w-full resize-none rounded-theme border border-neutralA-3 bg-neutral-base py-theme-1/2 pl-theme-1/2 pr-theme-3/2 text-gray-text-contrast shadow-2xl outline-none lg:w-[600px] xl:w-[800px]"
-        minRows={2}
-        maxRows={5}
-        placeholder="Ask me anything..."
-        value={message}
-        onChange={(event) => setMessage(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            sendButtonRef.current?.click();
-          }
-        }}
-      />
-      <button
-        ref={sendButtonRef}
-        className="absolute right-0 bottom-0 mb-3 mr-3 text-gray-text"
-        type="submit"
-      >
-        <Send width={20} height={20} />
-      </button>
+      <div className="w-full py-theme-1/4 px-theme-1/2 flex gap-theme-1/4 items-center">
+        <Switch>
+          <SwitchThumb />
+        </Switch>
+        <label className="text-neutral-text" htmlFor="data">Enable data</label>
+      </div>
+      <div className="w-full flex items-end h-fit p-theme-1/2 gap-theme-1/2">
+        <TextareaAutosize
+          className="scrollbar-track-hidden grow resize-none text-gray-text-contrast outline-none bg-transparent prevent-default-focus"
+          minRows={1}
+          maxRows={5}
+          placeholder="Ask me anything..."
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              sendButtonRef.current?.click();
+            }
+          }}
+        />
+        <button
+          ref={sendButtonRef}
+          className="bg-transparent rounded-theme pl-theme-1/4 pr-theme-1/2 py-theme-1/8 hover:bg-brand-solid-hover focus:bg-brand-solid-hover active:bg-brand-11 transition-colors group-focus-within:bg-brand-solid"
+          type="submit"
+          onClick={event => event.currentTarget.blur()}
+        >
+          <Send className="rotate-45 group-focus-within:stroke-brand-on-solid stroke-neutral-text transition-colors" width={18} height={18} />
+        </button>
+      </div>
     </form>
   );
 }

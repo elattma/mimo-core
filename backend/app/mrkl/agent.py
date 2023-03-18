@@ -99,20 +99,25 @@ class Agent(ABC):
             Returns:
                 (str) The derived response to the query.
         """
+        self._prepare_for_new_lifecycle()
         while self._should_continue():
             print(f"[{len(self._steps)}] Running...")
             prompt = self._construct_prompt(query)
             llm_output = self._llm.predict(prompt, self._stop)
             action_or_final_answer = self._parse_llm_output(llm_output)
+            for step in self._steps:
+                thought = step.action.log.split(self._llm_prefix)[-1]
+                print(f"{self._llm_prefix}:{thought}")
+                print(f"{self._observation_prefix}: {step.observation}")
             if isinstance(action_or_final_answer, FinalAnswer):
                 final_answer = action_or_final_answer
-                print(f"Question: {query}")
+                print(f"Query: {query}")
                 for step in self._steps:
-                    thought = step.action.log.split("Thought:")[-1]
-                    print(f"Thought: {thought}")
-                    print(f"Observation: {step.observation}")
-                thought = final_answer.log.split("Thought:")[-1]
-                print(f"Thought: {thought}")
+                    thought = step.action.log.split(self._llm_prefix)[-1]
+                    print(f"{self._llm_prefix}:{thought}")
+                    print(f"{self._observation_prefix}: {step.observation}")
+                thought = final_answer.log.split(self._llm_prefix)[-1]
+                print(f"{self._llm_prefix}:{thought}")
                 print()
                 return final_answer.output
             action: Action = action_or_final_answer
