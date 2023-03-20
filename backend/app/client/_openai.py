@@ -2,6 +2,26 @@ from typing import Dict, List, Optional, Union
 
 from openai import ChatCompletion, Completion, Embedding
 
+TRIPLETS_SUFFIX = (
+    'Text: {text}\n'
+    'Triplets:\n'
+)
+
+TRIPLETS_SYSTEM_CONTENT = (
+    'Some text is provided below. Given the text, extract '
+    'knowledge triplets in the form of ([subject] [predicate] [object]). '
+    'Avoid stopwords.\n'
+    '---------------------\n'
+    'Text: Alice is Bob\'s mother.\n'
+    'Triplets:\n'
+    '([Alice] [is mother of] [Bob])\n'
+    'Text: Philz is a coffee shop founded in Berkeley in 1982.\n'
+    'Triplets:\n'
+    '([Philz] [is] [coffee shop])\n'
+    '([Philz] [founded in] [Berkeley])\n'
+    '([Philz] [founded in] [1982])\n'
+    '---------------------\n'
+)
 
 class OpenAI:
     def __init__(self, api_key: str) -> None:
@@ -77,7 +97,7 @@ class OpenAI:
         content = message.get('content', None) if message else None
         return content
     
-    def summarize(self, text: str, max_length: int = 1000):
+    def summarize(self, text: str):
         if not (self._api_key and text):
             return None
         
@@ -85,9 +105,8 @@ class OpenAI:
             api_key=self._api_key,
             model='gpt-3.5-turbo',
             messages=[
-                { 'role': 'system', 'content': 'You are an assistant who summarizes.' },
+                { 'role': 'system', 'content': 'Summarize the text. Use simple sentences. Keep important keywords. Keep important nouns. Keep all proper nouns. Do not use pronouns.' },
                 { 'role': 'user', 'content': text },
-                { 'role': 'user', 'content': 'Given the above text document, describe what the document is and summarize the main points.' }
             ],
             temperature=0
         )
@@ -95,3 +114,21 @@ class OpenAI:
         message = summary_choices[0].get('message', None) if summary_choices and len(summary_choices) > 0 else None
         summary = message.get('content', None) if message else None
         return summary
+    
+    def triplets(self, text: str) -> str:
+        if not (self._api_key and text):
+            return None
+        
+        triplets_response = ChatCompletion.create(
+            api_key=self._api_key,
+            model='gpt-3.5-turbo',
+            messages=[
+                { 'role': 'system', 'content': TRIPLETS_SYSTEM_CONTENT },
+                { 'role': 'user', 'content': TRIPLETS_SUFFIX.format(text=text) },
+            ],
+            temperature=0
+        )
+        triplets_choices = triplets_response.get('choices', None) if triplets_response else None
+        message = triplets_choices[0].get('message', None) if triplets_choices and len(triplets_choices) > 0 else None
+        triplets = message.get('content', None) if message else None
+        return triplets

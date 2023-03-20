@@ -4,9 +4,9 @@ from time import time
 
 from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
+from app.client._secrets import Secrets
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB,
                                         UserIntegrationItem)
-from app.client.secrets import Secrets
 from app.fetcher.base import Fetcher
 
 secrets: Secrets = None

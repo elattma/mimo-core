@@ -6,9 +6,9 @@ from typing import Generator, List
 import requests
 from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
+from app.client._secrets import Secrets
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB, Roles,
                                         UserChatItem)
-from app.client.secrets import Secrets
 from openai import ChatCompletion
 from openai.openai_object import OpenAIObject
 from ulid import ulid

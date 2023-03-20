@@ -1,8 +1,8 @@
 from typing import List
 
-from app.client.neo4j import Neo4j
-from app.client.open_ai import OpenAI
-from app.client.pinecone import Pinecone
+from app.client._neo4j import Neo4j
+from app.client._openai import OpenAI
+from app.client._pinecone import Pinecone
 from app.mrkl.mrkl_agent import MRKLAgent
 from app.mrkl.open_ai import OpenAIChat, OpenAIText
 from app.mrkl.prompt import (ChatPrompt, ChatPromptMessage,

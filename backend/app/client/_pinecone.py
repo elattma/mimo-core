@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
+from typing import List, Set, Tuple
 
 import pinecone
 
@@ -13,10 +13,57 @@ class RowType(Enum):
 class Row:
     id: str
     embedding: List[float]
+
     owner: str
+    integration: str
     document_id: str
     type: RowType
+    date_day: int
+    leaf: bool
 
+    def to_metadata_dict(self):
+        return {
+            'owner': self.owner,
+            'integration': self.integration,
+            'document_id': self.document_id,
+            'type': self.type.value,
+            'date_day': self.date_day,
+            'leaf': self.leaf
+        }
+
+@dataclass
+class Filter:
+    owner: str
+    integration: set[str] = None
+    document_id: set[str] = None
+    type: set[RowType] = None
+    min_max_date_day: Tuple[int, int] = None
+    leaf: bool = None
+
+    def to_dict(self):
+        filter = {
+            'owner': self.owner
+        }
+        if self.integration:
+            filter['integration'] = {
+                '$in': list(self.integration)
+            }
+        if self.document_id:
+            filter['document_id'] = {
+                '$in': list(self.document_id)
+            }
+        if self.type:
+            filter['type'] = {
+                '$in': [t.value for t in self.type]
+            }
+        if self.min_max_date_day:
+            filter['date_day'] = {
+                '$gte': self.min_max_date_day[0],
+                '$lte': self.min_max_date_day[1]
+            }
+        if self.leaf:
+            filter['leaf'] = self.leaf
+        return filter
 
 class Pinecone:
     def __init__(self, api_key: str, environment: str, index_name: str = 'pre-alpha'):
@@ -29,21 +76,25 @@ class Pinecone:
                 name=index_name, 
                 dimension=1536, 
                 metadata_config={
-                    'indexed': ['owner', 'document_id', 'type']
+                    'indexed': ['owner', 'integration', 'document_id', 'type', 'leaf']
                 }
             )
-            self._inde = pinecone.Index(index_name=index_name)
+            self._index = pinecone.Index(index_name=index_name)
         
-    def _delete_old_vectors(self, owners: List[str], document_ids: List[str]) -> bool:
-        if not (self._index and owners and len(owners) > 0 and document_ids and len(document_ids) > 0):
+    def _delete_old_vectors(self, rows: List[Row]) -> bool:
+        if not (self._index and rows and len(rows) > 0):
             return False
-        delete_response = self._inde.delete(
+        
+        owners = set([row.owner for row in rows])
+        document_ids = set([row.document_id for row in rows])
+
+        delete_response = self._index.delete(
             filter={
                 'owner': {
-                    '$in': owners
+                    '$in': list(owners)
                 },
                 'document_id': {
-                    '$in': document_ids
+                    '$in': list(document_ids)
                 }
             }
         )
@@ -58,7 +109,7 @@ class Pinecone:
         
         len_vectors = len(vectors)
         for batch_index in range(0, len_vectors, batch_size):
-            upsert_response = self._inde.upsert(vectors=vectors[batch_index:batch_index + batch_size])
+            upsert_response = self._index.upsert(vectors=vectors[batch_index:batch_index + batch_size])
             print(upsert_response)
             if hasattr(upsert_response, 'upserted_count') and upsert_response.upserted_count >= min(len_vectors - batch_index, batch_size):
                 print(upsert_response.upserted_count)
@@ -79,29 +130,21 @@ class Pinecone:
             vectors.append({
                 'id': row.id,
                 'values': row.embedding,
-                'metadata': {
-                    'owner': row.owner,
-                    'document_id': row.document_id,
-                    'type': row.type.value,
-                }
+                'metadata': row.to_metadata_dict()
             })
         
-        deleted = self._delete_old_vectors(owners=list(owners), document_ids=list(document_ids))
+        deleted = self._delete_old_vectors(rows)
         upserted = self._batched_upsert(vectors=vectors)
         return deleted and upserted
     
-    def query(self, embedding: List[float], owner: str, types: List[RowType], k: int = 5):
+    def query(self, embedding: List[float], query_filter: Filter, k: int = 5):
         if not (self._index and embedding and len(embedding) > 0):
             return None
+
         query_response = self._index.query(
             vector=embedding,
             top_k=k,
-            filter={
-                'owner': owner,
-                'type': {
-                    '$in': [type.value for type in types]
-                }
-            },
+            filter=query_filter.to_dict(),
             include_metadata=True,
             include_values=True
         )

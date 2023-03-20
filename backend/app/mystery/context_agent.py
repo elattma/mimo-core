@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Dict, List
 
-from app.client.neo4j import ChunkFilter, Neo4j, PredicateFilter, QueryFilter
-from app.client.open_ai import OpenAI
-from app.client.pinecone import Pinecone, RowType
+from app.client._neo4j import ChunkFilter, Neo4j, PredicateFilter, QueryFilter
+from app.client._openai import OpenAI
+from app.client._pinecone import Pinecone, RowType
 from app.mrkl.llm import LLM
 from app.mrkl.mrkl_agent import MRKLAgent
 from app.mrkl.prompt import TextPromptTemplate

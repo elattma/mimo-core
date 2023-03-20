@@ -3,9 +3,9 @@ from typing import List, Mapping
 
 from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
+from app.client._ssm import SSM, Integration
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB,
                                         UserIntegrationItem)
-from app.client.ssm import SSM, Integration
 
 db: ParentChildDB = None
 ssm: SSM = None

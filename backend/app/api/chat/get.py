@@ -6,7 +6,7 @@ from app.api.util.response import (Errors, to_response_error,
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB,
                                         UserChatItem)
 
-db = None
+db: ParentChildDB = None
 
 def handler(event: dict, context):
     global db

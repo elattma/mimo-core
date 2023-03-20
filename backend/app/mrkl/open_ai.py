@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union
 
-from app.client.open_ai import OpenAI
+from app.client._openai import OpenAI
 from app.mrkl.llm import LLM
 from app.mrkl.prompt import ChatPrompt, Prompt, TextPrompt
 

@@ -44,6 +44,7 @@ class Upload(Fetcher):
         if len(files) < 1:
             print('empty uploads!')
             return None
+        print(response)
         
         next_token = response.get('NextContinuationToken', None)
         items = []
