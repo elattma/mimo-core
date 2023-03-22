@@ -57,7 +57,6 @@ def handler(event: dict, context):
     if not openai_api_key:
         return to_response_error(Errors.MISSING_SECRETS.value)
 
-    # TODO: experiment different strategies like spacy similarity, etc.
     chat_history: List[UserChatItem] = []
     try:
         chat_history = db.query("{namespace}{user}".format(
