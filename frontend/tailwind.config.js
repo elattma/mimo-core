@@ -262,6 +262,7 @@ module.exports = {
         "theme-1/8": "0.1875rem",
         "theme-1/4": "0.375rem",
         "theme-1/2": "0.75rem",
+        "theme-3/4": "1.125rem",
         theme: "1.5rem",
         "theme-3/2": "2.25rem",
         "theme-2": "3rem",

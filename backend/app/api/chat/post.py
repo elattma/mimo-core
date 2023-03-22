@@ -18,10 +18,9 @@ db: ParentChildDB = None
 secrets: Secrets = None
 
 def handler(event: dict, context):
-    global secrets
+    global db, secrets
 
-    request_context: dict = event.get(
-        'requestContext', None) if event else None
+    request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get(
         'authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None

@@ -161,9 +161,6 @@ class MRKLAgent(Agent):
         self,
         llm_output: str
     ) -> Union[Action, FinalAnswer]:
-        print('________________________________')
-        print(llm_output)
-        print('________________________________')
         if self._final_answer_pattern in llm_output:
             output = llm_output.split(self._final_answer_pattern)[-1].strip()
             return FinalAnswer(output=output, log=llm_output)

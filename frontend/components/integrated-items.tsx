@@ -1,25 +1,27 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIntegratedItemsContext } from "@/contexts/integrated-items-context";
+import { useIntegrationsContext } from "@/contexts/integrations-context";
+import { Integration } from "@/models";
 import { cva } from "class-variance-authority";
-import { ChevronDown, Cog, Globe, Star } from "lucide-react";
+import { ChevronDown, Cog, Globe, SearchIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
   Dispatch,
-  SetStateAction,
   forwardRef,
+  SetStateAction,
   useCallback,
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -31,16 +33,17 @@ export default function IntegratedItems() {
         Integrated Items
       </p>
       <Filters />
+      <Search />
       <Items />
     </div>
   );
 }
 
-type SelectionType = "all" | "favorites" | "custom";
+type SelectionType = "all" | "custom";
 
 function Filters() {
+  const { integrations } = useIntegrationsContext();
   const allRef = useRef<HTMLDivElement>(null);
-  const favoritesRef = useRef<HTMLDivElement>(null);
   const customRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<SelectionType>("all");
 
@@ -57,24 +60,16 @@ function Filters() {
                 customRef.current?.focus();
                 setSelection("custom");
                 break;
-              case "favorites":
+              case "custom":
                 allRef.current?.focus();
                 setSelection("all");
-                break;
-              case "custom":
-                favoritesRef.current?.focus();
-                setSelection("favorites");
                 break;
             }
           } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
             switch (selection) {
               case "all":
-                favoritesRef.current?.focus();
-                setSelection("favorites");
-                break;
-              case "favorites":
-                customRef.current?.focus();
-                setSelection("custom");
+                allRef.current?.focus();
+                setSelection("all");
                 break;
               case "custom":
                 allRef.current?.focus();
@@ -85,15 +80,11 @@ function Filters() {
         }}
       >
         <All ref={allRef} selection={selection} setSelection={setSelection} />
-        <Favorites
-          ref={favoritesRef}
-          selection={selection}
-          setSelection={setSelection}
-        />
         <Custom
           ref={customRef}
           selection={selection}
           setSelection={setSelection}
+          integrations={integrations}
         />
       </div>
     </fieldset>
@@ -134,134 +125,107 @@ const All = forwardRef<HTMLDivElement, RadioProps>(
   }
 );
 
-const Favorites = forwardRef<HTMLDivElement, RadioProps>(
-  ({ selection, setSelection }, forwardedRef) => {
-    const [checked, setChecked] = useState<boolean>(false);
-    useEffect(() => {
-      console.log(checked);
-    }, [checked]);
-    return (
+const Custom = forwardRef<
+  HTMLDivElement,
+  RadioProps & { integrations: Integration[] }
+>(({ selection, setSelection, integrations }, forwardedRef) => {
+  const [selectedIntegrations, setSelectedIntegrations] = useState<
+    Record<string, boolean>
+  >(
+    integrations.reduce((o: Record<string, boolean>, integration) => {
+      o[integration.id] = false;
+      return o;
+    }, {})
+  );
+  return (
+    <div
+      className={[
+        "flex h-fit rounded-theme border text-sm",
+        selection === "custom"
+          ? "border-brand-border bg-brand-bg text-brand-text"
+          : "border-neutral-border bg-neutral-bg text-neutral-text",
+      ].join(" ")}
+    >
       <div
+        ref={forwardedRef}
         className={[
-          "flex h-fit rounded-theme border text-sm",
-          selection === "favorites"
-            ? "border-brand-border bg-brand-bg text-brand-text"
-            : "border-neutral-border bg-neutral-bg text-neutral-text",
-        ].join(" ")}
-      >
-        <div
-          ref={forwardedRef}
-          className={[
-            "flex cursor-pointer items-center space-x-theme-1/8 rounded-l-theme border-r px-theme-1/4 py-theme-1/8 transition-colors",
-            selection === "favorites"
-              ? "border-brand-border hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
-              : "border-neutral-border hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
-          ].join(" ")}
-          role="radio"
-          aria-checked={selection === "favorites"}
-          aria-label="favorites"
-          tabIndex={0}
-          onClick={() => setSelection("favorites")}
-          onKeyDown={(event) => {
-            if (event.key === " ") {
-              setSelection("favorites");
-            }
-          }}
-        >
-          <Star className="h-4 w-4" />
-          <p className="select-none">Favorites</p>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <div
-              className={[
-                "flex cursor-pointer items-center justify-center rounded-r-theme px-theme-1/8 transition-colors",
-                selection === "favorites"
-                  ? "hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
-                  : "hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
-              ].join(" ")}
-              role="button"
-              tabIndex={0}
-              aria-label="configure favorites filter for integrations"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuGroup>
-              <DropdownMenuCheckboxItem
-                checked={checked}
-                onCheckedChange={setChecked}
-              >
-                Google Drive
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    );
-  }
-);
-
-const Custom = forwardRef<HTMLDivElement, RadioProps>(
-  ({ selection, setSelection }, forwardedRef) => {
-    return (
-      <div
-        className={[
-          "flex h-fit rounded-theme border text-sm",
+          "flex cursor-pointer items-center space-x-theme-1/8 rounded-l-theme border-r px-theme-1/4 py-theme-1/8 transition-colors",
           selection === "custom"
-            ? "border-brand-border bg-brand-bg text-brand-text"
-            : "border-neutral-border bg-neutral-bg text-neutral-text",
+            ? "border-brand-border hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
+            : "border-neutral-border hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
         ].join(" ")}
+        role="radio"
+        aria-checked={selection === "custom"}
+        aria-label="custom"
+        tabIndex={0}
+        onClick={() => setSelection("custom")}
+        onKeyDown={(event) => {
+          if (event.key === " ") {
+            setSelection("custom");
+          }
+        }}
       >
-        <div
-          ref={forwardedRef}
-          className={[
-            "flex cursor-pointer items-center space-x-theme-1/8 rounded-l-theme border-r px-theme-1/4 py-theme-1/8 transition-colors",
-            selection === "custom"
-              ? "border-brand-border hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
-              : "border-neutral-border hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
-          ].join(" ")}
-          role="radio"
-          aria-checked={selection === "custom"}
-          aria-label="custom"
-          tabIndex={0}
-          onClick={() => setSelection("custom")}
-          onKeyDown={(event) => {
-            if (event.key === " ") {
-              setSelection("custom");
-            }
-          }}
-        >
-          <Cog className="h-4 w-4" />
-          <p className="select-none">Custom</p>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <div
-              className={[
-                "flex cursor-pointer items-center justify-center rounded-r-theme px-theme-1/8 transition-colors",
-                selection === "custom"
-                  ? "hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
-                  : "hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
-              ].join(" ")}
-              role="button"
-              tabIndex={0}
-              aria-label="configure custom filter for integrations"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuGroup>
-              <DropdownMenuItem>Google Drive</DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Cog className="h-4 w-4" />
+        <p className="select-none">Custom</p>
       </div>
-    );
-  }
-);
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div
+            className={[
+              "flex cursor-pointer items-center justify-center rounded-r-theme px-theme-1/8 transition-colors",
+              selection === "custom"
+                ? "hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
+                : "hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
+            ].join(" ")}
+            role="button"
+            tabIndex={0}
+            aria-label="configure custom filter for integrations"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuGroup>
+            {integrations.map((integration, index) => (
+              <DropdownMenuCheckboxItem
+                key={index}
+                checked={selectedIntegrations[integration.id]}
+                onCheckedChange={(checked) => {
+                  setSelectedIntegrations({
+                    ...selectedIntegrations,
+                    [integration.id]: checked,
+                  });
+                }}
+              >
+                {integration.name}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <Button className="w-full" variant="ghost" size="sm">
+              Apply
+            </Button>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+});
+
+function Search() {
+  return (
+    <div className="group mx-0.5 flex items-center space-x-theme-1/4 rounded-theme px-theme-1/8 ring-1 ring-neutral-line ring-offset-1 transition-[box-shadow] focus-within:ring-2 focus-within:ring-brand-line">
+      <SearchIcon className="h-4 w-4 text-gray-text group-focus-within:text-gray-text-contrast" />
+      <input
+        className="prevent-default-focus flex-1 bg-transparent text-sm text-gray-text-contrast placeholder-gray-text"
+        type="text"
+        placeholder="Search"
+        aria-label="Search integrated items"
+      />
+    </div>
+  );
+}
 
 const itemVariants = cva(
   "flex select-none items-center space-x-theme-1/2 p-theme-1/2 transition-colors hover:cursor-pointer prevent-default-focus outline-none",
@@ -328,7 +292,9 @@ function Items() {
                 width={20}
                 height={20}
               />
-              <p className="text-sm font-medium">{item.title}</p>
+              <p className="truncate whitespace-nowrap text-sm font-medium">
+                {item.title}
+              </p>
             </div>
           ))}
         </div>

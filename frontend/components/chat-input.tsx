@@ -13,6 +13,7 @@ export default function ChatInput() {
   const user = useUser();
   const { addToChatHistory } = useChatHistoryContext();
   const sendButtonRef = useRef<HTMLButtonElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState("");
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = (event) => {
@@ -43,6 +44,7 @@ export default function ChatInput() {
       </div>
       <div className="w-full flex items-end h-fit p-theme-1/2 gap-theme-1/2">
         <TextareaAutosize
+          ref={textareaRef}
           className="scrollbar-track-hidden grow resize-none text-gray-text-contrast outline-none bg-transparent prevent-default-focus"
           minRows={1}
           maxRows={5}
@@ -58,9 +60,12 @@ export default function ChatInput() {
         />
         <button
           ref={sendButtonRef}
-          className="bg-transparent rounded-theme pl-theme-1/4 pr-theme-1/2 py-theme-1/8 hover:bg-brand-solid-hover focus:bg-brand-solid-hover active:bg-brand-11 transition-colors group-focus-within:bg-brand-solid"
+          className="bg-transparent rounded-theme pl-theme-1/4 pr-theme-1/2 py-theme-1/8 hover:group-focus-within:bg-brand-solid-hover focus:bg-brand-solid-hover active:bg-brand-11 transition-colors group-focus-within:bg-brand-solid"
           type="submit"
-          onClick={event => event.currentTarget.blur()}
+          onClick={event => {
+            event.currentTarget.blur()
+            textareaRef.current?.focus()
+          }}
         >
           <Send className="rotate-45 group-focus-within:stroke-brand-on-solid stroke-neutral-text transition-colors" width={18} height={18} />
         </button>

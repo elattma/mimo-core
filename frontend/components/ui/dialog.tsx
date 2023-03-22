@@ -3,7 +3,7 @@
 import { cn } from "@/lib/util";
 import * as Primitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { HTMLAttributes, forwardRef } from "react";
+import { forwardRef, HTMLAttributes } from "react";
 
 const Dialog = Primitive.Root;
 
@@ -52,7 +52,15 @@ const DialogContent = forwardRef<
       {...props}
     >
       {children}
-      <DialogClose />
+      <DialogClose
+        className={cn(
+          "text-neural-text absolute top-theme right-theme rounded-theme p-theme-1/4 transition-colors active:bg-neutral-bg-active hocus:bg-neutral-bg-hover hocus:text-neutral-text-contrast",
+          className
+        )}
+      >
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+      </DialogClose>
     </Primitive.Content>
   </DialogPortal>
 ));
@@ -61,18 +69,8 @@ DialogContent.displayName = Primitive.Content.displayName;
 const DialogClose = forwardRef<
   React.ElementRef<typeof Primitive.Close>,
   React.ComponentPropsWithoutRef<typeof Primitive.Close>
->(({ className, ...props }, forwardedRef) => (
-  <Primitive.Close
-    ref={forwardedRef}
-    className={cn(
-      "text-neural-text absolute top-theme right-theme rounded-theme p-theme-1/4 transition-colors active:bg-neutral-bg-active hocus:bg-neutral-bg-hover hocus:text-neutral-text-contrast",
-      className
-    )}
-    {...props}
-  >
-    <X className="h-4 w-4" />
-    <span className="sr-only">Close</span>
-  </Primitive.Close>
+>(({ ...props }, forwardedRef) => (
+  <Primitive.Close ref={forwardedRef} {...props} />
 ));
 DialogClose.displayName = Primitive.Close.displayName;
 
@@ -124,4 +122,5 @@ export {
   DialogDescription,
   DialogHeader,
   DialogFooter,
+  DialogClose,
 };

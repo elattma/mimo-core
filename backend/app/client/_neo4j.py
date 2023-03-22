@@ -127,7 +127,7 @@ class PredicateFilter:
     texts: Set[str] = None
 
 @dataclass
-class QueryFilter():
+class QueryFilter:
     owner: str
     document_filter: DocumentFilter = None
     chunk_filter: ChunkFilter = None

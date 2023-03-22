@@ -3,12 +3,10 @@
 import { Integration } from "@/models";
 import { GetIntegrationResponse } from "@/types/responses";
 import {
-  Dispatch,
+  createContext, Dispatch,
   ReactNode,
-  SetStateAction,
-  createContext,
-  useContext,
-  useState,
+  SetStateAction, useContext,
+  useState
 } from "react";
 
 type IntegrationsType = Integration[];

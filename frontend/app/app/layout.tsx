@@ -14,7 +14,7 @@ const AppLayout = async ({ children }: AppLayoutProps) => {
 
   return (
     <div className="flex max-h-screen min-h-0 grow flex-col overflow-y-hidden">
-      <header className="top container sticky z-40 bg-neutral-base">
+      <header className="container sticky top-0 z-40 bg-neutral-base">
         <div className="flex items-center justify-between border-b border-b-neutral-border py-theme-1/2">
           <MainNav items={appConfig.mainNav} />
           <UserNav />

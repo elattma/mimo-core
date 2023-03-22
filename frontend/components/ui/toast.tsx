@@ -1,6 +1,6 @@
 import { cn } from "@/lib/util";
 import * as Primitive from "@radix-ui/react-toast";
-import { VariantProps, cva } from "class-variance-authority";
+import { cva, VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import { ComponentPropsWithoutRef, ElementRef, forwardRef } from "react";
 
@@ -13,7 +13,7 @@ const ToastViewport = forwardRef<
   <Primitive.Viewport
     ref={forwardedRef}
     className={cn(
-      "fixed bottom-theme left-theme z-[100] max-h-screen w-full",
+      "fixed bottom-theme right-theme z-[100] flex max-h-screen w-80 max-w-[100vw] flex-col items-end",
       className
     )}
     {...props}

@@ -1,10 +1,10 @@
 "use client";
 import { cn } from "@/lib/util";
 import { Slot } from "@radix-ui/react-slot";
-import { VariantProps, cva } from "class-variance-authority";
+import { cva, VariantProps } from "class-variance-authority";
 import { ButtonHTMLAttributes, forwardRef } from "react";
 
-const buttonVariants = cva("rounded-theme font-medium transition-colors", {
+const buttonVariants = cva("rounded-theme font-semibold transition-colors", {
   variants: {
     variant: {
       default:
@@ -20,9 +20,9 @@ const buttonVariants = cva("rounded-theme font-medium transition-colors", {
         "bg-danger-solid text-danger-on-solid hover:bg-danger-solid-hover active:bg-danger-11",
     },
     size: {
-      default: "py-theme-1/4 px-theme text-sm",
+      default: "py-theme-1/4 px-theme-3/4 text-sm",
       sm: "py-theme-1/4 px-theme-1/2 text-xs",
-      lg: "py-theme-1/4 px-theme-2 text-base",
+      lg: "py-theme-1/4 px-theme text-base",
     },
   },
   defaultVariants: {

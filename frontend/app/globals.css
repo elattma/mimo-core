@@ -296,4 +296,30 @@
   .prevent-default-focus {
     @apply outline-none;
   }
+
+  .toast-animations[data-state="open"] {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .toast-animations[data-state="closed"] {
+    animation: fadeOut 0.3s ease-in-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }

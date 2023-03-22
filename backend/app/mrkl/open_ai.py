@@ -5,8 +5,8 @@ from app.client._openai import OpenAI
 from app.mrkl.llm import LLM
 from app.mrkl.prompt import ChatPrompt, Prompt, TextPrompt
 
-DEFAULT_TEXT_MODEL = "text-davinci-003"
-DEFAULT_CHAT_MODEL = "gpt-3.5-turbo"
+DEFAULT_TEXT_MODEL = 'text-davinci-003'
+DEFAULT_CHAT_MODEL = 'gpt-3.5-turbo'
 DEFAULT_MAX_TOKENS = 1000
 DEFAULT_TEMPERATURE = 0
 DEFAULT_TOP_P = None
@@ -15,7 +15,7 @@ DEFAULT_STOP = None
 
 
 class OpenAIBase(LLM, ABC):
-    """Abstract class for OpenAI's completion models."""
+    '''Abstract class for OpenAI's completion models.'''
 
     def __init__(
         self,
@@ -27,7 +27,7 @@ class OpenAIBase(LLM, ABC):
         n: Optional[int] = DEFAULT_N,
         stop: Optional[Union[str, List[str]]] = DEFAULT_STOP,
     ) -> None:
-        """Creates an instance for an OpenAI LLM.
+        '''Creates an instance for an OpenAI LLM.
 
             Args:
                 `model` `Optional[str]`: The OpenAI model to use.
@@ -46,7 +46,7 @@ class OpenAIBase(LLM, ABC):
 
             Returns:
                 `None`
-        """
+        '''
         self._client = client
         self._model: str = model
         self._max_tokens: int = max_tokens
@@ -54,7 +54,12 @@ class OpenAIBase(LLM, ABC):
         self._top_p: Union[int, None] = top_p
         self._n: int = n
         self._stop: Union[str, List[str], None] = stop
-        
+
+    @property
+    @abstractmethod
+    def encoding_name(self) -> str:
+        raise NotImplementedError
+
     @abstractmethod
     def predict(
         self,
@@ -64,9 +69,8 @@ class OpenAIBase(LLM, ABC):
         super().predict(prompt, stop)
 
 
-
 class OpenAIText(OpenAIBase):
-    """Interfaces with any of OpenAI's text completion models."""
+    '''Interfaces with any of OpenAI's text completion models.'''
 
     def __init__(
         self,
@@ -87,7 +91,13 @@ class OpenAIText(OpenAIBase):
             n=n,
             stop=stop
         )
-        
+
+    @property
+    def encoding_name(self) -> str:
+        if self._model == 'text-davinci-003':
+            return 'p50k_base'
+        else:
+            raise NotImplementedError
 
     def predict(
         self,
@@ -106,7 +116,7 @@ class OpenAIText(OpenAIBase):
 
 
 class OpenAIChat(OpenAIBase):
-    """Interfaces with any of OpenAI's chat completion models."""
+    '''Interfaces with any of OpenAI's chat completion models.'''
 
     def __init__(
         self,
@@ -127,7 +137,13 @@ class OpenAIChat(OpenAIBase):
             n=n,
             stop=stop
         )
-        
+
+    @property
+    def encoding_name(self) -> str:
+        if self._model == 'gpt-3.5-turbo' or self._model == 'gpt-4':
+            return 'cl100k_base'
+        else:
+            raise NotImplementedError
 
     def predict(
         self,
@@ -136,8 +152,8 @@ class OpenAIChat(OpenAIBase):
     ) -> str:
         messages = [
             {
-                "role": message.role,
-                "content": message.content
+                'role': message.role,
+                'content': message.content
             } for message in prompt.prompt
         ]
         return self._client.chat_completion(
