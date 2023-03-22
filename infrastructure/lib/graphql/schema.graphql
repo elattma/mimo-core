@@ -13,7 +13,8 @@ input ChatInput {
   userId: ID!,
   inputChatId: ID!, 
   outputChatId: ID!, 
-  message: String!, 
+  message: String!,
+  is_progress: Boolean!,
   role: String!,
   timestamp: Int
 }
@@ -23,6 +24,7 @@ type Chat {
   inputChatId: ID!, 
   outputChatId: ID!, 
   message: String!, 
+  is_progress: Boolean!,
   role: String!,
   timestamp: Int
 }

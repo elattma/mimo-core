@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, Generator, List, Optional, Union
 
 from openai import ChatCompletion, Completion, Embedding
 
@@ -69,6 +69,51 @@ class OpenAI:
         text: str = choices[0].get('text', None) if choices and len(choices) > 0 else None
         return text
     
+    def stream_chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        model: str = 'gpt-3.5-turbo',
+        max_tokens: int = 1000,
+        temperature: float = 0,
+        top_p: int = None,
+        n: int = 1,
+        stop: Optional[Union[str, List[str]]] = None,
+    ) -> Generator[str]:
+        if not (self._api_key and messages and len(messages) > 0):
+            return None
+
+        response_stream = ChatCompletion.create(
+            api_key=self._api_key,
+            messages=messages,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            n=n,
+            stop=stop,
+            stream=True
+        )
+
+        output: str = ''
+        accumulated_tokens: int = 0
+        for response in response_stream:
+            choices: List[dict] = response.get('choices', None) if response else None
+            if not choices or len(choices) == 0:
+                continue
+
+            for choice in choices:
+                delta: dict = choice.get('delta', None) if choice else None
+                streamed_output: dict = delta.get('content', None) if delta else None
+                if not streamed_output:
+                    continue
+                output += streamed_output
+                accumulated_tokens += len(streamed_output)
+            if accumulated_tokens > 20:
+                yield output
+                accumulated_tokens = 0
+        if accumulated_tokens > 0:
+            yield output
+
     def chat_completion(
         self,
         messages: List[Dict[str, str]],

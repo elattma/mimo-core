@@ -1,16 +1,15 @@
 import json
 import os
 import time
-from typing import Generator, List
+from typing import List
 
-import requests
 from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
+from app.api.util.stream import send_chat
+from app.client._openai import OpenAI
 from app.client._secrets import Secrets
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB, Roles,
                                         UserChatItem)
-from openai import ChatCompletion
-from openai.openai_object import OpenAIObject
 from ulid import ulid
 
 MODEL = "gpt-3.5-turbo"
@@ -65,52 +64,24 @@ def handler(event: dict, context):
         print("empty history!")
 
     # TODO: fetch relevant context from selected items or knowledge base and use as context to prompt
-    summary: str = None
 
-    messages = [{ 'role': 'system', 'content': 'You are a helpful assistant.' }]
-    if summary:
-        messages.append({ 'role': 'user', 'content': summary })
-    messages.extend([{ 'role': chat_item.role, 'content': chat_item.message } for chat_item in chat_history])
-    messages.append({ 'role': role, 'content': message })
-    print(messages)
-
-    response_stream: Generator[OpenAIObject] = ChatCompletion.create(
-        api_key=openai_api_key,
-        model=MODEL,
-        messages=messages,
-        temperature=0,
-        stream=True
-    )
+    openai = OpenAI(api_key=openai_api_key)
+    response_stream = openai.stream_chat_completion([])
     output_chat_id = ulid()
     output_role = Roles.ASSISTANT.value
     output_timestamp = int(time.time())
-
-    output: str = ""
-    accumulated_tokens: int = 0
-    for response in response_stream:
-        choices: List[dict] = response.get('choices', None) if response else None
-        if not choices or len(choices) == 0:
-            continue
-
-        for choice in choices:
-            delta: dict = choice.get('delta', None) if choice else None
-            streamed_output: dict = delta.get('content', None) if delta else None
-            if not streamed_output:
-                continue
-            output += streamed_output
-            accumulated_tokens += len(streamed_output)
-        if accumulated_tokens > 20:
-            send_chat(
-                appsync_endpoint=appsync_endpoint, 
-                authorization=authorization, 
-                user_id=user, 
-                input_chat_id=chat_id, 
-                output_chat_id=output_chat_id, 
-                message=output, 
-                role=Roles.ASSISTANT.value, 
-                timestamp=output_timestamp
-            )
-            accumulated_tokens = 0
+    
+    for output in response_stream:
+        send_chat(
+            appsync_endpoint=appsync_endpoint, 
+            authorization=authorization, 
+            user_id=user, 
+            input_chat_id=chat_id, 
+            output_chat_id=output_chat_id, 
+            message=output, 
+            role=Roles.ASSISTANT.value, 
+            timestamp=output_timestamp
+        )
 
     if not output:
         return to_response_error(Errors.OPENAI_ERROR.value)
@@ -141,32 +112,3 @@ def handler(event: dict, context):
         'role': output_role,
         'timestamp': output_timestamp
     })
-
-
-def send_chat(appsync_endpoint: str, authorization: str, user_id: str, input_chat_id: str, output_chat_id: str, message: str, role: str, timestamp: int) -> None:
-    if not message:
-        return
-
-    query = 'mutation($input: ChatInput!) { proxyChat(input: $input) { userId, inputChatId, outputChatId, message, role, timestamp }}'
-    variables = json.dumps({
-        "input": {
-            "userId": user_id,
-            "inputChatId": input_chat_id,
-            "outputChatId": output_chat_id,
-            "message": message,
-            "role": role,
-            "timestamp": timestamp
-        }
-    })
-    response = requests.post(
-        appsync_endpoint,
-        headers={
-            'Authorization': authorization.replace('Bearer ', '')
-        },
-        data=json.dumps({
-            'query': query,
-            'variables': variables
-        })
-    )
-    appsync_response = response.json()
-    print(appsync_response)
