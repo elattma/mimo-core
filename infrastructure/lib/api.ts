@@ -516,7 +516,7 @@ export class ApiStack extends Stack {
         GRAPH_DB_URI: NEO_4J_URI,
       },
       memorySize: 1024,
-      timeout: Duration.seconds(20),
+      timeout: Duration.seconds(120),
     });
     this.integrationsSecret.grantRead(chatHandler);
     mimoTable.grantReadWriteData(chatHandler);

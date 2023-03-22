@@ -159,8 +159,9 @@ class ChatSystem:
             prompt = self._generate_prompt(query)
             
         if not prompt:
-            return 'Failed to grab context.'
-        return self._chat_gpt.predict(prompt=prompt)
+            yield 'Failed to grab context.'
+            return
+        yield from self._chat_gpt.stream_predict(prompt=prompt)
 
     def _get_steps(self, query: str) -> str:
         '''Calls GPT-4 to get the steps for the context that needs to be fetched.
