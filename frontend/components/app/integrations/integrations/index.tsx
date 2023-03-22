@@ -33,7 +33,7 @@ const Integrations = ({ integrationData }: Props) => {
     } else {
       setIntegrations([]);
     }
-  }, [filterUnauthorized, filterAuthorized]);
+  }, [filterUnauthorized, filterAuthorized, allIntegrations]);
 
   return (
     <div className="flex space-x-theme">

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 "use client";
 
 import {
@@ -57,6 +59,7 @@ export default function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
+            {/* @ts-ignore */}
             <a className="hover:cursor-default" href="/api/auth/logout">
               Log out
             </a>

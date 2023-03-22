@@ -43,5 +43,6 @@ const ScrollArea = forwardRef<
     </Primitive.Root>
   )
 );
+ScrollArea.displayName = "ScrollArea";
 
 export { ScrollArea };

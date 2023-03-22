@@ -124,6 +124,7 @@ const All = forwardRef<HTMLDivElement, RadioProps>(
     );
   }
 );
+All.displayName = "All";
 
 const Custom = forwardRef<
   HTMLDivElement,
@@ -212,6 +213,7 @@ const Custom = forwardRef<
     </div>
   );
 });
+Custom.displayName = "Custom";
 
 function Search() {
   return (

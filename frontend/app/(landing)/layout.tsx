@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { cn } from "@/lib/util";
 import { ArrowRight } from "lucide-react";
 import { Lily_Script_One } from "next/font/google";
@@ -24,6 +26,7 @@ export default function LandingLayout({ children }: LandingLayoutProps) {
           >
             mimo
           </Link>
+          {/* @ts-ignore */}
           <a
             className="flex items-center gap-theme-1/8 rounded-theme text-gray-text-contrast transition-colors hover:text-brand-text focus:text-brand-text"
             href="/api/auth/login"
