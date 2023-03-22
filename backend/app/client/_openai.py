@@ -78,7 +78,7 @@ class OpenAI:
         top_p: int = None,
         n: int = 1,
         stop: Optional[Union[str, List[str]]] = None,
-    ) -> Generator[str]:
+    ) -> Generator:
         if not (self._api_key and messages and len(messages) > 0):
             return None
 
@@ -123,7 +123,7 @@ class OpenAI:
         top_p: int = None,
         n: int = 1,
         stop: Optional[Union[str, List[str]]] = None,
-    ):
+    ) -> str:
         if not (self._api_key and messages and len(messages) > 0):
             return None
 

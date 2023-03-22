@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union
+from typing import Generator, List, Optional, Union
 
 from app.client._openai import OpenAI
 from app.mrkl.llm import LLM
@@ -164,4 +164,25 @@ class OpenAIChat(OpenAIBase):
             top_p=self._top_p,
             n=self._n,
             stop=stop if stop else self._stop
+        )
+
+    def stream_predict(
+        self,
+        prompt: ChatPrompt,
+        stop: Optional[Union[str, List[str]]] = None
+    ) -> Generator:
+        messages = [
+            {
+                'role': message.role,
+                'content': message.content
+            } for message in prompt.prompt
+        ]
+        yield from self._client.stream_chat_completion(
+            messages=messages,
+            model=self._model,
+            max_tokens=self._max_tokens,
+            temperature=self._temperature,
+            top_p=self._top_p,
+            n=self._n,
+            stop=stop if stop else self._stop,
         )

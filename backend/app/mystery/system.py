@@ -1,7 +1,6 @@
-from typing import List, Dict
 from functools import reduce
+from typing import Dict, Generator, List
 
-from tiktoken import Encoding, get_encoding
 from app.client._neo4j import Neo4j
 from app.client._openai import OpenAI
 from app.client._pinecone import Pinecone
@@ -9,7 +8,8 @@ from app.mrkl.mrkl_agent import MRKLAgent
 from app.mrkl.open_ai import OpenAIChat, OpenAIText
 from app.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                              ChatPromptMessageRole)
-from app.mystery.context_agent import ContextAgent, Context
+from app.mystery.context_agent import Context, ContextAgent
+from tiktoken import Encoding, get_encoding
 
 MAX_TOKENS = 3000
 SYSTEM_MESSAGE = '''Pretend you are now DataGPT. You know everything that GPT-4 was trained on.
@@ -71,8 +71,8 @@ class ChatSystem:
             self._chat_encoding = get_encoding(
                 self._gpt_4.encoding_name
             )
-
-    def run(self, query: str) -> str:
+    
+    def _generate_contextualized_prompt(self, query: str) -> ChatPrompt:
         '''Produces a response to a query that is contextualized by the user's
         knowledge base.
           Args:
@@ -93,6 +93,9 @@ class ChatSystem:
         contexts: Dict[str, Context] = {}
         for step in steps:
             contexts[step] = self._context_agent.run(step)
+        
+        if not (contexts and len(contexts) > 0):
+            return None
 
         # Minify each context if the total number of tokens is too large
         token_count = reduce(
@@ -121,9 +124,43 @@ class ChatSystem:
         prompt = ChatPrompt(
             messages=[system_message, user_message]
         )
+        return prompt
+    
+    def _generate_prompt(self, query: str) -> ChatPrompt:
+        system_message = ChatPromptMessage(
+            role=ChatPromptMessageRole.SYSTEM.value,
+            content='Answer the user\'s message'
+        )
 
+        user_message = ChatPromptMessage(
+            role=ChatPromptMessageRole.USER.value,
+            content=query
+        )
+
+        prompt = ChatPrompt(
+            messages=[system_message, user_message]
+        )
+        return prompt
+
+    def run(self, query: str, contextualized: bool = False) -> str:
+        if contextualized:
+            prompt = self._generate_contextualized_prompt(query, contextualized)
+        else:
+            prompt = self._generate_prompt(query)
+
+        if not prompt:
+            return 'Failed to grab context.'
         return self._chat_gpt.predict(prompt=prompt)
             
+    def stream_run(self, query: str, contextualized: bool = False) -> Generator:
+        if contextualized:
+            prompt = self._generate_contextualized_prompt(query, contextualized)
+        else:
+            prompt = self._generate_prompt(query)
+            
+        if not prompt:
+            return 'Failed to grab context.'
+        return self._chat_gpt.predict(prompt=prompt)
 
     def _get_steps(self, query: str) -> str:
         '''Calls GPT-4 to get the steps for the context that needs to be fetched.

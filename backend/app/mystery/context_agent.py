@@ -1,19 +1,21 @@
-from abc import ABC
 import calendar
-from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Union, Literal
 import datetime
-import re
 import json
+import re
+from abc import ABC
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Literal, Tuple, Union
 
-from app.client._neo4j import EntityFilter, Neo4j, QueryFilter, PredicateFilter, ChunkFilter, DocumentFilter
+from app.client._neo4j import (ChunkFilter, DocumentFilter, EntityFilter,
+                               Neo4j, PredicateFilter, QueryFilter)
 from app.client._openai import OpenAI
-from app.client._pinecone import Pinecone, Filter as VectorFilter, RowType
+from app.client._pinecone import Filter as VectorFilter
+from app.client._pinecone import Pinecone, RowType
 from app.mrkl.llm import LLM
+from app.mrkl.open_ai import OpenAIChat
 from app.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                              ChatPromptMessageRole)
-from app.mrkl.open_ai import OpenAIChat
 from neo4j import Record
 
 now = datetime.datetime.now()
@@ -54,9 +56,6 @@ Tool documentation:
 # Returns the respective chunk IDs or document IDs
 {{
  "action": "Knowledge Graph on Triplet IDs",
- "input": {{
-  "knowledge_triplet_ids": List[str]
- }},
  "output": {{
   "type": "chunk_ids" | "document_ids"
  }}
@@ -181,8 +180,6 @@ Response:
     this_month_end = now.strftime(f'%Y-%m-{last_day_of_month}')
 )
 
-print(SYSTEM_MESSAGE)
-
 class ContextAgentError(Enum):
     # TODO: Make these the actual responses that the user will see
     CREATE_ACTION_ERROR = 'Error creating action'
@@ -214,12 +211,10 @@ class Action(ABC):
                 output_type=IdType(output_type)
             )
         elif action_name == ActionName.KNOWLEDGE_GRAPH_ON_TRIPLET_IDS.value:
-            triplet_ids = step.get('input', {}).get('knowledge_triplet_ids', [])
             output_type = step.get('output', {}).get('type', None)
-            if not triplet_ids or not output_type:
+            if not output_type:
                 return ContextAgentError.CREATE_ACTION_ERROR
             return KnowledgeGraphOnTripletsAction(
-                triplet_ids=triplet_ids,
                 output_type=IdType(output_type)
             )
         elif action_name == ActionName.DOCUMENT_GRAPH.value:
@@ -284,7 +279,6 @@ class KnowledgeGraphOnKeywordsAction(Action):
 
 @dataclass
 class KnowledgeGraphOnTripletsAction(Action):
-    triplet_ids: List[str]
     output_type: Union[Literal[IdType.CHUNK], Literal[IdType.DOCUMENT]]
 
 @dataclass

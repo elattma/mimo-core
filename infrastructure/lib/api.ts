@@ -45,6 +45,8 @@ interface LambdaParams {
   readonly timeout?: Duration;
 }
 
+const NEO_4J_URI = "neo4j+s://67eff9a1.databases.neo4j.io";
+
 export class ApiStack extends Stack {
   readonly api: RestApi;
   readonly authorizer: IAuthorizer;
@@ -178,7 +180,7 @@ export class ApiStack extends Stack {
       environment: {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
-        GRAPH_DB_URI: "neo4j+s://67eff9a1.databases.neo4j.io",
+        GRAPH_DB_URI: NEO_4J_URI,
       },
       memorySize: 2048,
       timeout: Duration.minutes(10),
@@ -511,6 +513,7 @@ export class ApiStack extends Stack {
         STAGE: stageId,
         APPSYNC_ENDPOINT: graphqlUrl,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
+        GRAPH_DB_URI: NEO_4J_URI,
       },
       memorySize: 1024,
       timeout: Duration.seconds(20),
@@ -545,6 +548,7 @@ export class ApiStack extends Stack {
       },
     });
 
+    // @mo TODO: add contextualized
     const chatRequestModel = this.api.addModel("ChatRequestModel", {
       contentType: "application/json",
       modelName: "ChatRequest",

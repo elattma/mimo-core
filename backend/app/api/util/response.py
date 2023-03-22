@@ -15,6 +15,7 @@ class Errors(Enum):
     AUTH_FAILED = 'auth failed'
     DB_WRITE_FAILED = 'db write failed'
     OPENAI_ERROR = 'openai error'
+    CHAT_ERROR = 'chat error'
     S3_ERROR = 's3 error'
 
 def to_response_error(error_message: Errors = 'An error occurred'):
