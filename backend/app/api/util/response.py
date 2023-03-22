@@ -1,5 +1,4 @@
 import json
-from decimal import Decimal
 from enum import Enum
 
 HEADERS = {
@@ -27,15 +26,9 @@ def to_response_error(error_message: Errors = 'An error occurred'):
         })
     } 
 
-class DecimalEncoder(json.JSONEncoder):
-  def default(self, obj):
-    if isinstance(obj, Decimal):
-      return str(obj)
-    return json.JSONEncoder.default(self, obj)
-
 def to_response_success(body: dict):
     return {
         'statusCode': 200,
         'headers': HEADERS,
-        'body': json.dumps(body, cls=DecimalEncoder, default=lambda o: o.__dict__)
+        'body': json.dumps(body, default=lambda o: o.__dict__)
     }

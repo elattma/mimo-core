@@ -82,7 +82,7 @@ def handler(event: dict, context):
     output_timestamp = int(time.time())
 
     response_stream = system.stream_run(message)
-    final_response = ''
+    final_response: str = ''
     for output in response_stream:
         send_chat(
             appsync_endpoint=appsync_endpoint, 
@@ -120,5 +120,5 @@ def handler(event: dict, context):
         'message': final_response,
         'author': MODEL,
         'role': output_role,
-        'timestamp': output_timestamp
+        'timestamp': str(output_timestamp)
     })

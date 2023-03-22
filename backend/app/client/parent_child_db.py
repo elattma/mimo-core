@@ -40,6 +40,30 @@ class UserChatItem(ParentChildItem):
     role: str
     timestamp: int
 
+    @staticmethod
+    def from_dict(item: dict):
+        if not item:
+            return None
+
+        parent = item.get('parent', None)
+        child = item.get('child', None)
+        message = item.get('message', None)
+        author = item.get('author', None)
+        role = item.get('role', None)
+        timestamp = item.get('timestamp', None)
+
+        if not (parent and child and message and author and role and timestamp):
+            return None
+        
+        return UserChatItem(
+            parent=parent,
+            child=child,
+            message=message,
+            author=author,
+            role=role,
+            timestamp=int(timestamp),
+        )
+
 @dataclass
 class UserIntegrationItem(ParentChildItem):
     access_token: str = None
@@ -47,6 +71,27 @@ class UserIntegrationItem(ParentChildItem):
     timestamp: int = None
     expiry_timestamp: int = None
     last_fetch_timestamp: int = None
+
+    @staticmethod
+    def from_dict(item: dict):
+        if not item:
+            return None
+
+        parent = item.get('parent', None)
+        child = item.get('child', None)
+
+        if not (parent and child):
+            return None
+        
+        return UserIntegrationItem(
+            parent=parent,
+            child=child,
+            access_token=item.get('access_token', None),
+            refresh_token=item.get('refresh_token', None),
+            timestamp=item.get('timestamp', None),
+            expiry_timestamp=item.get('expiry_timestamp', None),
+            last_fetch_timestamp=item.get('last_fetch_timestamp', None),
+        )
 
 class ParentChildDB:
     table = None
@@ -99,15 +144,27 @@ class ParentChildDB:
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
         else:
-            if not response['Items']:
+            response_items = response.get('Items', None) if response else None
+            if not response:
                 return []
+            
             items = []
-            for item in response['Items']:
-                if item['child']:
-                    if item['child'].startswith(KeyNamespaces.CHAT.value):
-                        items.append(UserChatItem(**item))
-                    if item['child'].startswith(KeyNamespaces.INTEGRATION.value):
-                        items.append(UserIntegrationItem(**item))
-                else:
-                    print("invalid item!" + json.dumps(item))
+            for response_item in response_items:
+                parent = response_item.get('parent', None) if response_item else None
+                child = response_item.get('child', None) if response_item else None
+                if not child:
+                    continue
+                
+                item: ParentChildItem = None
+                if child.startswith(KeyNamespaces.CHAT.value):
+                    item = UserChatItem.from_dict(response_item)
+                elif child.startswith(KeyNamespaces.INTEGRATION.value):
+                    item = UserIntegrationItem.from_dict(response_item)
+                
+                if not item:
+                    print("invalid item!")
+                    print(response_item)
+                    continue
+
+                items.append(item)
             return items
