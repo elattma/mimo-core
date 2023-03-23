@@ -5,7 +5,6 @@ from typing import List
 import requests
 from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
                               Filter, Item)
-from unstructured.partition.email import partition_email
 
 
 class GoogleMail(Fetcher):

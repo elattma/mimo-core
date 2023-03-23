@@ -48,7 +48,10 @@ def handler(event: dict, context):
     response_items: List[DiscoveryResponse] = []
     futures = None
     with ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
-        futures = [executor.submit(fetcher.discover) for fetcher in fetchers]
+        futures = []
+        for fetcher in fetchers:
+            if fetcher:
+                futures.append(executor.submit(fetcher.discover))
 
     if futures:
         for future in as_completed(futures):
