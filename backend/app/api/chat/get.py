@@ -28,6 +28,7 @@ def handler(event: dict, context):
     if next_token:
         query_args['next_token'] = next_token
     user_chat_items: List[UserChatItem] = db.query("{namespace}{user}".format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value, **query_args)
+    user_chat_items.reverse()
 
     return to_response_success([{
         'id': user_chat_item.get_raw_child(),

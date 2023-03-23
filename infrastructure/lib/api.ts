@@ -454,7 +454,7 @@ export class ApiStack extends Stack {
       environment: {
         STAGE: stageId,
       },
-      timeout: Duration.seconds(5),
+      timeout: Duration.seconds(20),
       memorySize: 512,
     });
     mimoTable.grantWriteData(authIntegrationHandler);
