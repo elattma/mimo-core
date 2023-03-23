@@ -2,12 +2,6 @@ import { mock_logRequest, mock_logResponse } from "@/lib/logs";
 import { NextRequest } from "next/server";
 
 const GET = async (request: NextRequest) => {
-  if (process.env.NODE_ENV !== "development") {
-    return new Response(null, {
-      status: 400,
-      statusText: "This endpoint is only available in development",
-    });
-  }
   mock_logRequest(request);
   const response = new Response(
     JSON.stringify([
@@ -94,12 +88,6 @@ const GET = async (request: NextRequest) => {
 };
 
 const POST = async (request: NextRequest) => {
-  if (process.env.NODE_ENV !== "development") {
-    return new Response(null, {
-      status: 400,
-      statusText: "This endpoint is only available in development",
-    });
-  }
   mock_logRequest(request);
   const response = new Response(JSON.stringify({ message: "OK" }), {
     status: 200,
