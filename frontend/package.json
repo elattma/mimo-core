@@ -9,9 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@apollo/client": "^3.7.10",
     "@auth0/nextjs-auth0": "^2.2.1",
     "@aws-sdk/client-s3": "^3.282.0",
     "@aws-sdk/lib-storage": "^3.282.0",
+    "@radix-ui/react-checkbox": "^1.0.3",
     "@radix-ui/react-dialog": "^1.0.2",
     "@radix-ui/react-dropdown-menu": "^2.0.3",
     "@radix-ui/react-scroll-area": "^1.0.3",
@@ -21,11 +23,13 @@
     "@types/node": "18.14.1",
     "@types/react": "18.0.28",
     "@types/react-dom": "18.0.11",
+    "bufferutil": "^4.0.7",
     "chalk": "^5.2.0",
     "class-variance-authority": "^0.4.0",
     "clsx": "^1.2.1",
     "eslint": "8.34.0",
     "eslint-config-next": "13.2.1",
+    "isomorphic-ws": "^5.0.0",
     "lucide-react": "^0.115.0",
     "next": "13.2.1",
     "react": "18.2.0",
@@ -35,9 +39,11 @@
     "react-wrap-balancer": "^0.4.0",
     "sharp": "^0.31.3",
     "stream": "^0.0.2",
+    "subscriptions-transport-ws": "^0.11.0",
     "tailwind-merge": "^1.10.0",
     "typescript": "4.9.5",
-    "ulid": "^2.3.0"
+    "ulid": "^2.3.0",
+    "utf-8-validate": "^5.0.10"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.13",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Switch, SwitchThumb } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useChatHistoryContext } from "@/contexts/chat-history-context";
 import { clientPost } from "@/lib/client-fetchers";
 import { Chat } from "@/models";
@@ -15,6 +15,7 @@ export default function ChatInput() {
   const sendButtonRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState("");
+  const [dataEnabled, setDataEnabled] = useState<boolean>(false);
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
@@ -24,28 +25,32 @@ export default function ChatInput() {
     if (!user.user?.sub) throw new Error("User is not logged in");
     const chat = new Chat(trimmedMessage, user?.user?.sub);
     addToChatHistory(chat);
-    clientPost("/chat", { body: JSON.stringify({ chat: chat.toJSON() }) }).then(
-      (data) => addToChatHistory(Chat.fromJSON(data))
-    );
+    clientPost("/chat", { body: JSON.stringify({ chat: chat.toJSON() }) });
     setMessage("");
   };
 
   return (
     <form
-      className="h-fit w-full rounded-theme lg:w-[600px] xl:w-[800px] flex flex-col border border-neutralA-3 bg-neutral-base shadow-2xl focus-within:ring-2 focus-within:ring-brand-line transition-[box-shadow] group divide-y divide-y-neutralA-3"
+      className="divide-y-neutralA-3 group flex h-fit w-full flex-col divide-y rounded-theme border border-neutralA-3 bg-neutral-base shadow-2xl transition-[box-shadow] focus-within:ring-2 focus-within:ring-brand-line lg:w-[600px] xl:w-[800px]"
       onSubmit={handleSubmit}
       autoComplete="off"
     >
-      <div className="w-full py-theme-1/4 px-theme-1/2 flex gap-theme-1/4 items-center">
-        <Switch>
-          <SwitchThumb />
-        </Switch>
-        <label className="text-neutral-text" htmlFor="data">Enable data</label>
+      <div className="flex w-full items-center gap-theme-1/4 py-theme-1/4 px-theme-1/2">
+        <Checkbox
+          checked={dataEnabled}
+          onCheckedChange={(checked) => {
+            if (typeof checked === "boolean") setDataEnabled(checked);
+            else setDataEnabled(false);
+          }}
+        />
+        <label className="text-neutral-text" htmlFor="data">
+          Enable data
+        </label>
       </div>
-      <div className="w-full flex items-end h-fit p-theme-1/2 gap-theme-1/2">
+      <div className="flex h-fit w-full items-end gap-theme-1/2 p-theme-1/2">
         <TextareaAutosize
           ref={textareaRef}
-          className="scrollbar-track-hidden grow resize-none text-gray-text-contrast outline-none bg-transparent prevent-default-focus"
+          className="scrollbar-track-hidden prevent-default-focus grow resize-none bg-transparent text-gray-text-contrast outline-none"
           minRows={1}
           maxRows={5}
           placeholder="Ask me anything..."
@@ -60,14 +65,18 @@ export default function ChatInput() {
         />
         <button
           ref={sendButtonRef}
-          className="bg-transparent rounded-theme pl-theme-1/4 pr-theme-1/2 py-theme-1/8 hover:group-focus-within:bg-brand-solid-hover focus:bg-brand-solid-hover active:bg-brand-11 transition-colors group-focus-within:bg-brand-solid"
+          className="rounded-theme bg-transparent py-theme-1/8 pl-theme-1/4 pr-theme-1/2 transition-colors focus:bg-brand-solid-hover active:bg-brand-11 group-focus-within:bg-brand-solid hover:group-focus-within:bg-brand-solid-hover"
           type="submit"
-          onClick={event => {
-            event.currentTarget.blur()
-            textareaRef.current?.focus()
+          onClick={(event) => {
+            event.currentTarget.blur();
+            textareaRef.current?.focus();
           }}
         >
-          <Send className="rotate-45 group-focus-within:stroke-brand-on-solid stroke-neutral-text transition-colors" width={18} height={18} />
+          <Send
+            className="rotate-45 stroke-neutral-text transition-colors group-focus-within:stroke-brand-on-solid"
+            width={18}
+            height={18}
+          />
         </button>
       </div>
     </form>
