@@ -9,9 +9,12 @@ from app.client.parent_child_db import (KeyNamespaces, ParentChildDB,
                                         UserIntegrationItem)
 from app.fetcher.base import Fetcher
 
+db: ParentChildDB = None
 secrets: Secrets = None
 
 def handler(event: dict, context):
+    global db, secrets
+
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
@@ -40,7 +43,8 @@ def handler(event: dict, context):
         return to_response_error(Errors.AUTH_FAILED.value)
     
     if fetcher.auth.access_token:
-        db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
+        if not db: 
+            db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
         parent = f'{KeyNamespaces.USER.value}{user}'
         child = f'{KeyNamespaces.INTEGRATION.value}{id}'
         try:

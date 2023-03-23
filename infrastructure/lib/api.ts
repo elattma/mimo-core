@@ -382,7 +382,7 @@ export class ApiStack extends Stack {
         STAGE: stageId,
         INTEGRATIONS_PATH: integrationsPath,
       },
-      timeout: Duration.seconds(5),
+      timeout: Duration.seconds(20),
       memorySize: 512,
     });
     mimoTable.grantReadData(getIntegrationHandler);
