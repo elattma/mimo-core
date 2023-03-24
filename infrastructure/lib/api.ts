@@ -314,6 +314,8 @@ export class ApiStack extends Stack {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
       },
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
     });
     uploadItemBucket.grantPut(uploadItemHandler);
 
