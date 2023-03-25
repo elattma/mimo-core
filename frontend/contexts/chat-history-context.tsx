@@ -1,14 +1,9 @@
 "use client";
 
-import getSubscribeClient from "@/lib/subscribe-client";
+import { getSubscribeClient } from "@/lib/subscribe-client";
 import { Chat } from "@/models";
 import { GetChatResponse } from "@/types/responses";
-import {
-  ApolloClient,
-  gql,
-  NormalizedCacheObject,
-  useSubscription,
-} from "@apollo/client";
+import { ApolloClient, gql, NormalizedCacheObject } from "@apollo/client";
 import {
   createContext,
   ReactNode,
@@ -54,57 +49,79 @@ const ChatHistoryProvider = ({
   accessToken,
   userId,
 }: Props) => {
-  const [client, setClient] = useState<ApolloClient<NormalizedCacheObject>>(
-    getSubscribeClient(accessToken)
-  );
-  const [token, setToken] = useState<string>(accessToken);
-  const [latestUserChat, setLatestUserChat] = useState<Chat | null>(
-    new Chat("random", "me")
-  );
-  const [chatHistory, setChatHistory] = useState<ChatHistoryType>(
-    initialChatHistory.map((chat) => Chat.fromJSON(chat))
-  );
-
-  const { data: newChat, loading: newChatLoading } = useSubscription(
-    AddedChat,
-    {
-      variables: { userId: userId || "", inputChatId: latestUserChat?.id },
-      client: client,
-    }
-  );
-
+  const [client, setClient] =
+    useState<ApolloClient<NormalizedCacheObject> | null>(null);
   useEffect(() => {
-    if (token !== accessToken) {
-      setClient(getSubscribeClient(accessToken));
-      setToken(accessToken);
+    if (accessToken) {
+      const newClient = getSubscribeClient(accessToken);
+      setClient(newClient);
     }
   }, [accessToken]);
 
-  useEffect(() => {
-    if (
-      !newChatLoading &&
-      newChat &&
-      newChat.inputChatId &&
-      newChat.outputChatId
-    ) {
-      if (chatHistory?.length < 1) throw Error("Chat history is empty.");
+  const [subscription, setSubscription] = useState<any>(null);
+  const [chatHistory, setChatHistory] = useState<ChatHistoryType>(
+    initialChatHistory?.map((chat) => Chat.fromJSON(chat))
+  );
+  const [latestUserChat, setLatestUserChat] = useState<Chat | null>(
+    chatHistory?.[chatHistory.length - 1] || new Chat("message", "author")
+  );
 
-      const newChatObject = Chat.fromJSON({
-        message: newChat.message,
-        author: newChat.role,
-        id: newChat.outputChatId,
-        timestamp: newChat.timestamp,
-        role: newChat.role,
-      });
-      setChatHistory((prev) => [...prev, newChatObject]);
+  useEffect(() => {
+    if (client && userId && latestUserChat) {
+      console.log("hi!!");
+      console.log(userId);
+      console.log(latestUserChat.id);
+      const clientSubscription = client
+        .subscribe({
+          query: AddedChat,
+          variables: {
+            userId: userId,
+            inputChatId: latestUserChat.id,
+          },
+        })
+        .subscribe(
+          (next) => {
+            console.log(next);
+          },
+          (error) => {
+            console.log(error);
+          },
+          () => {
+            console.log("completed");
+          }
+        );
+
+      console.log(clientSubscription);
+      setSubscription(clientSubscription);
     }
-  }, [newChat, newChatLoading]);
+  }, [client, latestUserChat]);
+
+  // useEffect(() => {
+  //   if (
+  //     !newChatLoading &&
+  //     newChat &&
+  //     newChat.inputChatId &&
+  //     newChat.outputChatId
+  //   ) {
+  //     if (chatHistory?.length < 1) throw Error("Chat history is empty.");
+
+  //     const newChatObject = Chat.fromJSON({
+  //       message: newChat.message,
+  //       author: newChat.role,
+  //       id: newChat.outputChatId,
+  //       timestamp: newChat.timestamp,
+  //       role: newChat.role,
+  //     });
+  //     setChatHistory((prev) => [...prev, newChatObject]);
+  //   }
+  // }, [newChat, newChatLoading]);
 
   const addToChatHistory = (chat: Chat) => {
     setChatHistory((prev) => [...prev, chat]);
     if (chat.role === Chat.Role.USER) setLatestUserChat(chat);
     else setLatestUserChat(null);
   };
+  console.log(chatHistory);
 
   return (
     <ChatHistoryContext.Provider value={{ chatHistory, addToChatHistory }}>
@@ -116,7 +133,9 @@ const ChatHistoryProvider = ({
 const useChatHistoryContext = () => {
   const context = useContext(ChatHistoryContext);
   if (context === undefined) {
-    throw new Error("Expected chatHistory to be defined.");
+    throw new Error(
+      "useChatHistoryContext must be used within a ChatHistoryProvider"
+    );
   }
   return context;
 };

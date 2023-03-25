@@ -1,10 +1,9 @@
 import base64
-import re
-from typing import List
+from typing import Generator, List
 
 import requests
-from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
-                              Filter, Item)
+from app.fetcher.base import (Block, BodyBlock, DiscoveryResponse, Fetcher,
+                              Filter, Item, TitleBlock)
 
 
 class GoogleMail(Fetcher):
@@ -35,52 +34,58 @@ class GoogleMail(Fetcher):
             return None
         
         response = requests.get(
-            'https://www.googleapis.com/gmail/v1/users/me/messages',
+            'https://www.googleapis.com/gmail/v1/users/me/threads',
             params={ **filters },
             headers={
                 'Authorization': f'Bearer {self.auth.access_token}'
             }
         )
-        discovery_response = response.json()
+        discovery_response = response.json() if response else None
 
-        if not response or not discovery_response:
-            print('failed to get google mail')
+        if not discovery_response:
             return None
         
         next_token = discovery_response.get('nextPageToken', None) if discovery_response else None
-        messages = discovery_response.get('messages', None) if discovery_response else None
+        threads = discovery_response.get('threads', None) if discovery_response else None
 
         return DiscoveryResponse(
             integration=self._INTEGRATION, 
             icon=self.get_icon(),
             items=[Item(
-                id=message.get('id', None) if message else None,
-                title=message.get('snippet', None) if message else None,
-                link=f'https://mail.google.com/mail/u//#inbox/{message["id"]}' if message else None,
+                id=thread.get('id', None) if thread else None,
+                title=thread.get('snippet', None) if thread else None,
+                link=f'https://mail.google.com/mail/u//#inbox/{thread["id"]}' if thread else None,
                 preview=None
-            ) for message in messages],
+            ) for thread in threads],
             next_token=next_token
         )
 
-    def fetch(self, id: str) -> FetchResponse:
+    def fetch(self, id: str) -> Generator[Block, None, None]:
         print('google_mail load!')
         self.auth.refresh()
         response = requests.get(
-            f'https://www.googleapis.com/gmail/v1/users/me/messages/{id}',
+            f'https://www.googleapis.com/gmail/v1/users/me/threads/{id}',
             headers={
                 'Authorization': f'Bearer {self.auth.access_token}'
             }
         )
 
         load_response = response.json() if response else None
-        message_part = load_response.get('payload', None) if load_response else None
-
-        if not message_part:
-            print('failed to get message')
-            return None
+        messages = load_response.get('messages', None) if load_response else None
+        message_parts = [message.get('payload', None) if messages else None for message in messages]
+        if not message_parts or len(message_parts) == 0:
+            return
         
-        message_parts = [message_part]
-        chunks: List[Chunk] = []
+        subjects = set()
+        for part in message_parts:
+            headers = part.get('headers', []) if part else []
+            for subject in [header.get('value', None) for header in headers if header.get('name', None) == 'Subject']:
+                if subject:
+                    subjects.add(subject)
+        for subject in subjects:
+            yield TitleBlock(title=subject)
+           
+        texts: List[str] = []
         while len(message_parts) > 0:
             part = message_parts.pop(0)
             if not part:
@@ -93,16 +98,11 @@ class GoogleMail(Fetcher):
             if text:
                 mime_type = part.get('mimeType', None) if part else None
                 if mime_type and mime_type.startswith('text/plain'):
-                    chunks.append(Chunk(content=text))
+                    texts.append(text)
 
             parts = part.get('parts', None)
             if parts:
                 message_parts[0:0] = parts
 
-        # TODO: add fetching attachments
-
-        return FetchResponse(
-            integration=self._INTEGRATION,
-            chunks=self.merge_split_chunks(chunks)
-        )
-    
+        for text in self._merge_split_texts(texts):
+            yield BodyBlock(body=text)

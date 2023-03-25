@@ -1,4 +1,5 @@
 import { Integration } from "@/models";
+import Image from "next/image";
 
 type Props = {
   integration: Integration;
@@ -23,10 +24,12 @@ const IntegrationPanel = ({ integration }: Props) => {
       className="rounded-theme border border-neutral-border p-theme shadow-none transition-all hover:border-neutral-border-hover hover:shadow focus:border-neutral-border-hover focus:shadow"
       {...compProps}
     >
-      <svg
-        className="mb-theme-1/4 h-10 w-10"
-        dangerouslySetInnerHTML={{ __html: integration.icon }}
-      />
+      <Image
+        src={`https://${integration.icon}`}
+        alt={`Logo for ${integration.name}`}
+        width={20}
+        height={20}
+      ></Image>
       <p className="font-medium text-neutral-text-contrast">
         {integration.name}
       </p>

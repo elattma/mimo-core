@@ -1,4 +1,3 @@
-import json
 from time import time
 
 import requests

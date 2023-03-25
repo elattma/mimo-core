@@ -29,10 +29,12 @@ export async function getSession(headers: Headers) {
 const ChatLayout = async ({ children }: ChatLayoutProps) => {
   const chatHistoryData = await serverGet("/chat");
   const { session } = await getSession(headers());
+  if (!session?.idToken) return null;
+
   return (
     <ChatHistoryProvider
       initialChatHistory={chatHistoryData}
-      accessToken={session?.accessToken || ""}
+      accessToken={session?.idToken}
       userId={session?.user.sub}
     >
       <div className="container relative flex min-h-0 grow flex-col gap-theme pb-theme md:flex-row md:pt-theme">

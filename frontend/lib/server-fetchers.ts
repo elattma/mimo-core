@@ -30,6 +30,7 @@ const _fetcher = async <JSON = any>(
       error.status = response.status;
       throw error;
     } else {
+      console.log(json);
       throw new Error("An unexpected error occurred");
     }
   }

@@ -59,15 +59,13 @@ def handler(event: dict, context):
                     'refresh_token': item.refresh_token,
                     'expiry_timestamp': item.expiry_timestamp
                 }, last_fetch_timestamp=item.last_fetch_timestamp))
-    fetchers.append(
-        Fetcher.create(
-            "upload",
-            {"bucket": upload_item_bucket, "prefix": f"{user}/"},
-            last_fetch_timestamp=upload_item.last_fetch_timestamp
-            if upload_item
-            else None,
-        )
-    )
+    fetchers.append(Fetcher.create(
+        "upload",
+        {"bucket": upload_item_bucket, "prefix": f"{user}/"},
+        last_fetch_timestamp=upload_item.last_fetch_timestamp
+        if upload_item
+        else None,
+    ))
 
     openai = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
     neo4j = Neo4j(
@@ -120,6 +118,7 @@ def discover_fetch_ingest(
 ) -> DfiResponse:
     next_token: str = None
     succeeded: bool = True
+    max_items = 200
     while True:
         filter = Filter(next_token=next_token)
         discovery_response: DiscoveryResponse = fetcher.discover(filter=filter)
@@ -128,21 +127,25 @@ def discover_fetch_ingest(
             break
         next_token = discovery_response.next_token
         for item in discovery_response.items:
-            fetch_response: FetchResponse = fetcher.fetch(item.id)
-            if not fetch_response:
-                succeeded = False
-                continue
-            ingest_input = IngestInput(
-                owner=user,
-                integration=fetcher._INTEGRATION,
-                document_id=item.id,
-                chunks=[chunk.content for chunk in fetch_response.chunks],
-                timestamp=timestamp,
-            )
-            ingest_response: IngestResponse = ingestor.ingest(ingest_input)
-            if not ingest_response.succeeded:
-                succeeded = False
-                continue
+            max_items -= 1
+            generator = fetcher.fetch(item.id)
+
+            for document in generator:
+                if not document:
+                    continue
+                ingest_input = IngestInput(
+                    owner=user,
+                    integration=fetcher._INTEGRATION,
+                    document_id=item.id,
+                    chunks=[chunk.content for chunk in fetch_response.chunks],
+                    timestamp=timestamp,
+                )
+                ingest_response: IngestResponse = ingestor.ingest(ingest_input)
+                if not ingest_response.succeeded:
+                    succeeded = False
+                    continue
+            if max_items <= 0:
+                return DfiResponse(integration=fetcher._INTEGRATION, succeeded=succeeded)
         if not next_token:
             break
 

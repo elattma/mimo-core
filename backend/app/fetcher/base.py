@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import Generator, List
 
 from app.auth.base import Auth
 
-MAX_CHUNK_SIZE = 600
-MAX_CHUNK_OVERLAP = 50
-
+MAX_TEXT_SIZE = 600
+MAX_TEXT_OVERLAP = 50
 
 @dataclass
 class Filter:
@@ -31,16 +30,29 @@ class DiscoveryResponse:
 
 
 @dataclass
-class Chunk:
-    content: str
-
+class Block(ABC):
+    pass
 
 @dataclass
-class FetchResponse:
-    integration: str
-    chunks: List[Chunk]
-    next_token: str = None
+class SummaryBlock(Block):
+    summary: str
 
+@dataclass
+class BodyBlock(Block):
+    body: str
+
+@dataclass
+class TitleBlock(Block):
+    title: str
+
+# TODO: change to 1 block for all comments, but they have a chunkify method
+# class Comment:
+#     author: str
+#     text: str
+
+@dataclass
+class CommentsBlock(Block):
+    comments: str
 
 class Fetcher(ABC):
     _INTEGRATION = "base"
@@ -92,42 +104,42 @@ class Fetcher(ABC):
         raise NotImplementedError("discover not implemented")
 
     @abstractmethod
-    def fetch(self, id: str) -> FetchResponse:
+    def fetch(self, id: str) -> Generator[Block, None, None]:
         raise NotImplementedError("fetch not implemented")
 
-    def __merge_chunks(self, chunks: List[Chunk]) -> Chunk:
-        return Chunk(content="\n\n".join([chunk.content for chunk in chunks]).strip())
+    def _merge_texts(self, texts: List[str]) -> str:
+        return "\n\n".join([text for text in texts])
 
-    def merge_split_chunks(self, chunks: List[Chunk]) -> List[Chunk]:
-        if not chunks or len(chunks) < 1:
-            return None
-        final_chunks: List[Chunk] = []
-        temporary_chunks: List[Chunk] = []
-        total_chunks_size = 0
-        for chunk in chunks:
-            if not chunk or not chunk.content:
+    def _merge_split_texts(self, texts: List[str]) -> List[str]:
+        if not texts or len(texts) < 1:
+            return []
+        final_texts: List[str] = []
+        temporary_texts: List[str] = []
+        total_texts_size = 0
+        for text in texts:
+            if not text:
                 continue
-            chunk_size = len(chunk.content)
-            if chunk_size < 1:
+            text_size = len(text)
+            if text_size < 1:
                 continue
 
-            if total_chunks_size + chunk_size >= MAX_CHUNK_SIZE:
-                if total_chunks_size > MAX_CHUNK_SIZE:
-                    print(f"Created a chunk of size {total_chunks_size}")
+            if total_texts_size + text_size >= MAX_TEXT_SIZE:
+                if total_texts_size > MAX_TEXT_SIZE:
+                    print(f"Created a text of size {total_texts_size}")
 
-                if len(temporary_chunks) > 0:
-                    final_chunks.append(self.__merge_chunks(temporary_chunks))
-                    while total_chunks_size > MAX_CHUNK_OVERLAP or (
-                        total_chunks_size + chunk_size > MAX_CHUNK_SIZE
-                        and total_chunks_size > 0
+                if len(temporary_texts) > 0:
+                    final_texts.append(self._merge_texts(temporary_texts))
+                    while total_texts_size > MAX_TEXT_OVERLAP or (
+                        total_texts_size + text_size > MAX_TEXT_SIZE
+                        and total_texts_size > 0
                     ):
-                        total_chunks_size -= len(temporary_chunks[0].content)
-                        temporary_chunks.pop(0)
+                        total_texts_size -= len(temporary_texts[0])
+                        temporary_texts.pop(0)
 
-            temporary_chunks.append(chunk)
-            total_chunks_size += chunk_size
+            temporary_texts.append(text)
+            total_texts_size += text_size
 
-        if len(temporary_chunks) > 0:
-            final_chunks.append(self.__merge_chunks(temporary_chunks))
+        if len(temporary_texts) > 0:
+            final_texts.append(self._merge_texts(temporary_texts))
 
-        return final_chunks
+        return final_texts

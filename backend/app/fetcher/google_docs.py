@@ -1,9 +1,9 @@
 from datetime import datetime
-from typing import List
+from typing import Generator, List
 
 import requests
-from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
-                              Filter, Item)
+from app.fetcher.base import (Block, BodyBlock, DiscoveryResponse, Fetcher,
+                              Filter, Item, TitleBlock)
 
 
 class GoogleDocs(Fetcher):
@@ -66,7 +66,7 @@ class GoogleDocs(Fetcher):
             next_token=next_token
         )
 
-    def fetch(self, id: str) -> FetchResponse:
+    def fetch(self, id: str) -> Generator[Block, None, None]:
         print('google_docs load!')
         self.auth.refresh()
         response = requests.get(
@@ -76,13 +76,15 @@ class GoogleDocs(Fetcher):
             }
         )
         load_response = response.json() if response else None
+        title = load_response.get('title', None) if load_response else None
+        if title:
+            yield TitleBlock(title=title)
         body = load_response.get('body', None) if load_response else None
         content = body.get('content', None) if body else None
         if not content:
-            print('failed to get doc')
-            return None
+            return
         
-        chunks: List[Chunk] = []
+        texts: List[str] = []
         while content and len(content) > 0:
             value = content.pop(0)
             if not value:
@@ -93,7 +95,7 @@ class GoogleDocs(Fetcher):
                     text += element['textRun']['content'] if 'textRun' in element else ''
                 text = text.strip().replace('\n', '')
                 if len(text) > 0:
-                    chunks.append(Chunk(content=text))
+                    texts.append(text)
             elif 'table' in value and 'tableRows' in value['table']:
                 for table_row in value['table']['tableRows']:
                     if not table_row or 'tableCells' not in table_row:
@@ -104,8 +106,6 @@ class GoogleDocs(Fetcher):
                         content[0:0] = cell['content']
             elif 'tableOfContents' in value and 'content' in value['tableOfContents']:
                 content[0:0] = value['tableOfContents']['content']
-
-        return FetchResponse(
-            integration=self._INTEGRATION,
-            chunks=self.merge_split_chunks(chunks=chunks)
-        )
+            
+        for text in self._merge_split_texts(texts):
+            yield BodyBlock(body=text)

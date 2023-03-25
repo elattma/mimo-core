@@ -44,6 +44,20 @@ const INTEGRATION_CONFIGS: IntegrationConfig[] = [
     oauth2_link:
       "https://api.notion.com/v1/oauth/authorize?client_id=c23b0a26-4048-4fe6-888b-f6a89ce1caac&response_type=code&owner=user",
   },
+  {
+    id: "zendesk",
+    name: "Zendesk",
+    description: "Some description for Zendesk",
+    oauth2_link:
+      "https://mimo845.zendesk.com/oauth/authorizations/new?response_type=code&client_id=14311603347725&scope=read",
+  },
+  {
+    id: "zoho",
+    name: "Zoho",
+    description: "Some description for Zoho",
+    oauth2_link:
+      "https://accounts.zoho.com/oauth/v2/auth?scope=ZohoCRM.modules.READ&client_id=1000.FOXW2IM5QG3WT0PJTJZDW6WJKQ9LEQ&response_type=code&access_type=offline&prompt=consent",
+  },
 ];
 
 export interface SsmStackProps extends StackProps {
