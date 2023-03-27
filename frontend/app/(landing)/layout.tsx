@@ -36,7 +36,7 @@ export default function LandingLayout({ children }: LandingLayoutProps) {
           </a>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex flex-1 flex-col">{children}</main>
     </div>
   );
 }

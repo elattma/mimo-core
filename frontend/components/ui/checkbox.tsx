@@ -1,34 +1,61 @@
 import { cn } from "@/lib/util";
 import * as Primitive from "@radix-ui/react-checkbox";
-import { cva } from "class-variance-authority";
+import { cva, VariantProps } from "class-variance-authority";
 import { Check } from "lucide-react";
 
-const checkboxVariants = cva(
-  "rounded-theme border p-theme-1/8 transition-colors",
-  {
-    variants: {
-      checked: {
-        true: "bg-brand-bg hocus:bg-brand-bg-hover border-brand-border",
-        false: "bg-transparent hocus:bg-neutral-bg-hover border-neutral-border",
-      },
+const checkboxVariants = cva("rounded-theme border transition-colors", {
+  variants: {
+    selected: {
+      true: "bg-brand-bg hocus:bg-brand-bg-hover border-brand-border",
+      false: "bg-transparent hocus:bg-neutral-bg-hover border-neutral-border",
     },
-  }
-);
+    size: {
+      sm: "p-theme-1/8",
+      default: "p-theme-1/8",
+      lg: "p-theme-1/4",
+    },
+  },
+  defaultVariants: {
+    size: "default",
+  },
+});
 
-type CheckboxProps = React.ComponentProps<typeof Primitive.Root>;
+const checkboxCheckVariants = cva("stroke-brand-text", {
+  variants: {
+    size: {
+      sm: "h-2 w-2",
+      default: "h-3 w-3",
+      lg: "h-4 w-4",
+    },
+  },
+  defaultVariants: {
+    size: "default",
+  },
+});
 
-export function Checkbox({ className, checked, ...props }: CheckboxProps) {
+type CheckboxProps = VariantProps<typeof checkboxVariants> &
+  React.ComponentProps<typeof Primitive.Root>;
+
+export function Checkbox({
+  className,
+  size,
+  checked,
+  ...props
+}: CheckboxProps) {
   return (
     <Primitive.Root
       className={cn(
-        checkboxVariants({ checked: checked === "indeterminate" || checked }),
+        checkboxVariants({
+          selected: checked === "indeterminate" || checked,
+          size,
+        }),
         className
       )}
       {...props}
     >
-      <div className="h-3 w-3">
+      <div className={checkboxCheckVariants({ size })}>
         <Primitive.Indicator>
-          <Check className="h-3 w-3 stroke-brand-text" />
+          <Check className={checkboxCheckVariants({ size })} />
         </Primitive.Indicator>
       </div>
     </Primitive.Root>

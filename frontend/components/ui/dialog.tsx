@@ -80,7 +80,7 @@ const DialogTitle = forwardRef<
 >(({ className, ...props }, forwardedRef) => (
   <Primitive.Title
     ref={forwardedRef}
-    className={cn("text-lg font-medium text-gray-text-contrast", className)}
+    className={cn("text-lg font-semibold text-gray-text-contrast", className)}
     {...props}
   />
 ));

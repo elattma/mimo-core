@@ -20,7 +20,7 @@ const RootLayout = ({ children }: RootLayoutProps) => {
     <UserProvider>
       <html
         className={cn(
-          "bg-neutral-base font-sans text-gray-text antialiased",
+          "dark-mode bg-neutral-base font-sans text-gray-text antialiased",
           inter.variable
         )}
         lang="en"

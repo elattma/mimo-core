@@ -12,21 +12,26 @@ import Balancer from "react-wrap-balancer";
 export default function LandingPage() {
   return (
     <>
-      <section className="container flex flex-col items-center justify-center gap-theme py-theme md:flex-row">
-        <div className="flex flex-col items-center gap-theme-3/4 md:w-fit md:items-start md:gap-theme lg:w-128">
-          <h1 className="text-center text-5xl font-semibold leading-tight text-neutral-text-contrast md:text-start lg:text-6xl">
-            <Balancer ratio={0.75}>Lorem ipsum dolor sit amet.</Balancer>
+      <section className="container flex grow flex-col items-center justify-center">
+        <div className="flex max-w-2xl grow flex-col items-center justify-center pb-theme-2 xl:max-w-4xl">
+          <div className="mb-theme-1/2 rounded-full border border-neutral-border bg-neutral-bg px-theme-1/2 py-theme-1/4 text-xs font-medium text-neutral-text">
+            <p>Coming April 2023</p>
+          </div>
+          <h1 className="mb-theme-1/2 bg-gradient-to-r from-brand-9 to-brand-12 bg-clip-text text-center text-5xl font-bold text-transparent xl:text-6xl">
+            <Balancer className="leading-snug">
+              Any Data. From Anywhere. For Your AI Agents.
+            </Balancer>
           </h1>
-          <p className="text-center text-xl font-medium text-neutral-text md:text-start lg:text-2xl">
-            <Balancer ratio={0.5}>
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Ut sunt
-              fugit cumque.
+          <p className="mb-theme text-center text-2xl font-semibold leading-snug text-gray-text-contrast xl:text-3xl">
+            <Balancer>
+              Transform Your B2B AI SaaS with Mimo's Customer Data Integration
+              Platform
             </Balancer>
           </p>
           <Dialog>
             <DialogTrigger asChild>
               <Button className="w-fit" size="lg">
-                Join Waitlist
+                Request Early Access
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -39,7 +44,6 @@ export default function LandingPage() {
             </DialogContent>
           </Dialog>
         </div>
-        <div className="h-60 w-full shrink-0 rounded-theme bg-brand-bg md:w-96"></div>
       </section>
     </>
   );
