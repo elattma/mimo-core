@@ -3,10 +3,12 @@
 import { Integration } from "@/models";
 import { GetIntegrationResponse } from "@/types/responses";
 import {
-  createContext, Dispatch,
+  createContext,
+  Dispatch,
   ReactNode,
-  SetStateAction, useContext,
-  useState
+  SetStateAction,
+  useContext,
+  useState,
 } from "react";
 
 type IntegrationsType = Integration[];
@@ -15,7 +17,7 @@ type IntegrationsContextType = {
   setIntegrations: Dispatch<SetStateAction<IntegrationsType>>;
 };
 
-const IntegrationsContext = createContext<IntegrationsContextType | undefined>(
+const integrationsContext = createContext<IntegrationsContextType | undefined>(
   undefined
 );
 
@@ -30,14 +32,14 @@ export function IntegrationsProvider({ children, initial }: Props) {
   );
 
   return (
-    <IntegrationsContext.Provider value={{ integrations, setIntegrations }}>
+    <integrationsContext.Provider value={{ integrations, setIntegrations }}>
       {children}
-    </IntegrationsContext.Provider>
+    </integrationsContext.Provider>
   );
 }
 
 export const useIntegrationsContext = () => {
-  const context = useContext(IntegrationsContext);
+  const context = useContext(integrationsContext);
   if (context === undefined) {
     throw new Error("Expected integrations to be defined.");
   }

@@ -1,3 +1,5 @@
+"use client";
+
 import ItemUploader from "@/components/item-uploader";
 import {
   Dialog,
@@ -7,14 +9,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Item } from "@/models";
-import { Plus } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useItemsContext } from "@/contexts/items-context";
+import { cva } from "class-variance-authority";
+import { File, Plus } from "lucide-react";
+import { useCallback, useState } from "react";
 
-type UploadedItemsProps = {
-  items: Item[];
-};
-
-export default function UploadedItems({ items }: UploadedItemsProps) {
+export default function UploadedItems() {
   return (
     <div className="flex w-full flex-col space-y-theme-1/2">
       <div className="flex w-full items-center justify-between">
@@ -43,15 +44,76 @@ export default function UploadedItems({ items }: UploadedItemsProps) {
           </DialogContent>
         </Dialog>
       </div>
-      {items.length === 0 ? (
-        <div className="rounded-theme border border-dashed border-neutral-border p-theme">
-          <p className="text-center text-sm text-gray-text">
-            You have no uploaded items. Press the plus to add one.
-          </p>
-        </div>
-      ) : (
-        <></>
-      )}
+      <Items />
     </div>
   );
+}
+
+const itemVariants = cva(
+  "flex select-none items-center space-x-theme-1/2 p-theme-1/2 transition-colors hover:cursor-pointer prevent-default-focus outline-none",
+  {
+    variants: {
+      selected: {
+        true: "bg-brand-bg text-brand-text-contrast hocus:bg-brand-bg-hover active:bg-brand-bg-active",
+        false:
+          "text-gray-text hocus:bg-neutral-bg-hover active:bg-neutral-bg-active bg-transparent",
+      },
+    },
+  }
+);
+
+function Items() {
+  const { uploadedItems } = useItemsContext();
+  const [selected, setSelected] = useState<number | null>(null);
+
+  const selectOrUnselectItem = useCallback(
+    (index: number) => {
+      if (selected === index) setSelected(null);
+      else setSelected(index);
+    },
+    [selected]
+  );
+
+  if (uploadedItems.length === 0) {
+    return (
+      <div className="rounded-theme border border-dashed border-neutral-border p-theme">
+        <p className="text-center text-sm text-gray-text">
+          You have no uploaded items. Press the plus to add one.
+        </p>
+      </div>
+    );
+  } else {
+    return (
+      <ScrollArea
+        className="rounded-theme border border-neutral-border bg-neutral-bg-subtle"
+        innerClassName="max-h-52"
+      >
+        <div className="flex flex-col divide-y divide-neutral-border">
+          {uploadedItems.map((item, index) => (
+            <div
+              className={itemVariants({ selected: selected === index })}
+              role="checkbox"
+              tabIndex={0}
+              aria-checked={selected === index}
+              aria-label={item.title}
+              key={index}
+              onClick={(event) => {
+                selectOrUnselectItem(index);
+                event.currentTarget.blur();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === " " || event.key === "Enter")
+                  selectOrUnselectItem(index);
+              }}
+            >
+              <File className="h-4 w-4 stroke-neutral-text" />
+              <p className="truncate whitespace-nowrap text-sm font-medium">
+                {item.title}
+              </p>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    );
+  }
 }

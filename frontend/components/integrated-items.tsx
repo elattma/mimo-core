@@ -10,11 +10,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useIntegratedItemsContext } from "@/contexts/integrated-items-context";
 import { useIntegrationsContext } from "@/contexts/integrations-context";
+import { useItemsContext } from "@/contexts/items-context";
 import { Integration } from "@/models";
+import { DropdownMenuPortal } from "@radix-ui/react-dropdown-menu";
 import { cva } from "class-variance-authority";
-import { ChevronDown, Cog, Globe, SearchIcon } from "lucide-react";
+import { ChevronDown, Cog, Globe, Search as SearchIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -27,13 +28,15 @@ import {
 } from "react";
 
 export default function IntegratedItems() {
+  const [searchTerm, setSearchTerm] = useState("");
+
   return (
     <div className="flex h-full w-full min-w-full flex-col space-y-theme-1/2">
       <p className="text-sm font-semibold text-gray-text-contrast">
         Integrated Items
       </p>
       <Filters />
-      <Search />
+      <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       <Items />
     </div>
   );
@@ -185,45 +188,54 @@ const Custom = forwardRef<
             <ChevronDown className="h-4 w-4" />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuGroup>
-            {integrations.map((integration, index) => (
-              <DropdownMenuCheckboxItem
-                key={index}
-                checked={selectedIntegrations[integration.id]}
-                onCheckedChange={(checked) => {
-                  setSelectedIntegrations({
-                    ...selectedIntegrations,
-                    [integration.id]: checked,
-                  });
-                }}
-              >
-                {integration.name}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <Button className="w-full" variant="ghost" size="sm">
-              Apply
-            </Button>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
+        <DropdownMenuPortal>
+          <DropdownMenuContent align="start">
+            <DropdownMenuGroup>
+              {integrations.map((integration, index) => (
+                <DropdownMenuCheckboxItem
+                  key={index}
+                  checked={selectedIntegrations[integration.id]}
+                  onCheckedChange={(checked) => {
+                    setSelectedIntegrations({
+                      ...selectedIntegrations,
+                      [integration.id]: checked,
+                    });
+                  }}
+                >
+                  {integration.name}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <Button className="w-full" variant="ghost" size="sm">
+                Apply
+              </Button>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
       </DropdownMenu>
     </div>
   );
 });
 Custom.displayName = "Custom";
 
-function Search() {
+type SearchProps = {
+  searchTerm: string;
+  setSearchTerm: Dispatch<SetStateAction<string>>;
+};
+
+function Search({ searchTerm, setSearchTerm }: SearchProps) {
   return (
-    <div className="group mx-0.5 flex items-center space-x-theme-1/4 rounded-theme px-theme-1/8 ring-1 ring-neutral-line ring-offset-1 transition-[box-shadow] focus-within:ring-2 focus-within:ring-brand-line">
+    <div className="group mx-0.5 flex items-center space-x-theme-1/4 rounded-theme px-theme-1/8 ring-2 ring-neutral-line transition-[box-shadow] focus-within:ring-brand-line">
       <SearchIcon className="h-4 w-4 text-gray-text group-focus-within:text-gray-text-contrast" />
       <input
         className="prevent-default-focus flex-1 bg-transparent text-sm text-gray-text-contrast placeholder-gray-text"
         type="text"
         placeholder="Search"
         aria-label="Search integrated items"
+        value={searchTerm}
+        onChange={(event) => setSearchTerm(event.target.value)}
       />
     </div>
   );
@@ -243,12 +255,11 @@ const itemVariants = cva(
 );
 
 function Items() {
-  const { integratedItems } = useIntegratedItemsContext();
+  const { integratedItems } = useItemsContext();
   const [selected, setSelected] = useState<number | null>(null);
 
   const selectOrUnselectItem = useCallback(
     (index: number) => {
-      console.log(index, selected);
       if (selected === index) setSelected(null);
       else setSelected(index);
     },
@@ -271,8 +282,11 @@ function Items() {
     );
   } else {
     return (
-      <ScrollArea className="grow rounded-theme border border-neutral-border bg-neutral-bg-subtle">
-        <div className="divide-y-neutral-border flex flex-col divide-y">
+      <ScrollArea
+        className="rounded-theme border border-neutral-border bg-neutral-bg-subtle"
+        innerClassName="max-h-52"
+      >
+        <div className="flex flex-col divide-y divide-neutral-border">
           {integratedItems.map((item, index) => (
             <div
               className={itemVariants({ selected: selected === index })}
@@ -281,7 +295,10 @@ function Items() {
               aria-checked={selected === index}
               aria-label={item.title}
               key={index}
-              onClick={() => selectOrUnselectItem(index)}
+              onClick={(event) => {
+                selectOrUnselectItem(index);
+                event.currentTarget.blur();
+              }}
               onKeyDown={(event) => {
                 if (event.key === " " || event.key === "Enter")
                   selectOrUnselectItem(index);

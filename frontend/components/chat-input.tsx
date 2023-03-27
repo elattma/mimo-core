@@ -31,26 +31,27 @@ export default function ChatInput() {
 
   return (
     <form
-      className="divide-y-neutralA-3 group flex h-fit w-full flex-col divide-y rounded-theme border border-neutralA-3 bg-neutral-base shadow-2xl transition-[box-shadow] focus-within:ring-2 focus-within:ring-brand-line lg:w-[600px] xl:w-[800px]"
+      className="group flex h-fit w-full flex-col divide-y divide-neutralA-3 rounded-theme border border-neutralA-3 bg-neutral-base shadow-2xl transition-[box-shadow] focus-within:ring-2 focus-within:ring-brand-line lg:w-[600px] xl:w-[800px]"
       onSubmit={handleSubmit}
       autoComplete="off"
     >
       <div className="flex w-full items-center gap-theme-1/4 py-theme-1/4 px-theme-1/2">
         <Checkbox
+          size="sm"
           checked={dataEnabled}
           onCheckedChange={(checked) => {
             if (typeof checked === "boolean") setDataEnabled(checked);
             else setDataEnabled(false);
           }}
         />
-        <label className="text-neutral-text" htmlFor="data">
+        <label className="text-sm text-neutral-text" htmlFor="data">
           Enable data
         </label>
       </div>
       <div className="flex h-fit w-full items-end gap-theme-1/2 p-theme-1/2">
         <TextareaAutosize
           ref={textareaRef}
-          className="scrollbar-track-hidden prevent-default-focus grow resize-none bg-transparent text-gray-text-contrast outline-none"
+          className="scrollbar-track-hidden prevent-default-focus grow resize-none bg-transparent text-gray-text-contrast outline-none placeholder:text-gray-10"
           minRows={1}
           maxRows={5}
           placeholder="Ask me anything..."

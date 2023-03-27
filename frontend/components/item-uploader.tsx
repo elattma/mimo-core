@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
+import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { clientPost } from "@/lib/client-fetchers";
 import { cn, truncate } from "@/lib/util";
 import { File } from "lucide-react";
@@ -13,8 +13,6 @@ export default function ItemUploader() {
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
-      console.log(files);
-      console.log(acceptedFiles);
       if (acceptedFiles.length < 1) return;
       // TODO: Add error toast
       if (files.length + acceptedFiles.length > 5) {
@@ -37,7 +35,7 @@ export default function ItemUploader() {
       console.log("You must upload at least one file.");
       return;
     }
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NEXT_PUBLIC_MOCK_OR_PROXY === "mock") {
       console.log("Uploading files...");
       console.log(files);
       return;
@@ -97,7 +95,9 @@ export default function ItemUploader() {
         )}
       </div>
       <DialogFooter className="flex w-full items-center justify-end">
-        <Button onClick={uploadFiles}>Upload</Button>
+        <DialogClose asChild>
+          <Button onClick={uploadFiles}>Upload</Button>
+        </DialogClose>
       </DialogFooter>
     </>
   );
