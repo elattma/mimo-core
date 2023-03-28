@@ -8,11 +8,14 @@ export default function WaitlistForm() {
   const [email, setEmail] = useState<string>("");
 
   const handleSubmit: FormEventHandler = (event) => {
-    event.preventDefault();
-    console.log(email);
+    fetch("/api/waitlist", {
+      method: "POST",
+      body: JSON.stringify({ message: email }),
+      next: { revalidate: 10 },
+    });
   };
   return (
-    <form className="flex flex-col" onSubmit={handleSubmit}>
+    <form className="flex flex-col">
       <label className="mb-theme-1/8 text-sm">Email</label>
       <input
         className="mb-theme rounded-theme border border-neutral-border bg-transparent p-theme-1/4 text-gray-text placeholder:text-gray-10"
@@ -22,7 +25,7 @@ export default function WaitlistForm() {
         onChange={(event) => setEmail(event.target.value)}
       />
       <DialogClose asChild>
-        <Button type="submit" className="w-fit self-end">
+        <Button type="submit" className="w-fit self-end" onClick={handleSubmit}>
           Join
         </Button>
       </DialogClose>

@@ -87,12 +87,6 @@ const GET = async (request: NextRequest) => {
 
 const POST = async (request: NextRequest) => {
   mock_logRequest(request);
-  if (!request.body) {
-    return new Response(null, {
-      status: 400,
-      statusText: "Invalid or missing request body",
-    });
-  }
   const randomLength = Math.floor(Math.random() * 20) + 1;
   const randomWords = Array.from(
     { length: randomLength },

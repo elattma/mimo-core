@@ -57,6 +57,7 @@ const DialogContent = forwardRef<
           "text-neural-text absolute top-theme right-theme rounded-theme p-theme-1/4 transition-colors active:bg-neutral-bg-active hocus:bg-neutral-bg-hover hocus:text-neutral-text-contrast",
           className
         )}
+        role="button"
       >
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>

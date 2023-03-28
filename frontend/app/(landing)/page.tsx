@@ -24,8 +24,8 @@ export default function LandingPage() {
           </h1>
           <p className="mb-theme text-center text-2xl font-semibold leading-snug text-gray-text-contrast xl:text-3xl">
             <Balancer>
-              Transform Your B2B AI SaaS with Mimo's Customer Data Integration
-              Platform
+              Power your B2B AI SaaS with Mimo's customer data integration
+              platform.
             </Balancer>
           </p>
           <Dialog>
@@ -36,9 +36,7 @@ export default function LandingPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>
-                  <h1>Join Waitlist</h1>
-                </DialogTitle>
+                <DialogTitle>Join Waitlist</DialogTitle>
               </DialogHeader>
               <WaitlistForm />
             </DialogContent>
