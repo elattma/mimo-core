@@ -5,8 +5,8 @@ import boto3
 import nltk
 
 nltk.data.path.append('./nltk_data/')
-from app.fetcher.base import (Block, BodyBlock, DiscoveryResponse, Fetcher,
-                              Filter, Item, TitleBlock)
+from app.fetcher.base import (BlockStream, BodyBlock, DiscoveryResponse,
+                              Fetcher, Filter, Item, TitleBlock)
 
 
 # TODO: add explicit error handling
@@ -63,7 +63,7 @@ class Upload(Fetcher):
             next_token=next_token
         )
 
-    def fetch(self, id: str) -> Generator[Block, None, None]:
+    def fetch(self, id: str) -> Generator[BlockStream, None, None]:
         from unstructured.partition.auto import partition
 
         with tempfile.NamedTemporaryFile() as temporary_file:
@@ -75,12 +75,12 @@ class Upload(Fetcher):
             temporary_file.seek(0)
             elements = partition(file=temporary_file)
         
-        texts: List[str] = [str(element) for element in elements]
+        body_blocks: List[BodyBlock] = [BodyBlock(body=str(element)) for element in elements]
 
-        yield TitleBlock(title=id.replace(f'{self.auth.prefix}/', ''))
+        yield BlockStream([TitleBlock(title=id.replace(f'{self.auth.prefix}/', ''))])
 
-        for text in self._merge_split_texts(texts):
-            yield BodyBlock(body=text)
+        for body_stream in self._streamify_blocks(body_blocks):
+            yield body_stream
 
     def generate_presigned_url(self, name: str, content_type: str, **kwargs) -> str:
         return self.s3_client.generate_presigned_url(

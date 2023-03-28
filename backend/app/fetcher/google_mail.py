@@ -2,8 +2,8 @@ import base64
 from typing import Generator, List
 
 import requests
-from app.fetcher.base import (Block, BodyBlock, DiscoveryResponse, Fetcher,
-                              Filter, Item, TitleBlock)
+from app.fetcher.base import (Block, BlockStream, BodyBlock, DiscoveryResponse,
+                              Fetcher, Filter, Item, TitleBlock)
 
 
 class GoogleMail(Fetcher):
@@ -60,7 +60,7 @@ class GoogleMail(Fetcher):
             next_token=next_token
         )
 
-    def fetch(self, id: str) -> Generator[Block, None, None]:
+    def fetch(self, id: str) -> Generator[BlockStream, None, None]:
         print('google_mail load!')
         self.auth.refresh()
         response = requests.get(
@@ -83,9 +83,9 @@ class GoogleMail(Fetcher):
                 if subject:
                     subjects.add(subject)
         for subject in subjects:
-            yield TitleBlock(title=subject)
+            yield BlockStream([TitleBlock(title=subject)])
            
-        texts: List[str] = []
+        body_blocks: List[BodyBlock] = []
         while len(message_parts) > 0:
             part = message_parts.pop(0)
             if not part:
@@ -98,11 +98,11 @@ class GoogleMail(Fetcher):
             if text:
                 mime_type = part.get('mimeType', None) if part else None
                 if mime_type and mime_type.startswith('text/plain'):
-                    texts.append(text)
+                    body_blocks.append(BodyBlock(body=text))
 
             parts = part.get('parts', None)
             if parts:
                 message_parts[0:0] = parts
 
-        for text in self._merge_split_texts(texts):
-            yield BodyBlock(body=text)
+        for body_stream in self._streamify_blocks(body_blocks):
+            yield body_stream

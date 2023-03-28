@@ -56,7 +56,7 @@ const INTEGRATION_CONFIGS: IntegrationConfig[] = [
     name: "Zoho",
     description: "Some description for Zoho",
     oauth2_link:
-      "https://accounts.zoho.com/oauth/v2/auth?scope=ZohoCRM.modules.READ&client_id=1000.FOXW2IM5QG3WT0PJTJZDW6WJKQ9LEQ&response_type=code&access_type=offline&prompt=consent",
+      "https://accounts.zoho.com/oauth/v2/auth?scope=ZohoCRM.modules.ALL,ZohoCRM.coql.READ&client_id=1000.FOXW2IM5QG3WT0PJTJZDW6WJKQ9LEQ&response_type=code&access_type=offline&prompt=consent",
   },
 ];
 

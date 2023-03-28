@@ -1,8 +1,9 @@
 from typing import Generator
 
 import requests
-from app.fetcher.base import (Block, BodyBlock, DiscoveryResponse, Fetcher,
-                              Filter, Item, TitleBlock)
+from app.fetcher.base import (Block, BlockStream, BodyBlock, CommentBlock,
+                              DiscoveryResponse, Fetcher, Filter, Item,
+                              TitleBlock)
 
 
 class Zendesk(Fetcher):
@@ -30,7 +31,7 @@ class Zendesk(Fetcher):
             'https://mimo2079.zendesk.com/api/v2/tickets',
             params={ **filters },
             headers={
-                'Authorization': f'Basic access_token_test='
+                'Authorization': f'Basic ____='
             }
         )
         discovery_response = response.json()
@@ -53,29 +54,23 @@ class Zendesk(Fetcher):
             next_token=next_token
         )
         
-    def fetch(self, id: str) -> Generator[Block, None, None]:
-        response = requests.get(
-            f'https://mimo2079.zendesk.com/api/v2/tickets/{id}',
-            headers={
-                'Authorization': f'Basic access_token_test='
-            }
-        )
+    def fetch(self, id: str) -> Generator[BlockStream, None, None]:
+        session = requests.Session()
+        session.headers.update({
+            'Authorization': 'Basic ____='
+        })
+        response = session.get(f'https://mimo2079.zendesk.com/api/v2/tickets/{id}')
         ticket_response = response.json() if response else None
         ticket = ticket_response.get('ticket', None) if ticket_response else None
         subject = ticket.get('subject', None) if ticket else None
         if subject:
-            yield TitleBlock(title=subject)
+            yield BlockStream([TitleBlock(title=subject)])
         description = ticket.get('description', None) if ticket else None
         if description:
-            for text in self._merge_split_texts([description]):
-                yield BodyBlock(body=text)
+            for body_stream in self._streamify_blocks([BodyBlock(body=description)]):
+                yield body_stream
 
-        response = requests.get(
-            f'https://mimo2079.zendesk.com/api/v2/tickets/{id}/comments',
-            headers={
-                'Authorization': f'Basic access_token_test='
-            }
-        )
+        response = session.get(f'https://mimo2079.zendesk.com/api/v2/tickets/{id}/comments')
         comments_response = response.json() if response else None
         comments = comments_response.get('comments', None) if comments_response else None
         comments = comments[1:] if comments else None
@@ -83,12 +78,15 @@ class Zendesk(Fetcher):
         if not comments:
             return
         
-        print(comments)
-
-zendesk = Zendesk()
-d = zendesk.discover()
-print(d)
-for x in d.items:
-    print(x)
-    for y in zendesk.fetch(x.id):
-        print(y)
+        comment_blocks = []
+        for comment in comments:
+            author_id = comment.get('author_id', None) if comment else None
+            author = 'unknown'
+            if author_id:
+                response = session.get(f'https://mimo2079.zendesk.com/api/v2/users/{author_id}')
+                author_response = response.json() if response else None
+                author = author_response.get('user', {}).get('name', None) if author_response else None
+            comment_blocks.append(CommentBlock(author=author, text=comment.get('plain_body', None)))
+        
+        for comment_stream in self._streamify_blocks(comment_blocks):
+            yield comment_stream

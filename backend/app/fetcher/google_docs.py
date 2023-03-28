@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Generator, List
 
 import requests
-from app.fetcher.base import (Block, BodyBlock, DiscoveryResponse, Fetcher,
-                              Filter, Item, TitleBlock)
+from app.fetcher.base import (BlockStream, BodyBlock, DiscoveryResponse,
+                              Fetcher, Filter, Item, TitleBlock)
 
 
 class GoogleDocs(Fetcher):
@@ -66,7 +66,7 @@ class GoogleDocs(Fetcher):
             next_token=next_token
         )
 
-    def fetch(self, id: str) -> Generator[Block, None, None]:
+    def fetch(self, id: str) -> Generator[BlockStream, None, None]:
         print('google_docs load!')
         self.auth.refresh()
         response = requests.get(
@@ -78,13 +78,13 @@ class GoogleDocs(Fetcher):
         load_response = response.json() if response else None
         title = load_response.get('title', None) if load_response else None
         if title:
-            yield TitleBlock(title=title)
+            yield BlockStream([TitleBlock(title=title)])
         body = load_response.get('body', None) if load_response else None
         content = body.get('content', None) if body else None
         if not content:
             return
         
-        texts: List[str] = []
+        body_blocks: List[BodyBlock] = []
         while content and len(content) > 0:
             value = content.pop(0)
             if not value:
@@ -95,7 +95,7 @@ class GoogleDocs(Fetcher):
                     text += element['textRun']['content'] if 'textRun' in element else ''
                 text = text.strip().replace('\n', '')
                 if len(text) > 0:
-                    texts.append(text)
+                    body_blocks.append(BodyBlock(body=text))
             elif 'table' in value and 'tableRows' in value['table']:
                 for table_row in value['table']['tableRows']:
                     if not table_row or 'tableCells' not in table_row:
@@ -107,5 +107,5 @@ class GoogleDocs(Fetcher):
             elif 'tableOfContents' in value and 'content' in value['tableOfContents']:
                 content[0:0] = value['tableOfContents']['content']
             
-        for text in self._merge_split_texts(texts):
-            yield BodyBlock(body=text)
+        for body_stream in self._streamify_blocks(body_blocks):
+            yield body_stream

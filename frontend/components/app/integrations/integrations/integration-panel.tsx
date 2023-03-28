@@ -6,8 +6,8 @@ type Props = {
 };
 
 const IntegrationPanel = ({ integration }: Props) => {
-  const Comp = integration.authorized ? "div" : "a";
-  const compProps = integration.authorized
+  const Comp = integration.authorized ? "a" : "a";
+  const compProps = false
     ? {}
     : {
         href: `${integration.oauth2_link}&redirect_uri=${

@@ -4,14 +4,14 @@ from typing import Generator, List
 
 from app.auth.base import Auth
 
-MAX_TEXT_SIZE = 600
-MAX_TEXT_OVERLAP = 50
+MAX_BLOCK_SIZE = 600
+MAX_BLOCK_OVERLAP = 50
 
+# TODO: add last sync time to filter only updated documents
 @dataclass
 class Filter:
     next_token: str = None
     limit: int = 20
-
 
 @dataclass
 class Item:
@@ -19,7 +19,6 @@ class Item:
     title: str
     link: str
     preview: str
-
 
 @dataclass
 class DiscoveryResponse:
@@ -31,28 +30,133 @@ class DiscoveryResponse:
 
 @dataclass
 class Block(ABC):
-    pass
+    _LABEL = 'base'
+    subclasses = {}
+
+    @abstractmethod
+    def to_str(self) -> str:
+        raise NotImplementedError('to_str not implemented')
+    
+    @abstractmethod
+    def get_as_dict(self) -> dict:
+        raise NotImplementedError('get_as_dict not implemented')
+
+class BlockStream:
+    blocks: List[Block]
+
+    def __init__(self, blocks: List[Block] = []):
+        self.blocks = blocks
+
+    def add_block(self, block: Block):
+        self.blocks.append(block)
+
+    def to_str(self) -> str:
+        return '\n\n'.join([block.to_str() for block in self.blocks])
+    
+    def get_as_dict(self) -> dict:
+        return {
+            'blocks': [block.get_as_dict() for block in self.blocks]
+        }
 
 @dataclass
 class SummaryBlock(Block):
+    _LABEL = 'summary'
     summary: str
+
+    def to_str(self) -> str:
+        return self.summary
+    
+    def get_as_dict(self) -> dict:
+        return {
+            'summary': self.summary
+        }
 
 @dataclass
 class BodyBlock(Block):
+    _LABEL = 'body'
     body: str
+
+    def to_str(self) -> str:
+        return self.body
+    
+    def get_as_dict(self) -> dict:
+        return {
+            'body': self.body
+        }
 
 @dataclass
 class TitleBlock(Block):
+    _LABEL = 'title'
     title: str
 
+    def to_str(self) -> str:
+        return self.title
+    
+    def get_as_dict(self) -> dict:
+        return {
+            'title': self.title
+        }
+
 # TODO: change to 1 block for all comments, but they have a chunkify method
-# class Comment:
-#     author: str
-#     text: str
+@dataclass
+class CommentBlock(Block):
+    author: str
+    text: str
+
+    def to_str(self) -> str:
+        return f'{self.author}:{self.text}'
+    
+    def get_as_dict(self) -> dict:
+        return {
+            'author': self.author,
+            'text': self.text
+        }
 
 @dataclass
-class CommentsBlock(Block):
-    comments: str
+class DealBlock(Block):
+    owner: str
+    name: str
+    contact: str
+    type: str
+    stage: str
+    close_date: str
+    amount: int
+    probability: int
+
+    def to_str(self) -> str:
+        return ';'.join([f'{k}:{v}' for k, v in self.get_as_dict().items()])
+    
+    def get_as_dict(self) -> dict:
+        return {
+            'owner': self.owner,
+            'name': self.name,
+            'contact': self.contact,
+            'type': self.type,
+            'stage': self.stage,
+            'close_date': self.close_date,
+            'amount': self.amount,
+            'probability': self.probability
+        }
+
+@dataclass
+class ContactBlock(Block):
+    name: str
+    created_by: str
+    department: str
+    title: str
+    lead_source: str
+
+    def to_str(self) -> str:
+        return ';'.join([f'{k}:{v}' for k, v in self.get_as_dict().items()])
+    
+    def get_as_dict(self) -> dict:
+        return {
+            'name': self.name,
+            'created_by': self.created_by,
+            'department': self.department,
+            'title': self.title,
+            'lead_source': self.lead_source
+        }
 
 class Fetcher(ABC):
     _INTEGRATION = "base"
@@ -104,42 +208,39 @@ class Fetcher(ABC):
         raise NotImplementedError("discover not implemented")
 
     @abstractmethod
-    def fetch(self, id: str) -> Generator[Block, None, None]:
+    def fetch(self, id: str) -> Generator[BlockStream, None, None]:
         raise NotImplementedError("fetch not implemented")
 
-    def _merge_texts(self, texts: List[str]) -> str:
-        return "\n\n".join([text for text in texts])
-
-    def _merge_split_texts(self, texts: List[str]) -> List[str]:
-        if not texts or len(texts) < 1:
+    def _streamify_blocks(self, blocks: List[Block]) -> List[BlockStream]:
+        if not blocks or len(blocks) < 1:
             return []
-        final_texts: List[str] = []
-        temporary_texts: List[str] = []
-        total_texts_size = 0
-        for text in texts:
-            if not text:
+        final_blocks: List[BlockStream] = []
+        temporary_blocks: List[Block] = []
+        total_blocks_size = 0
+        for block in blocks:
+            if not block:
                 continue
-            text_size = len(text)
-            if text_size < 1:
+            block_size = len(block.to_str())
+            if block_size < 1:
                 continue
 
-            if total_texts_size + text_size >= MAX_TEXT_SIZE:
-                if total_texts_size > MAX_TEXT_SIZE:
-                    print(f"Created a text of size {total_texts_size}")
+            if total_blocks_size + block_size >= MAX_BLOCK_SIZE:
+                if total_blocks_size > MAX_BLOCK_SIZE:
+                    print(f'Created a block of size {total_blocks_size}')
 
-                if len(temporary_texts) > 0:
-                    final_texts.append(self._merge_texts(temporary_texts))
-                    while total_texts_size > MAX_TEXT_OVERLAP or (
-                        total_texts_size + text_size > MAX_TEXT_SIZE
-                        and total_texts_size > 0
+                if len(temporary_blocks) > 0:
+                    final_blocks.append(BlockStream(temporary_blocks))
+                    while total_blocks_size > MAX_BLOCK_OVERLAP or (
+                        total_blocks_size + block_size > MAX_BLOCK_SIZE
+                        and total_blocks_size > 0
                     ):
-                        total_texts_size -= len(temporary_texts[0])
-                        temporary_texts.pop(0)
+                        total_blocks_size -= len(temporary_blocks[0])
+                        temporary_blocks.pop(0)
 
-            temporary_texts.append(text)
-            total_texts_size += text_size
+            temporary_blocks.append(block)
+            total_blocks_size += block_size
+            
+        if len(temporary_blocks) > 0:
+            final_blocks.append(BlockStream(temporary_blocks))
 
-        if len(temporary_texts) > 0:
-            final_texts.append(self._merge_texts(temporary_texts))
-
-        return final_texts
+        return final_blocks
