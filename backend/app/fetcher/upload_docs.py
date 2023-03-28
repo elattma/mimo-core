@@ -3,13 +3,14 @@ from typing import Generator, List
 
 import boto3
 import nltk
+from app.model.blocks import BlockStream, BodyBlock, TitleBlock
 
 nltk.data.path.append('./nltk_data/')
-from app.fetcher.base import (BlockStream, BodyBlock, DiscoveryResponse,
-                              Fetcher, Filter, Item, TitleBlock)
+from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
 
 
 # TODO: add explicit error handling
+# TODO: only docs, no other file types yet supported. Need to add in other classes
 class Upload(Fetcher):
     _INTEGRATION = 'upload'
     s3_client = None
@@ -77,9 +78,9 @@ class Upload(Fetcher):
         
         body_blocks: List[BodyBlock] = [BodyBlock(body=str(element)) for element in elements]
 
-        yield BlockStream([TitleBlock(title=id.replace(f'{self.auth.prefix}/', ''))])
+        yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=id.replace(f'{self.auth.prefix}/', ''))])
 
-        for body_stream in self._streamify_blocks(body_blocks):
+        for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
             yield body_stream
 
     def generate_presigned_url(self, name: str, content_type: str, **kwargs) -> str:

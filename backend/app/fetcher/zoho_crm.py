@@ -2,8 +2,8 @@ from typing import Generator
 from urllib.parse import quote
 
 import requests
-from app.fetcher.base import (Block, CommentBlock, ContactBlock, DealBlock,
-                              DiscoveryResponse, Fetcher, Filter, Item)
+from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
+from app.model.blocks import Block, CommentBlock, ContactBlock, DealBlock
 
 
 class Zoho(Fetcher):
@@ -97,7 +97,7 @@ class Zoho(Fetcher):
         notes_response = response.json() if response and response.status_code == 200 else None
         notes = notes_response.get('data', None) if notes_response else None
         comment_blocks = [CommentBlock(author=owner, text=(f'{note.get("Note_Title", "")}: {note.get("Note_Content", "")}')) for note in notes] if notes else []
-        for comment_stream in self._streamify_blocks(comment_blocks):
+        for comment_stream in self._streamify_blocks(CommentBlock._LABEL, comment_blocks):
             yield comment_stream
 
         account_name: str = account['Account_Name']
@@ -121,7 +121,7 @@ class Zoho(Fetcher):
             amount=int(deal.get('Amount')) if deal.get('Amount', None) else None,
             probability=int(deal.get('Probability')) if deal.get('Probability', None) else None,
         ) for deal in deals] if deals else []
-        for deal_stream in self._streamify_blocks(deal_blocks):
+        for deal_stream in self._streamify_blocks(DealBlock._LABEL, deal_blocks):
             yield deal_stream
 
         response = session.get(
@@ -139,5 +139,5 @@ class Zoho(Fetcher):
             title=contact.get('Title', None),
             lead_source=contact.get('Lead_Source', None),
         ) for contact in contacts] if contacts else []
-        for contact_stream in self._streamify_blocks(contact_blocks):
+        for contact_stream in self._streamify_blocks(ContactBlock._LABEL, contact_blocks):
             yield contact_stream

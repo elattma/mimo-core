@@ -1,9 +1,8 @@
 from typing import Generator
 
 import requests
-from app.fetcher.base import (Block, BlockStream, BodyBlock, CommentBlock,
-                              DiscoveryResponse, Fetcher, Filter, Item,
-                              TitleBlock)
+from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
+from app.model.blocks import BlockStream, BodyBlock, CommentBlock, TitleBlock
 
 
 class Zendesk(Fetcher):
@@ -27,14 +26,17 @@ class Zendesk(Fetcher):
             if filter.limit:
                 filters['page[size]'] = filter.limit
 
+        print('before')
         response = requests.get(
             'https://mimo2079.zendesk.com/api/v2/tickets',
             params={ **filters },
             headers={
-                'Authorization': f'Basic ____='
+                'Authorization': f'Basic '
             }
         )
         discovery_response = response.json()
+        print(discovery_response)
+        print('after')
 
         if not discovery_response:
             return None
@@ -57,17 +59,17 @@ class Zendesk(Fetcher):
     def fetch(self, id: str) -> Generator[BlockStream, None, None]:
         session = requests.Session()
         session.headers.update({
-            'Authorization': 'Basic ____='
+            'Authorization': 'Basic '
         })
         response = session.get(f'https://mimo2079.zendesk.com/api/v2/tickets/{id}')
         ticket_response = response.json() if response else None
         ticket = ticket_response.get('ticket', None) if ticket_response else None
         subject = ticket.get('subject', None) if ticket else None
         if subject:
-            yield BlockStream([TitleBlock(title=subject)])
+            yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=subject)])
         description = ticket.get('description', None) if ticket else None
         if description:
-            for body_stream in self._streamify_blocks([BodyBlock(body=description)]):
+            for body_stream in self._streamify_blocks(BodyBlock._LABEL, [BodyBlock(body=description)]):
                 yield body_stream
 
         response = session.get(f'https://mimo2079.zendesk.com/api/v2/tickets/{id}/comments')
@@ -88,5 +90,5 @@ class Zendesk(Fetcher):
                 author = author_response.get('user', {}).get('name', None) if author_response else None
             comment_blocks.append(CommentBlock(author=author, text=comment.get('plain_body', None)))
         
-        for comment_stream in self._streamify_blocks(comment_blocks):
+        for comment_stream in self._streamify_blocks(CommentBlock._LABEL, comment_blocks):
             yield comment_stream

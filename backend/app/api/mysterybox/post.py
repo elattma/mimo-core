@@ -12,12 +12,12 @@ from app.client._pinecone import Pinecone
 from app.client._secrets import Secrets
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB,
                                         ParentChildItem, UserIntegrationItem)
-from app.fetcher.base import DiscoveryResponse, Fetcher, FetchResponse, Filter
+from app.fetcher.base import DiscoveryResponse, Fetcher, Filter
+from app.model.blocks import Block
 from app.mystery.ingestor import IngestInput, Ingestor, IngestResponse
 
 db: ParentChildDB = None
 secrets: Secrets = None
-
 
 def handler(event: dict, context):
     global db, secrets
@@ -59,13 +59,11 @@ def handler(event: dict, context):
                     'refresh_token': item.refresh_token,
                     'expiry_timestamp': item.expiry_timestamp
                 }, last_fetch_timestamp=item.last_fetch_timestamp))
-    fetchers.append(Fetcher.create(
-        "upload",
-        {"bucket": upload_item_bucket, "prefix": f"{user}/"},
-        last_fetch_timestamp=upload_item.last_fetch_timestamp
-        if upload_item
-        else None,
-    ))
+    upload_fetcher = Fetcher.create('upload', {
+        'bucket': upload_item_bucket,
+        'prefix': f'{user}/'
+    }, last_fetch_timestamp=upload_item.last_fetch_timestamp if upload_item else None)
+    fetchers.append(upload_fetcher)
 
     openai = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
     neo4j = Neo4j(
@@ -81,6 +79,8 @@ def handler(event: dict, context):
 
     dfi_responses: List[DfiResponse] = []
     futures = None
+    if not fetchers:
+        return to_response_success({})
     with ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
         futures = [
             executor.submit(discover_fetch_ingest, user, fetcher, ingestor, timestamp)
@@ -106,20 +106,18 @@ def handler(event: dict, context):
     neo4j.close()
     return to_response_success({})
 
-
 @dataclass
 class DfiResponse:
     integration: str
     succeeded: bool
 
-
 def discover_fetch_ingest(
     user: str, fetcher: Fetcher, ingestor: Ingestor, timestamp: int
 ) -> DfiResponse:
+    max_items = 1
     next_token: str = None
     succeeded: bool = True
-    max_items = 200
-    while True:
+    while True: 
         filter = Filter(next_token=next_token)
         discovery_response: DiscoveryResponse = fetcher.discover(filter=filter)
         if not (discovery_response and discovery_response.items):
@@ -128,22 +126,22 @@ def discover_fetch_ingest(
         next_token = discovery_response.next_token
         for item in discovery_response.items:
             max_items -= 1
-            generator = fetcher.fetch(item.id)
+            blocks_generator = fetcher.fetch(item.id)
 
-            for document in generator:
-                if not document:
-                    continue
-                ingest_input = IngestInput(
-                    owner=user,
-                    integration=fetcher._INTEGRATION,
-                    document_id=item.id,
-                    chunks=[chunk.content for chunk in fetch_response.chunks],
-                    timestamp=timestamp,
-                )
-                ingest_response: IngestResponse = ingestor.ingest(ingest_input)
-                if not ingest_response.succeeded:
-                    succeeded = False
-                    continue
+            blocks: List[Block] = []
+            for block in blocks_generator:
+                blocks.append(block)
+            ingest_input = IngestInput(
+                owner=user,
+                integration=fetcher._INTEGRATION,
+                document_id=item.id,
+                blocks=blocks,
+                timestamp=timestamp,
+            )
+            ingest_response: IngestResponse = ingestor.ingest(ingest_input)
+            if not ingest_response.succeeded:
+                succeeded = False
+                continue
             if max_items <= 0:
                 return DfiResponse(integration=fetcher._INTEGRATION, succeeded=succeeded)
         if not next_token:

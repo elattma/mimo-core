@@ -2,8 +2,8 @@ import base64
 from typing import Generator, List
 
 import requests
-from app.fetcher.base import (Block, BlockStream, BodyBlock, DiscoveryResponse,
-                              Fetcher, Filter, Item, TitleBlock)
+from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
+from app.model.blocks import BlockStream, BodyBlock, TitleBlock
 
 
 class GoogleMail(Fetcher):
@@ -83,7 +83,7 @@ class GoogleMail(Fetcher):
                 if subject:
                     subjects.add(subject)
         for subject in subjects:
-            yield BlockStream([TitleBlock(title=subject)])
+            yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=subject)])
            
         body_blocks: List[BodyBlock] = []
         while len(message_parts) > 0:
@@ -104,5 +104,5 @@ class GoogleMail(Fetcher):
             if parts:
                 message_parts[0:0] = parts
 
-        for body_stream in self._streamify_blocks(body_blocks):
+        for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
             yield body_stream

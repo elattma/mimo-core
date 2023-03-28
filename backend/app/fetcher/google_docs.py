@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Generator, List
 
 import requests
-from app.fetcher.base import (BlockStream, BodyBlock, DiscoveryResponse,
-                              Fetcher, Filter, Item, TitleBlock)
+from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
+from app.model.blocks import BlockStream, BodyBlock, TitleBlock
 
 
 class GoogleDocs(Fetcher):
@@ -78,7 +78,7 @@ class GoogleDocs(Fetcher):
         load_response = response.json() if response else None
         title = load_response.get('title', None) if load_response else None
         if title:
-            yield BlockStream([TitleBlock(title=title)])
+            yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=title)])
         body = load_response.get('body', None) if load_response else None
         content = body.get('content', None) if body else None
         if not content:
@@ -107,5 +107,5 @@ class GoogleDocs(Fetcher):
             elif 'tableOfContents' in value and 'content' in value['tableOfContents']:
                 content[0:0] = value['tableOfContents']['content']
             
-        for body_stream in self._streamify_blocks(body_blocks):
+        for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
             yield body_stream

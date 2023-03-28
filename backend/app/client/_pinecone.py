@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Set, Tuple
+from typing import List, Tuple
 
 import pinecone
 
 
 class RowType(Enum):
-    CHUNK = 'chunk'
+    BLOCK = 'block'
     TRIPLET = 'triplet'
 
 @dataclass
@@ -19,7 +19,6 @@ class Row:
     document_id: str
     type: RowType
     date_day: int
-    leaf: bool
 
     def to_metadata_dict(self):
         return {
@@ -27,8 +26,7 @@ class Row:
             'integration': self.integration,
             'document_id': self.document_id,
             'type': self.type.value,
-            'date_day': self.date_day,
-            'leaf': self.leaf
+            'date_day': self.date_day
         }
 
 @dataclass
@@ -38,7 +36,6 @@ class Filter:
     document_id: set[str] = None
     type: set[RowType] = None
     min_max_date_day: Tuple[int, int] = None
-    leaf: bool = None
 
     def to_dict(self):
         filter = {
@@ -61,8 +58,6 @@ class Filter:
                 '$gte': self.min_max_date_day[0],
                 '$lte': self.min_max_date_day[1]
             }
-        if self.leaf:
-            filter['leaf'] = self.leaf
         return filter
 
 class Pinecone:
@@ -76,7 +71,7 @@ class Pinecone:
                 name=index_name, 
                 dimension=1536, 
                 metadata_config={
-                    'indexed': ['owner', 'integration', 'document_id', 'type', 'leaf']
+                    'indexed': ['owner', 'integration', 'document_id', 'type']
                 }
             )
             self._index = pinecone.Index(index_name=index_name)

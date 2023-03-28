@@ -4,7 +4,7 @@ import os
 from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
 from app.fetcher.base import Fetcher
-from app.fetcher.upload import Upload
+from app.fetcher.upload_docs import Upload
 
 
 def handler(event: dict, context):
