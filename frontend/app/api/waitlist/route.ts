@@ -1,3 +1,4 @@
+import { DynamoDB } from "@aws-sdk/client-dynamodb";
 import { NextRequest } from "next/server";
 
 const POST = async (request: NextRequest) => {
@@ -9,11 +10,26 @@ const POST = async (request: NextRequest) => {
     return new Response("Missing message in body", { status: 400 });
   }
 
-  return fetch(process.env.SLACK_WEBHOOK_URL || "", {
+  // import dynamodb client and call putitem
+  // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#putItem-property
+  const dynamoClient = new DynamoDB({ region: "us-east-1" });
+  try {
+    await dynamoClient.putItem({
+      TableName: "mimo-beta-waitlist",
+      Item: {
+        email: { S: data.message },
+      },
+    });
+  } catch (e) {
+    return new Response("Error saving to dynamo", { status: 500 });
+  }
+
+  await fetch(process.env.SLACK_WEBHOOK_URL || "", {
     method: "POST",
     body: JSON.stringify({ text: data.message }),
-    next: { revalidate: 1 },
   });
+
+  return;
 };
 
 export { POST };
