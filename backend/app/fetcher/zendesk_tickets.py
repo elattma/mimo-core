@@ -76,7 +76,6 @@ class Zendesk(Fetcher):
         comments_response = response.json() if response else None
         comments = comments_response.get('comments', None) if comments_response else None
         comments = comments[1:] if comments else None
-
         if not comments:
             return
         

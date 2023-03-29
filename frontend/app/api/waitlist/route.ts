@@ -12,7 +12,7 @@ const POST = async (request: NextRequest) => {
   return fetch(process.env.SLACK_WEBHOOK_URL || "", {
     method: "POST",
     body: JSON.stringify({ text: data.message }),
-    next: { revalidate: 10 },
+    next: { revalidate: 1 },
   });
 };
 

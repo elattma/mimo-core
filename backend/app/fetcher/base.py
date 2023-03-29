@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Generator, List
 
 from app.auth.base import Auth
@@ -29,7 +29,7 @@ class DiscoveryResponse:
     next_token: str
 
 class Fetcher(ABC):
-    _INTEGRATION = "base"
+    _INTEGRATION = 'base'
 
     subclasses = {}
 
@@ -43,7 +43,7 @@ class Fetcher(ABC):
             }
 
         if not integration or not cls.subclasses.get(integration, None):
-            print(f"integration auth not found for {integration}")
+            print(f'integration auth not found for {integration}')
             return None
 
         fetcher = cls.subclasses[integration]()
@@ -63,19 +63,19 @@ class Fetcher(ABC):
         self.auth.validate()
 
     def get_icon(self) -> str:
-        return f"assets.mimo.team/icons/{self._INTEGRATION}.svg"
+        return f'assets.mimo.team/icons/{self._INTEGRATION}.svg'
 
     @abstractmethod
     def get_auth_type(self) -> str:
-        raise NotImplementedError("get_auth_type not implemented")
+        raise NotImplementedError('get_auth_type not implemented')
 
     @abstractmethod
     def get_auth_attributes(self) -> dict:
-        raise NotImplementedError("get_auth_attributes not implemented")
+        raise NotImplementedError('get_auth_attributes not implemented')
 
     @abstractmethod
     def discover(self, filter: Filter = None) -> DiscoveryResponse:
-        raise NotImplementedError("discover not implemented")
+        raise NotImplementedError('discover not implemented')
 
     @abstractmethod
     def fetch(self, id: str) -> Generator[BlockStream, None, None]:

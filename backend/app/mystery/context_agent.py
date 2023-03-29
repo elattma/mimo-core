@@ -12,7 +12,6 @@ from app.client._neo4j import (ChunkFilter, DocumentFilter, EntityFilter,
 from app.client._openai import OpenAI
 from app.client._pinecone import Filter as VectorFilter
 from app.client._pinecone import Pinecone, RowType
-from app.mrkl.llm import LLM
 from app.mrkl.open_ai import OpenAIChat
 from app.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                              ChatPromptMessageRole)
@@ -21,164 +20,26 @@ from neo4j import Record
 now = datetime.datetime.now()
 last_day_of_month = calendar.monthrange(year=int(now.strftime("%Y")), month=int(now.strftime("%m")))[1]
 
-SYSTEM_MESSAGE = '''Pretend you are a consultant brought in to help query data.
-You are an expert at using knowledge graphs and vector databases.
+SYSTEM_MESSAGE = '''You are DataGPT, a large language model that is an expert at retrieving data from a specialized database.
+Your job is to examine a Question and produce a well-formed Query for the database.
 
-Your job is use the data tools below to retrieve data based on a query.
-Each tool is listed below. You must only use the tools below.
+A Query consists of four optional components that can be derived from the Question.
+1. `entities`: Any named entities that are explicitly mentioned in the Question with any words that link them to other entities.
+2. `time_frame`: A period of time that the Question specifies.
+3. `sources`: Any data sources that are implicitly or explicitly mentioned in the Question. The available sources are {data_sources}.
+4. `blocks`: The database divides its source documents into different blocks. `blocks` is a list of these blocks that the Question explicitly or implicitly mentioned. The avaiable blocks are {blocks}.
 
-For reference:
-It is currently {todays_time} on {todays_date}. (use 24-hour clock)
-The company has integrated the following data sources: 
-Gmail for mail, Google Docs for documents, Salesforce for customer relationship manager, and Zendesk for customer support tickets.
-
-Some tips to help you:
-A company has extracted all information from the following data sources and stored it both a knowledge graph and a vector database.
-If you are handling a relationship between multiple entities, I suggest using the vector database and output "knowledge_triplet_ids".
-If you don't know what to do, use the vector database and output "chunk_ids".
-The final step of your output should always be to use the Document Graph.
-Remember to only use the tools below. And you must use the response format of the examples.
---------
-Tool documentation:
-# Used to query a knowledge graph based on a specific keywords
-# Returns either IDs of chunks of text or knowledge triplets connected to that node
+A well-formed Query is a JSON object and should look like this:
 {{
- "action": "Knowledge Graph on Keywords",
- "input": {{
-  "keywords": List[str]
- }},
- "output": {{
-  type: "chunk_ids" | "knowledge_triplet_ids"
- }}
+ "entities": {{
+  "name": str,
+  "links": str[]
+ }}[],
+ "timeFrame": str[], // [startDate, endDate]
+ "sources": str[],
+ "blocks": str[]
 }}
-
-# Used to query a knowledge graph based on a set of knowledge_triplet_ids from the graph
-# Returns the respective chunk IDs or document IDs
-{{
- "action": "Knowledge Graph on Triplet IDs",
- "output": {{
-  "type": "chunk_ids" | "document_ids"
- }}
-}}
-
-# Used to retrieve text
-# Optionally can enter chunk IDs or document IDs
-# Return chunks of text, entire documents, or summaries of the text
-{{
- "action": "Document Graph",
- # Can add as many as are helpful
- "optional_filters": {{
-  "ids_type": "chunk_ids" | "document_ids"
-  "data_sources": List[str]
-  "time_frame": ["YYYY-MM-DD", "YYYY-MM-DD"]
- }},
- "output": {{
-  "type": "chunk_text" | "document_text" | "summary_text",
- }}
-}}
-
-# Used to get the most semantically similar
-# Output "chunk_ids" if looking for the most relevant chunk of text to a query
-# Output "knowledge_triplet_ids" if looking for a relationship or action by an entity
-{{
- "action": "Vector Database",
- "input": {{
-  "query": str
- }},
- # Can add as many as are helpful
- "optional_filters": {{
-  "document_ids": List[str],
-  "data_sources": List[str],
-  "time_frame": ["YYYY-MM-DD", "YYYY-MM-DD"]
- }},
- "output": {{
-  "type": "chunk_ids" | "knowledge_triplet_ids"
- }}
-}}
---------
-You must used the output format shown in the examples below:
-
-Query: Return all emails involving cargo.one in the last week.
-Response:
-[
- {{
-  "action": "Knowledge Graph on Keyword",
-  "input": {{
-   "keywords": ["cargo.one"]
-  }},
-  "output": {{
-   "type": "chunk_ids"
-  }}
- }},
- {{
-  "action": "Document Graph",
-  "optional_filters": {{
-   "ids_type": "chunk_ids",
-   "data_sources": ["Gmail"],
-   "time_frame": ["{last_week_start}", "{todays_date}"]
-  }},
-  "output": {{
-   "type": "document_text"
-  }}
- }}
-]
-
-Query: Today's Intercom tickets.
-Response:
-[
- {{
-  "action": "Document Graph",
-  "optional_filters": {{
-   "data_sources": ["Intercom"],
-   "time_frame": ["{todays_date}", "{todays_date}"]
-  }},
-  "output": {{
-   type: "document_text"
-  }}
- }}
-]
-
-Query: All Intercom tickets from this month of a customer complaining about the new product
-Response:
-[
- {{
-  "action": "Vector Database",
-  "input": {{
-   "query": "customer complaining about the new product"
-  }},
-  "optional_filters": {{
-   "data_sources": ["Intercom"],
-   "time_range": ["{this_month_start}", "{this_month_end}"]
-  }},
-  "output": {{
-   "knowledge_triplet_ids"
-  }}
- }},
- {{
-  "action": "Knowledge Graph on Triplet IDs",
-  "input": {{
-   "knowledge_triplet_ids": List[str]
-  }},
-  "output": {{
-    type: "document_ids"
-  }}
- }},
- {{
-  "action": "Document Graph",
-  "optional_filters": {{
-   "ids": "document_ids"
-  }},
-  "output": {{
-   type: "document_text"
-  }}
- }}
-]'''.format(
-    todays_date = now.strftime('%Y-%m-%d'),
-    todays_time = now.strftime('%H:%M:%S'),
-    last_week_start = (now - datetime.timedelta(days=6)).strftime('%Y-%m-%d'),
-    this_month_start = now.strftime('%Y-%m-01'),
-    this_month_end = now.strftime(f'%Y-%m-{last_day_of_month}')
-)
+'''.format()
 
 class ContextAgentError(Enum):
     # TODO: Make these the actual responses that the user will see
@@ -381,8 +242,8 @@ class ContextAgent():
                 state = self._vector_database(action)
             else:
                 raise Exception('Invalid action')
-        return '\n\n'.join(state.get('texts', [])) if state else ''
 
+        return '\n\n'.join(state.get('texts', [])) if state else ''
     def _knowledge_graph_on_keywords(self, action: KnowledgeGraphOnKeywordsAction) -> Dict[str, Any]:
         query_filter = QueryFilter(
             owner=self._owner,

@@ -11,7 +11,7 @@ export default function WaitlistForm() {
     fetch("/api/waitlist", {
       method: "POST",
       body: JSON.stringify({ message: email }),
-      next: { revalidate: 10 },
+      next: { revalidate: 1 },
     });
   };
   return (
