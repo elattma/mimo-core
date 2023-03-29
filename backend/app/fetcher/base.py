@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Generator, List
 
 from app.auth.base import Auth
@@ -80,6 +81,12 @@ class Fetcher(ABC):
     @abstractmethod
     def fetch(self, id: str) -> Generator[BlockStream, None, None]:
         raise NotImplementedError("fetch not implemented")
+
+    def _get_timestamp_from_format(self, timestamp_str: str, format: str = None) -> int:
+        if not (timestamp_str and format):
+            return None
+        timestamp_datetime = datetime.strptime(timestamp_str, format)
+        return int(timestamp_datetime.timestamp())
 
     def _streamify_blocks(self, label: str, blocks: List[Block]) -> List[BlockStream]:
         if not blocks or len(blocks) < 1:

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Tuple
+from typing import List
 
 import pinecone
 
@@ -15,32 +15,49 @@ class Row:
     embedding: List[float]
 
     owner: str
-    integration: str
-    document_id: str
     type: RowType
     date_day: int
+
+    integration: str
+    document_id: str
+    block_label: str
 
     def to_metadata_dict(self):
         return {
             'owner': self.owner,
+            'type': self.type.value,
+            'date_day': self.date_day,
             'integration': self.integration,
             'document_id': self.document_id,
-            'type': self.type.value,
-            'date_day': self.date_day
+            'block_label': self.block_label,
         }
 
 @dataclass
 class Filter:
     owner: str
+    type: set[RowType] = None
+    min_date_day: int = None
+    max_date_day: int = None
     integration: set[str] = None
     document_id: set[str] = None
-    type: set[RowType] = None
-    min_max_date_day: Tuple[int, int] = None
+    block_label: set[str] = None
 
     def to_dict(self):
         filter = {
             'owner': self.owner
         }
+        if self.type:
+            filter['type'] = {
+                '$in': [t.value for t in self.type]
+            }
+        if self.min_date_day or self.max_date_day:
+            date_day = {}
+            if self.min_date_day:
+                date_day['$gte'] = self.min_date_day
+            if self.max_date_day:
+                date_day['$lte'] = self.max_date_day
+
+            filter['date_day'] = date_day
         if self.integration:
             filter['integration'] = {
                 '$in': list(self.integration)
@@ -49,19 +66,14 @@ class Filter:
             filter['document_id'] = {
                 '$in': list(self.document_id)
             }
-        if self.type:
-            filter['type'] = {
-                '$in': [t.value for t in self.type]
-            }
-        if self.min_max_date_day:
-            filter['date_day'] = {
-                '$gte': self.min_max_date_day[0],
-                '$lte': self.min_max_date_day[1]
+        if self.block_label:
+            filter['block_label'] = {
+                '$in': list(self.block_label)
             }
         return filter
 
 class Pinecone:
-    def __init__(self, api_key: str, environment: str, index_name: str = 'pre-alpha'):
+    def __init__(self, api_key: str, environment: str, index_name: str = 'beta'):
         pinecone.init(api_key=api_key, environment=environment)
         indexes = pinecone.list_indexes()
         if indexes and index_name in indexes:
@@ -71,7 +83,7 @@ class Pinecone:
                 name=index_name, 
                 dimension=1536, 
                 metadata_config={
-                    'indexed': ['owner', 'integration', 'document_id', 'type']
+                    'indexed': ['owner', 'type', 'date_day', 'integration', 'document_id', 'block_label']
                 }
             )
             self._index = pinecone.Index(index_name=index_name)
@@ -127,6 +139,7 @@ class Pinecone:
                 'values': row.embedding,
                 'metadata': row.to_metadata_dict()
             })
+            print(row.to_metadata_dict())
         
         deleted = self._delete_old_vectors(rows)
         upserted = self._batched_upsert(vectors=vectors)

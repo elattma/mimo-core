@@ -29,5 +29,16 @@ export class DynamoStack extends Stack {
         type: AttributeType.STRING,
       },
     });
+
+    new Table(this, "mimo-waitlist", {
+      partitionKey: {
+        name: "email",
+        type: AttributeType.STRING,
+      },
+      pointInTimeRecovery: true,
+      tableName: "mimo-beta-waitlist",
+      removalPolicy: RemovalPolicy.RETAIN,
+      billingMode: BillingMode.PAY_PER_REQUEST,
+    });
   }
 }

@@ -83,14 +83,20 @@ class UserIntegrationItem(ParentChildItem):
         if not (parent and child):
             return None
         
+        access_token = item.get('access_token', None)
+        refresh_token = item.get('refresh_token', None)
+        timestamp = item.get('timestamp', None)
+        expiry_timestamp = item.get('expiry_timestamp', None)
+        last_fetch_timestamp = item.get('last_fetch_timestamp', None)
+        
         return UserIntegrationItem(
             parent=parent,
             child=child,
-            access_token=item.get('access_token', None),
-            refresh_token=item.get('refresh_token', None),
-            timestamp=item.get('timestamp', None),
-            expiry_timestamp=item.get('expiry_timestamp', None),
-            last_fetch_timestamp=item.get('last_fetch_timestamp', None),
+            access_token=access_token,
+            refresh_token=refresh_token,
+            timestamp=int(timestamp) if timestamp else None,
+            expiry_timestamp=int(expiry_timestamp) if expiry_timestamp else None,
+            last_fetch_timestamp=int(last_fetch_timestamp) if last_fetch_timestamp else None,
         )
 
 class ParentChildDB:

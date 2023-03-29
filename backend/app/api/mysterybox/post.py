@@ -8,12 +8,13 @@ from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
 from app.client._neo4j import Neo4j
 from app.client._openai import OpenAI
+from app.client._pinecone import Filter as QueryFilter
 from app.client._pinecone import Pinecone
 from app.client._secrets import Secrets
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB,
                                         ParentChildItem, UserIntegrationItem)
 from app.fetcher.base import DiscoveryResponse, Fetcher, Filter
-from app.model.blocks import Block
+from app.model.blocks import Block, BlockStream
 from app.mystery.ingestor import IngestInput, Ingestor, IngestResponse
 
 db: ParentChildDB = None
@@ -52,7 +53,7 @@ def handler(event: dict, context):
             if integration and integration == "upload":
                 upload_item = item
             else:
-                fetchers.append(Fetcher.create(item.get_raw_child(), {
+                fetchers.append(Fetcher.create(integration, {
                     'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
                     'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
                     'access_token': item.access_token,
@@ -114,7 +115,7 @@ class DfiResponse:
 def discover_fetch_ingest(
     user: str, fetcher: Fetcher, ingestor: Ingestor, timestamp: int
 ) -> DfiResponse:
-    max_items = 1
+    max_items = 1 # TODO: remove once ready
     next_token: str = None
     succeeded: bool = True
     while True: 
@@ -126,17 +127,18 @@ def discover_fetch_ingest(
         next_token = discovery_response.next_token
         for item in discovery_response.items:
             max_items -= 1
+            ingestion_timestamp = int(time())
             blocks_generator = fetcher.fetch(item.id)
 
-            blocks: List[Block] = []
-            for block in blocks_generator:
-                blocks.append(block)
+            block_streams: List[BlockStream] = []
+            for block_stream in blocks_generator:
+                block_streams.append(block_stream)
             ingest_input = IngestInput(
                 owner=user,
                 integration=fetcher._INTEGRATION,
                 document_id=item.id,
-                blocks=blocks,
-                timestamp=timestamp,
+                block_streams=block_streams,
+                timestamp=ingestion_timestamp
             )
             ingest_response: IngestResponse = ingestor.ingest(ingest_input)
             if not ingest_response.succeeded:

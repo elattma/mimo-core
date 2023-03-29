@@ -28,15 +28,17 @@ class Block(Node):
     embedding: List[float]
     label: str
     content: str
+    last_updated_timestamp: int
 
     @staticmethod
     def get_index_properties():
-        return ['label', 'content']
+        return ['label', 'content', 'last_updated_timestamp']
 
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
         map['label'] = self.label
         map['content'] = self.content
+        map['last_updated_timestamp'] = self.last_updated_timestamp
         return map
 
 @dataclass

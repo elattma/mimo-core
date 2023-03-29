@@ -5,6 +5,7 @@ import requests
 from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
 from app.model.blocks import BlockStream, BodyBlock, TitleBlock
 
+GOOGLE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 class GoogleDocs(Fetcher):
     _INTEGRATION = 'google_docs'
@@ -70,6 +71,18 @@ class GoogleDocs(Fetcher):
         print('google_docs load!')
         self.auth.refresh()
         response = requests.get(
+            f'https://www.googleapis.com/drive/v3/files/{id}',
+            params={
+                'fields': 'modifiedTime'
+            },
+            headers={
+                'Authorization': f'Bearer {self.auth.access_token}'
+            }
+        )
+        file_response = response.json() if response else None
+        last_updated_timestamp = self._get_timestamp_from_format(file_response.get('modifiedTime', None), GOOGLE_TIME_FORMAT) if file_response else None
+
+        response = requests.get(
             f'https://docs.googleapis.com/v1/documents/{id}',
             headers={
                 'Authorization': f'Bearer {self.auth.access_token}'
@@ -78,7 +91,7 @@ class GoogleDocs(Fetcher):
         load_response = response.json() if response else None
         title = load_response.get('title', None) if load_response else None
         if title:
-            yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=title)])
+            yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=title, last_updated_timestamp=last_updated_timestamp)])
         body = load_response.get('body', None) if load_response else None
         content = body.get('content', None) if body else None
         if not content:
@@ -95,7 +108,7 @@ class GoogleDocs(Fetcher):
                     text += element['textRun']['content'] if 'textRun' in element else ''
                 text = text.strip().replace('\n', '')
                 if len(text) > 0:
-                    body_blocks.append(BodyBlock(body=text))
+                    body_blocks.append(BodyBlock(body=text, last_updated_timestamp=last_updated_timestamp))
             elif 'table' in value and 'tableRows' in value['table']:
                 for table_row in value['table']['tableRows']:
                     if not table_row or 'tableCells' not in table_row:

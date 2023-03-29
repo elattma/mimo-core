@@ -71,38 +71,54 @@ class GoogleMail(Fetcher):
         )
 
         load_response = response.json() if response else None
+        last_updated_timestamp = load_response.get('internalDate', None) if load_response else None
+        last_updated_timestamp = int(int(last_updated_timestamp) / 1000) if last_updated_timestamp else None
         messages = load_response.get('messages', None) if load_response else None
-        message_parts = [message.get('payload', None) if messages else None for message in messages]
-        if not message_parts or len(message_parts) == 0:
+        if not messages:
             return
         
+        for message in messages:
+            last_updated_timestamp = message.get('internalDate', None) if message else None
+            last_updated_timestamp = int(int(last_updated_timestamp) / 1000) if last_updated_timestamp else None
+            message['last_updated_time'] = last_updated_timestamp
+
         subjects = set()
-        for part in message_parts:
+        title_blocks: List[TitleBlock] = []
+        for message in messages:
+            part = message.get('payload', None) if message else None
             headers = part.get('headers', []) if part else []
             for subject in [header.get('value', None) for header in headers if header.get('name', None) == 'Subject']:
                 if subject:
                     subjects.add(subject)
-        for subject in subjects:
-            yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=subject)])
-           
+                    title_blocks.append(TitleBlock(title=subject, last_updated_timestamp=message['last_updated_time']))
+
+        for title_stream in self._streamify_blocks(TitleBlock._LABEL, title_blocks):
+            yield title_stream
+        
         body_blocks: List[BodyBlock] = []
-        while len(message_parts) > 0:
-            part = message_parts.pop(0)
-            if not part:
+        for message in messages:
+            message_parts = [message.get('payload', None)] if message else None
+            if not message_parts:
                 continue
 
-            body = part.get('body', None)
-            data = body.get('data', None) if body else None
-            text = base64.urlsafe_b64decode(data + '=' * (4 - len(data) % 4)) if data else None
-            text = text.decode('utf-8') if text else None
-            if text:
-                mime_type = part.get('mimeType', None) if part else None
-                if mime_type and mime_type.startswith('text/plain'):
-                    body_blocks.append(BodyBlock(body=text))
+            last_updated_timestamp = message.get('last_updated_time', None) if message else None
+            while len(message_parts) > 0:
+                part = message_parts.pop(0)
+                if not part:
+                    continue
 
-            parts = part.get('parts', None)
-            if parts:
-                message_parts[0:0] = parts
+                body = part.get('body', None)
+                data = body.get('data', None) if body else None
+                text = base64.urlsafe_b64decode(data + '=' * (4 - len(data) % 4)) if data else None
+                text = text.decode('utf-8') if text else None
+                if text:
+                    mime_type = part.get('mimeType', None) if part else None
+                    if mime_type and mime_type.startswith('text/plain'):
+                        body_blocks.append(BodyBlock(body=text, last_updated_timestamp=message['last_updated_time']))
 
-        for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
-            yield body_stream
+                parts = part.get('parts', None)
+                if parts:
+                    message_parts[0:0] = parts
+
+            for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
+                yield body_stream

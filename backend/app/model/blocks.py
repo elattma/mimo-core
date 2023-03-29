@@ -6,6 +6,7 @@ from typing import List
 @dataclass
 class Block(ABC):
     _LABEL = 'block'
+    last_updated_timestamp: int
     
     @abstractmethod
     def to_str(self) -> str:
