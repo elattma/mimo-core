@@ -13,7 +13,7 @@ export default function WaitlistForm() {
     fetch("/api/waitlist", {
       method: "POST",
       body: JSON.stringify({ message: email }),
-      next: { revalidate: 1 },
+      next: { revalidate: 2 },
     });
     close.current?.click();
   };

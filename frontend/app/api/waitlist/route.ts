@@ -10,8 +10,6 @@ const POST = async (request: NextRequest) => {
     return new Response("Missing message in body", { status: 400 });
   }
 
-  // import dynamodb client and call putitem
-  // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#putItem-property
   const dynamoClient = new DynamoDB({ region: "us-east-1" });
   try {
     await dynamoClient.putItem({
