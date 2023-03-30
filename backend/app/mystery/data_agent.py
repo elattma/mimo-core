@@ -82,6 +82,13 @@ SOURCE_TO_INTEGRATIONS = {
     'customer_support': ['zendesk']
 }
 
+BLOCKS_BY_SOURCE = {
+    'email': ['title', 'body', 'summary'],
+    'crm': ['comment', 'deal', 'contact'],
+    'documents': ['title', 'body', 'summary'],
+    'customer_support': ['title', 'body', 'summary']
+}
+
 @dataclass
 class Entity:
     name: str
@@ -148,6 +155,33 @@ class BlockDescription:
     name: str
     description: str
 
+BLOCK_LABEL_TO_BLOCK_DESCRIPTION = {
+    'body': BlockDescription(
+        'body',
+        'The primary content of a page.'
+    ),
+    'title': BlockDescription(
+        'title',
+        'The title or subject of a page.'
+    ),
+    'comment': BlockDescription(
+        'comment',
+        'A comment on a page.'
+    ),
+    'summary': BlockDescription(
+        'summary',
+        'A summary of a page.'
+    ),
+    'deal': BlockDescription(
+        'deal',
+        'A deal in a CRM account.'
+    ),
+    'contact': BlockDescription(
+        'contact',
+        'Information about a person in a CRM account.'
+    )
+}
+
 @dataclass
 class Source:
     page_id: str
@@ -190,8 +224,6 @@ class DataAgent(ABC):
         self,
         mystery: str,
         data_sources: List[str],
-        block_descriptions: List[BlockDescription],
-        blocks_by_source: Dict[str, List[str]]
     ) -> Query:
         '''Create a query from a mystery.
 
@@ -205,8 +237,6 @@ class DataAgent(ABC):
         prompt = self._generate_prompt(
             mystery,
             data_sources,
-            block_descriptions,
-            blocks_by_source
         )
         response = self._llm.predict(prompt=prompt)
         query = _parse_llm_response_for_query(response)
@@ -281,17 +311,23 @@ class DataAgent(ABC):
         self,
         mystery: str,
         data_sources: List[str],
-        block_descriptions: List[BlockDescription],
-        blocks_by_source: Dict[str, List[str]],
     ) -> ChatPrompt:
         data_sources = ', '.join(data_sources)
+        relevant_blocks = []
+        for source in BLOCKS_BY_SOURCE.keys():
+            relevant_blocks.extend(BLOCKS_BY_SOURCE[source])
+        relevant_blocks = set(relevant_blocks)
+        relevant_block_descriptions = [
+            BLOCK_LABEL_TO_BLOCK_DESCRIPTION[block]
+            for block in relevant_blocks
+        ]
         block_descriptions = '\n'.join([
             f'{i + 1}: {block.name}: {block.description}'
-            for i, block in enumerate(block_descriptions)
+            for i, block in enumerate(relevant_block_descriptions)
         ])
         blocks_by_source = '\n'.join([
             f'{source}: {", ".join(blocks)}'
-            for source, blocks in blocks_by_source.items()
+            for source, blocks in BLOCKS_BY_SOURCE.items()
         ])
         system_message = ChatPromptMessage(
             role=ChatPromptMessageRole.SYSTEM.value,

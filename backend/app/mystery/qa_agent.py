@@ -11,8 +11,6 @@ The available context can be found below.
 {context}
 '''
 
-
-
 @dataclass
 class Answer:
     content: str
@@ -22,25 +20,15 @@ class QuestionAnswerAgent(DataAgent):
     # TODO: Move data_sources and block_descriptions to the constructor
     def run(
         self,
-        question: str, 
-        data_sources: List[str], 
-        block_descriptions: List[BlockDescription],
-        blocks_by_source: Dict[str, List[str]]
+        question: str,
+        data_sources: List[str],
     ) -> Answer:
-        print('Creating query...')
         query = self.create_query(
             question,
             data_sources,
-            block_descriptions,
-            blocks_by_source
         )
-        print(f'Query created:\n{query}')
-        print('Executing query...')
         context_basket = self.execute_query(query)
-        print(f'Query executed:\n{context_basket}')
-        print('Answering question...')
         answer = self._use_context_to_answer_question(question, context_basket)
-        print(f'Question answered:\n{answer}')
         return answer
 
     def _use_context_to_answer_question(
