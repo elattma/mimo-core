@@ -15,6 +15,7 @@ MAX_TOKENS = 3000
 GENERATE_QUESTIONS_SYSTEM_MESSAGE = '''You are ChatGPT and you only know everything that GPT-4 was trained on.
 You are chatting with a user that assumes you know everything about their company and its data. But, you don't know everything.
 Your job is to come up with a list of questions based on what you need to know more about to respond to the user.
+The questions will be used to fetch information from a database, they will not be directed to the user. So, do not ask questionst that are intended to be answered by the user.
 The list of questions should be in the format [{question1} {question2} ... {questionN}}]
 The examples below will show you how to think. Follow the format of the examples.
 ---------
