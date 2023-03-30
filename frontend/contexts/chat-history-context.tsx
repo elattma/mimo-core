@@ -29,7 +29,6 @@ const ChatHistoryProvider = ({ children, initialChatHistory }: Props) => {
   const addToChatHistory = (chat: Chat) => {
     setChatHistory((prev) => [...prev, chat]);
   };
-  console.log(chatHistory);
 
   return (
     <chatHistoryContext.Provider value={{ chatHistory, addToChatHistory }}>

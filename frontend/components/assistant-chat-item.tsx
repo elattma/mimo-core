@@ -6,11 +6,11 @@ type AssistantChatItemProps = {
 
 export default function AssistantChatItem({ chat }: AssistantChatItemProps) {
   return (
-    // Container to align the chat bubble to the right
     <div className="w-fit min-w-0 max-w-full grow-0 self-start">
-      {/* The actual chat bubble; enforces margin when width is full */}
       <div className="mr-theme-2 break-words rounded-t-theme rounded-br-theme border border-neutral-5 bg-neutral-bg p-theme-1/2">
-        <p className="text-sm text-neutral-text-contrast">{chat.message}</p>
+        <p className="whitespace-pre-wrap break-words text-sm text-brand-text-contrast">
+          {chat.message}
+        </p>
       </div>
     </div>
   );
