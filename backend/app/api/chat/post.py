@@ -1,11 +1,9 @@
 import json
 import os
 import time
-from typing import List
 
 from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
-from app.api.util.stream import send_chat
 from app.client._neo4j import Neo4j
 from app.client._openai import OpenAI
 from app.client._pinecone import Pinecone
@@ -30,11 +28,7 @@ def handler(event: dict, context):
     user: str = authorizer.get('principalId', None) if authorizer else None
 
     stage: str = os.environ['STAGE']
-    appsync_endpoint: str = os.environ['APPSYNC_ENDPOINT']
     graph_db_uri: str = os.environ['GRAPH_DB_URI']
-
-    headers: dict = event.get('headers', None) if event else None
-    authorization: str = headers.get('Authorization', None) if headers else None
 
     body: str = event.get('body', None) if event else None
     body: dict = json.loads(body) if body else None
@@ -42,10 +36,8 @@ def handler(event: dict, context):
     chat_id: str = chat.get('id', None) if chat else None
     message: str = chat.get('message', None) if chat else None
     timestamp: int = chat.get('timestamp', None) if chat else None
-    contextualized: bool = body.get('contextualized', None) if chat else None
-    items: List[dict] = body.get('items', None) if body else None
 
-    if not (user and stage and appsync_endpoint and authorization and chat_id and message and timestamp):
+    if not (user and stage and chat_id and message and timestamp):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if not secrets:
@@ -56,14 +48,6 @@ def handler(event: dict, context):
     openai_api_key = secrets.get('OPENAI_API_KEY')
     if not openai_api_key:
         return to_response_error(Errors.MISSING_SECRETS.value)
-
-    chat_history: List[UserChatItem] = []
-    try:
-        chat_history = db.query("{namespace}{user}".format(
-            namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.CHAT.value)
-    except Exception as e:
-        print(e)
-        print("empty history!")
 
     # TODO: fetch relevant context from selected items or knowledge base and use as context to prompt
 
@@ -76,7 +60,7 @@ def handler(event: dict, context):
         )
         vector_db = Pinecone(api_key=secrets.get("PINECONE_API_KEY"), environment="us-east1-gcp", index_name='beta')
         integrations = ['documents', 'email', 'crm', 'customer_support']
-        system = ChatSystem(user, graph_db, vector_db, openai, integrations)
+        system = ChatSystem('test_user', graph_db, vector_db, openai, integrations)
 
     output_chat_id = ulid()
     output_role = Roles.ASSISTANT.value
@@ -110,3 +94,4 @@ def handler(event: dict, context):
         'role': output_role,
         'timestamp': str(output_timestamp)
     })
+

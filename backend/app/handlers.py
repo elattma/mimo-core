@@ -40,3 +40,8 @@ def item_post(event, context):
 def mysterybox_post(event, context):
     from app.api.mysterybox.post import handler
     return handler(event, context)
+
+
+def qa_get(event, context):
+    from app.api.qa.get import handler
+    return handler(event, context)

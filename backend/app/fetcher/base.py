@@ -102,9 +102,6 @@ class Fetcher(ABC):
                 continue
 
             if total_blocks_size + block_size >= MAX_BLOCK_SIZE:
-                if total_blocks_size > MAX_BLOCK_SIZE:
-                    print(f'Created a block of size {total_blocks_size}')
-
                 if len(temporary_blocks) > 0:
                     final_blocks.append(BlockStream(label, temporary_blocks))
                     while total_blocks_size > MAX_BLOCK_OVERLAP or (

@@ -115,7 +115,7 @@ class DfiResponse:
 def discover_fetch_ingest(
     user: str, fetcher: Fetcher, ingestor: Ingestor, timestamp: int
 ) -> DfiResponse:
-    max_items = 1 # TODO: remove once ready
+    max_items = 2000 # TODO: remove once ready
     next_token: str = None
     succeeded: bool = True
     while True: 

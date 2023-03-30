@@ -26,10 +26,10 @@ class GoogleDocs(Fetcher):
             print('failed to refresh google docs token')
             return None
         discover_filters = ['mimeType="application/vnd.google-apps.document"', 'trashed=false']
-        if self.last_fetch_timestamp:
-            date = datetime.fromtimestamp(self.last_fetch_timestamp)
-            formatted_time = date.strftime('%Y-%m-%dT%H:%M:%S')
-            discover_filters.append(f'(modifiedTime > "{formatted_time}" or sharedWithMeTime > "{formatted_time}")')
+        # if self.last_fetch_timestamp:
+        #     date = datetime.fromtimestamp(self.last_fetch_timestamp)
+        #     formatted_time = date.strftime('%Y-%m-%dT%H:%M:%S')
+        #     discover_filters.append(f'(modifiedTime > "{formatted_time}" or sharedWithMeTime > "{formatted_time}")')
         params = {
             'q': ' and '.join(discover_filters)
         }
@@ -119,6 +119,6 @@ class GoogleDocs(Fetcher):
                         content[0:0] = cell['content']
             elif 'tableOfContents' in value and 'content' in value['tableOfContents']:
                 content[0:0] = value['tableOfContents']['content']
-            
+        
         for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
             yield body_stream

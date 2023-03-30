@@ -130,7 +130,7 @@ class Ingestor:
                 embedding=block.target.embedding,
                 owner=owner,
                 type=RowType.BLOCK,
-                date_day=date_day,
+                date_day=int(date_day),
                 integration=document.integration,
                 document_id=document.id,
                 block_label=block.target.label,

@@ -222,6 +222,52 @@ export class ApiStack extends Stack {
         ],
       }
     );
+
+    const qa = mysterybox.addResource("qa");
+    const qaHandler = this.getHandler({
+      method: "qa_get",
+      environment: {
+        STAGE: stageId,
+        GRAPH_DB_URI: NEO_4J_URI,
+      },
+      memorySize: 2048,
+      timeout: Duration.minutes(10),
+    });
+
+    const qaResponseModel = this.api.addModel("qaResponseModel", {
+      contentType: "application/json",
+      modelName: "qaResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          answer: {
+            type: JsonSchemaType.STRING,
+          },
+          sources: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.STRING,
+            },
+          },
+        },
+      },
+    });
+
+    qa.addMethod("GET", new LambdaIntegration(qaHandler), {
+      authorizer: this.authorizer,
+      requestParameters: {
+        "method.request.querystring.question": true,
+      },
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": qaResponseModel,
+          },
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
   };
 
   createItemRoutes = (

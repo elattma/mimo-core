@@ -76,9 +76,9 @@ class Upload(Fetcher):
             temporary_file.seek(0)
             elements = partition(file=temporary_file)
         
-        body_blocks: List[BodyBlock] = [BodyBlock(body=str(element)) for element in elements]
+        body_blocks: List[BodyBlock] = [BodyBlock(body=str(element), last_updated_timestamp=None) for element in elements]
 
-        yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=id.replace(f'{self.auth.prefix}/', ''))])
+        yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=id.replace(f'{self.auth.prefix}/', ''), last_updated_timestamp=None)])
 
         for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
             yield body_stream

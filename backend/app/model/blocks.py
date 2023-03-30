@@ -20,12 +20,9 @@ class BlockStream:
     blocks: List[Block]
     label: str
 
-    def __init__(self, label: str, blocks: List[Block] = []):
+    def __init__(self, label: str, blocks: List[Block]):
         self.label = label
-        self.blocks = blocks
-
-    def add_block(self, block: Block):
-        self.blocks.append(block)
+        self.blocks = [block for block in blocks]
 
     def to_str(self) -> str:
         return '\n\n'.join([block.to_str() for block in self.blocks])
