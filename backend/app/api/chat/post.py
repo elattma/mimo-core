@@ -12,7 +12,7 @@ from app.client._pinecone import Pinecone
 from app.client._secrets import Secrets
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB, Roles,
                                         UserChatItem)
-from app.mystery.system import ChatSystem
+from app.mystery.chat_system import ChatSystem
 from ulid import ulid
 
 MODEL = "gpt-3.5-turbo"
@@ -75,26 +75,14 @@ def handler(event: dict, context):
             password=secrets.get("GRAPH_DB_SECRET")
         )
         vector_db = Pinecone(api_key=secrets.get("PINECONE_API_KEY"), environment="us-east1-gcp", index_name='beta')
-        system = ChatSystem(user, graph_db, vector_db, openai)
+        integrations = ['documents', 'email', 'crm', 'customer_support']
+        system = ChatSystem(user, graph_db, vector_db, openai, integrations)
 
     output_chat_id = ulid()
     output_role = Roles.ASSISTANT.value
     output_timestamp = int(time.time())
 
-    response_stream = system.stream_run(message)
-    final_response: str = ''
-    for output in response_stream:
-        send_chat(
-            appsync_endpoint=appsync_endpoint, 
-            authorization=authorization, 
-            user_id=user, 
-            input_chat_id=chat_id, 
-            output_chat_id=output_chat_id, 
-            message=output, 
-            role=Roles.ASSISTANT.value, 
-            timestamp=output_timestamp
-        )
-        final_response = output
+    response = system.run(message)
 
     parent = f'{KeyNamespaces.USER.value}{user}'
     input_chat = UserChatItem(
@@ -108,7 +96,7 @@ def handler(event: dict, context):
     output_chat = UserChatItem(
         parent=parent,
         child=f'{KeyNamespaces.CHAT.value}{output_chat_id}',
-        message=final_response,
+        message=response,
         author=MODEL,
         role=output_role,
         timestamp=output_timestamp
@@ -117,7 +105,7 @@ def handler(event: dict, context):
 
     return to_response_success({
         'id': output_chat_id,
-        'message': final_response,
+        'message': response,
         'author': MODEL,
         'role': output_role,
         'timestamp': str(output_timestamp)

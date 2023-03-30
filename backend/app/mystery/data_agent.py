@@ -295,7 +295,6 @@ class DataAgent(ABC):
                     if document_node else None
                 integration = document_node.get('integration', None) \
                     if document_node else None
-                print(block_node, '\n\n')
                 content = block_node.get('content', None) \
                     if block_node else None
                 if not content:
@@ -346,11 +345,10 @@ class DataAgent(ABC):
         )
         return prompt
     
-def _parse_llm_response_for_query(query: str) -> Query:
-    regex = r'Query:\s*{(.*)}'
-    match = re.search(regex, query, re.DOTALL)
+def _parse_llm_response_for_query(llm_response: str) -> Query:
+    match = re.search(r'{[\s\S]*}', llm_response, re.DOTALL)
     if match:
-        query_str = '{' + match.group(1) + '}'
+        query_str = match.group(0)
         query_dict = json.loads(query_str)
         query = Query.from_dict(query_dict)
         return query
