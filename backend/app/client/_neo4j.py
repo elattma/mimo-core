@@ -200,6 +200,6 @@ class Neo4j:
             f'WHERE {" AND ".join(document_query_wheres)} '
         )
         query += 'RETURN '
-        query += 'd, co, c'
+        query += 'd, co, b'
         result = tx.run(query, owner=query_filter.owner)
         return list(result)

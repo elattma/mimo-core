@@ -74,7 +74,7 @@ def handler(event: dict, context):
             user=secrets.get("GRAPH_DB_KEY"),
             password=secrets.get("GRAPH_DB_SECRET")
         )
-        vector_db = Pinecone(api_key=secrets.get("PINECONE_API_KEY"), environment="us-east1-gcp", index_name='pre-alpha')
+        vector_db = Pinecone(api_key=secrets.get("PINECONE_API_KEY"), environment="us-east1-gcp", index_name='beta')
         system = ChatSystem(user, graph_db, vector_db, openai)
 
     output_chat_id = ulid()
