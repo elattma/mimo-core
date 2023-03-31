@@ -227,7 +227,7 @@ type SearchProps = {
 
 function Search({ searchTerm, setSearchTerm }: SearchProps) {
   return (
-    <div className="group mx-0.5 flex items-center space-x-theme-1/4 rounded-theme px-theme-1/8 ring-2 ring-neutral-line transition-[box-shadow] focus-within:ring-brand-line">
+    <div className="group flex items-center space-x-theme-1/4 rounded-theme border border-neutral-border p-theme-1/8 ring-0 ring-neutral-line transition-[box-shadow] focus-within:ring-2 focus-within:ring-brand-line">
       <SearchIcon className="h-4 w-4 text-gray-text group-focus-within:text-gray-text-contrast" />
       <input
         className="prevent-default-focus flex-1 bg-transparent text-sm text-gray-text-contrast placeholder-gray-text"
