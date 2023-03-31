@@ -1,4 +1,5 @@
 type Query {
+  getChat(inputChatId: ID!): Chat @aws_oidc
 }
 
 type Mutation {
