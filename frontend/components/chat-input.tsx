@@ -25,18 +25,7 @@ export default function ChatInput() {
     if (!user.user?.sub) throw new Error("User is not logged in");
     const chat = new Chat(trimmedMessage, user?.user?.sub);
     addToChatHistory(chat);
-    clientPost("/chat", { body: JSON.stringify({ chat: chat.toJSON() }) }).then(
-      (response) => {
-        const assistantChat = new Chat(
-          response.message,
-          response.author,
-          response.id,
-          response.timestamp,
-          Chat.Role.ASSISTANT
-        );
-        addToChatHistory(assistantChat);
-      }
-    );
+    clientPost("/chat", { body: JSON.stringify({ chat: chat.toJSON() }) });
     setMessage("");
   };
 

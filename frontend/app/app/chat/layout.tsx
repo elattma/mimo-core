@@ -12,7 +12,7 @@ type ChatLayoutProps = {
   children?: ReactNode;
 };
 
-export function getReqResp(headers: Headers) {
+function getReqResp(headers: Headers) {
   const req = new IncomingMessage(new Socket());
   headers.forEach((v, k) => {
     req.headers[k] = v;
@@ -21,7 +21,7 @@ export function getReqResp(headers: Headers) {
   return { req, res };
 }
 
-export async function getSession(headers: Headers) {
+async function getSession(headers: Headers) {
   const { req, res } = getReqResp(headers);
   return { session: await auth0GetSession(req, res), req, res };
 }

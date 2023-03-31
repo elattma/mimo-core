@@ -3,7 +3,7 @@
 import { getSubscribeClient } from "@/lib/subscribe-client";
 import { Chat } from "@/models";
 import { GetChatResponse } from "@/types/responses";
-import { gql } from "@apollo/client";
+import { ApolloClient, gql, NormalizedCacheObject } from "@apollo/client";
 import {
   createContext,
   ReactNode,
@@ -52,25 +52,58 @@ const ChatHistoryProvider = ({
   const [chatHistory, setChatHistory] = useState<ChatHistoryType>(
     initialChatHistory?.map((chat) => Chat.fromJSON(chat))
   );
+  const [client, setClient] = useState<ApolloClient<NormalizedCacheObject>>();
 
   useEffect(() => {
-    console.log("???????");
-    console.log(accessToken);
-    if (accessToken) {
+    if (userId && accessToken) {
       const client = getSubscribeClient(accessToken);
-      console.log(client);
-      client.subscribe({
-        query: AddedChat,
-        variables: {
-          userId,
-          inputChatId: initialChatHistory[initialChatHistory.length - 1].id,
-        },
-      });
+      setClient(client);
     }
-  }, [accessToken]);
+  }, [userId, accessToken]);
 
   const addToChatHistory = (chat: Chat) => {
     setChatHistory((prev) => [...prev, chat]);
+    if (chat.role === Chat.Role.USER) {
+      client
+        ?.subscribe({
+          query: AddedChat,
+          variables: {
+            userId,
+            inputChatId: chat.id,
+          },
+        })
+        .subscribe({
+          next: (result) => {
+            const updatedChat = result.data.updatedChat;
+            setChatHistory((prev) => {
+              const updatedChatIndex = prev.findIndex(
+                (chat) => chat.id === updatedChat.outputChatId
+              );
+              if (updatedChatIndex === -1) {
+                return [
+                  ...prev,
+                  Chat.fromJSON({
+                    message: updatedChat.message,
+                    author: "gpt-4",
+                    id: updatedChat.outputChatId,
+                    timestamp: updatedChat.timestamp,
+                    role: Chat.Role.ASSISTANT,
+                  }),
+                ];
+              }
+              const updatedChatHistory = [...prev];
+              updatedChatHistory[updatedChatIndex] = Chat.fromJSON({
+                message: updatedChat.message,
+                author: "gpt-4",
+                id: updatedChat.outputChatId,
+                timestamp: updatedChat.timestamp,
+                role: Chat.Role.ASSISTANT,
+              });
+              return updatedChatHistory;
+            });
+          },
+        });
+    }
   };
 
   return (
