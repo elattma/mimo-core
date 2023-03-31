@@ -233,6 +233,7 @@ export class ApiStack extends Stack {
       memorySize: 2048,
       timeout: Duration.minutes(10),
     });
+    this.integrationsSecret.grantRead(qaHandler);
 
     const qaResponseModel = this.api.addModel("qaResponseModel", {
       contentType: "application/json",
