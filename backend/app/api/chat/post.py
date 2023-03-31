@@ -4,6 +4,7 @@ import time
 
 from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
+from app.api.util.stream import send_chat
 from app.client._neo4j import Neo4j
 from app.client._openai import OpenAI
 from app.client._pinecone import Pinecone
@@ -28,7 +29,11 @@ def handler(event: dict, context):
     user: str = authorizer.get('principalId', None) if authorizer else None
 
     stage: str = os.environ['STAGE']
+    appsync_endpoint: str = os.environ['APPSYNC_ENDPOINT']
     graph_db_uri: str = os.environ['GRAPH_DB_URI']
+
+    headers: dict = event.get('headers', None) if event else None
+    authorization: str = headers.get('Authorization', None) if headers else None
 
     body: str = event.get('body', None) if event else None
     body: dict = json.loads(body) if body else None
@@ -37,7 +42,7 @@ def handler(event: dict, context):
     message: str = chat.get('message', None) if chat else None
     timestamp: int = chat.get('timestamp', None) if chat else None
 
-    if not (user and stage and chat_id and message and timestamp):
+    if not (user and stage and appsync_endpoint and authorization and chat_id and message and timestamp):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if not secrets:
@@ -67,6 +72,20 @@ def handler(event: dict, context):
     output_timestamp = int(time.time())
 
     response = system.run(message)
+    answer = None
+    for thought in response:
+        print(thought)
+        send_chat(
+            appsync_endpoint=appsync_endpoint, 
+            authorization=authorization, 
+            user_id=user, 
+            input_chat_id=chat_id, 
+            output_chat_id=output_chat_id, 
+            message=thought, 
+            role=Roles.ASSISTANT.value, 
+            timestamp=output_timestamp
+        )
+        answer = thought
 
     parent = f'{KeyNamespaces.USER.value}{user}'
     input_chat = UserChatItem(
@@ -80,7 +99,7 @@ def handler(event: dict, context):
     output_chat = UserChatItem(
         parent=parent,
         child=f'{KeyNamespaces.CHAT.value}{output_chat_id}',
-        message=response,
+        message=answer,
         author=MODEL,
         role=output_role,
         timestamp=output_timestamp
@@ -89,9 +108,8 @@ def handler(event: dict, context):
 
     return to_response_success({
         'id': output_chat_id,
-        'message': response,
+        'message': answer,
         'author': MODEL,
         'role': output_role,
         'timestamp': str(output_timestamp)
     })
-
