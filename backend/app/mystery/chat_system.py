@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List
+from typing import Dict, Generator, List
 
 from tiktoken import Encoding, get_encoding
 
@@ -61,13 +61,40 @@ class ChatSystem:
                 self._gpt_4.encoding_name
             )
 
-    def run(self, message: str) -> str:
+    def run(self, message: str) -> Generator[str, None, None]:
         questions: List[str] = self._generate_questions_from_message(message)
+        if questions:
+            questions_str = '\n'.join(f'{i}. {q}' for i, q in enumerate(questions, 1))
+            yield ('Before we can respond to your message, we need to find '
+                   f'answers to the following questions:\n{questions_str}')
         qas: Dict[str, Answer] = {}
         for question in questions:
+            yield f'Finding an answer to: {question}'
             answer = self._qa_agent.run(question, self._integrations)
+            yield 'Answer found!'
             qas[question] = answer
+        if questions:
+            yield 'I now have all the information I need to respond to your message.'
         response = self._respond_using_qas(message, qas)
+        yield response
+    
+    def debug_run(self, message: str) -> str:
+        print('[ChatSystem] Running debug_run...\n')
+        print('[ChatSystem] Received message...')
+        print(message, '\n')
+        print('[ChatSystem] Generating questions...')
+        questions: List[str] = self._generate_questions_from_message(message)
+        print(questions, '\n')
+        qas: Dict[str, Answer] = {}
+        for question in questions:
+            print('[ChatSystem] Running QuestionAnswerAgent on question...')
+            answer = self._qa_agent.debug_run(question, self._integrations)
+            print('[ChatSystem] Answer received...')
+            print(answer, '\n')
+            qas[question] = answer
+        print('[ChatSystem] Generating response...')
+        response = self._respond_using_qas(message, qas)
+        print(response, '\n')
         return response
     
     def _generate_questions_from_message(self, message: str) -> str:

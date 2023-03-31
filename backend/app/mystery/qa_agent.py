@@ -31,6 +31,28 @@ class QuestionAnswerAgent(DataAgent):
         answer = self._use_context_to_answer_question(question, context_basket)
         return answer
 
+    def debug_run(
+        self,
+        question: str,
+        data_sources: List[str],
+    ) -> Answer:
+        print('[QuestionAnswerAgent] Running debug_run...\n')
+        print('[QuestionAnswerAgent] Received question...')
+        print(question, '\n')
+        print('[QuestionAnswerAgent] Creating query...')
+        query = self.create_query(
+            question,
+            data_sources,
+        )
+        print(query, '\n')
+        print('[QuestionAnswerAgent] Executing query...')
+        context_basket = self.execute_query(query)
+        print(context_basket, '\n')
+        print('[QuestionAnswerAgent] Using context to answer question...')
+        answer = self._use_context_to_answer_question(question, context_basket)
+        print(answer, '\n')
+        return answer
+
     def _use_context_to_answer_question(
         self,
         question: str,
