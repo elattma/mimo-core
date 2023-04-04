@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import List
+
 from app.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                              ChatPromptMessageRole)
-
-from app.mystery.data_agent import (ContextBasket, DataAgent, Source)
+from app.mystery.data_agent import ContextBasket, DataAgent, Source
 
 SYSTEM_MESSAGE_CONTENT = '''Pretend you are AnswerGPT. Your job is to answer a question using the context you are given.
 The available context can be found below.
@@ -63,5 +63,3 @@ class QuestionAnswerAgent(DataAgent):
         llm_output = self._llm.predict(prompt)
         sources = [context.source for context in context_basket]
         return Answer(content=llm_output, sources=sources)
-
-

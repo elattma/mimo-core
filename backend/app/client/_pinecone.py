@@ -7,7 +7,6 @@ import pinecone
 
 class RowType(Enum):
     BLOCK = 'block'
-    TRIPLET = 'triplet'
 
 @dataclass
 class Row:

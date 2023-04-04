@@ -7,11 +7,11 @@ from math import sqrt
 from typing import Any, Dict, List, Type, Union
 
 import tiktoken
-
 from app.client._neo4j import (BlockFilter, DocumentFilter, Limit, NameFilter,
-                                Neo4j, OrderBy, OrderDirection, QueryFilter)
+                               Neo4j, OrderBy, OrderDirection, QueryFilter)
 from app.client._openai import OpenAI
-from app.client._pinecone import Pinecone
+from app.client._pinecone import Filter as VectorFilter
+from app.client._pinecone import Pinecone, RowType
 from app.mrkl.open_ai import OpenAIChat
 from app.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                              ChatPromptMessageRole)
@@ -326,6 +326,7 @@ class BlocksFilter(QueryComponent):
     '''Enforces that only results from these blocks are considered. e.g.
     "title contains", "summarize"'''
     blocks: List[Block]
+    block_ids: List[str] = None
 
     @staticmethod
     def from_llm_response(llm_response: List[str]) -> 'BlocksFilter':
@@ -556,10 +557,51 @@ class DataAgent(ABC):
         )
         return ChatPrompt([system_message, user_message])
     
-    def _fetch_relevant_context_without_names(
-            self, query: Query) -> ContextBasket:
-        results = self._query_neo4j(query)
+    def _fetch_relevant_context_without_names(self, query: Query) -> ContextBasket:
+        print('[DataAgent] Fetching relevant context without names...')
         context_basket = ContextBasket()
+        question_embedding = self._openai.embed(query.question)
+
+        # TODO: deduplicate this code
+        integrations = None
+        if IntegrationsFilter in query.components:
+            integrations_filter: IntegrationsFilter = (
+                query.components[IntegrationsFilter])
+            integrations = set([_integration_name(integration)
+                                for integration 
+                                in integrations_filter.integrations])
+        
+        min_date_day = None
+        max_date_day = None
+        if AbsoluteTimeFilter in query.components:
+            absolute_time_filter: AbsoluteTimeFilter = (
+                query.components[AbsoluteTimeFilter])
+            min_date_day = absolute_time_filter.start
+            max_date_day = absolute_time_filter.end
+
+        block_label = None
+        if BlocksFilter in query.components:
+            blocks_filter: BlocksFilter = query.components[BlocksFilter]
+            block_label = [block.value for block in blocks_filter.blocks]
+        
+        vector_filter = VectorFilter(
+            owner=self._owner,
+            type=set([RowType.BLOCK]),
+            min_date_day=min_date_day,
+            max_date_day=max_date_day,
+            integration=integrations,
+            block_label=block_label
+        )
+
+        relevant_block_rows = self._vector_db.query(embedding=question_embedding, query_filter=vector_filter)
+        if not relevant_block_rows:
+            return context_basket
+        block_ids = [row.get('id', None) for row in relevant_block_rows]
+        
+        results = self._graph_db.get_by_filter(QueryFilter(
+            owner=self._owner,
+            block_filter=BlockFilter(ids=block_ids)
+        ))
         if results:
             for record in results:
                 block_node = record.get('block', None) if record else None
@@ -578,8 +620,8 @@ class DataAgent(ABC):
                 ))
         return context_basket
     
-    def _fetch_relevant_context_with_names(
-            self, query: Query) -> ContextBasket:
+    def _fetch_relevant_context_with_names(self, query: Query) -> ContextBasket:
+        print('[DataAgent] Fetching relevant context with names...')
         results = self._query_neo4j(query)
         block_ids = []
         if results:
@@ -627,6 +669,7 @@ class DataAgent(ABC):
 
     
     def _fetch_exact_context(self, query: Query) -> ContextBasket:
+        print('[DataAgent] Fetching exact context...')
         results = self._query_neo4j(query)
         context_basket = ContextBasket()
         if results:
@@ -652,6 +695,7 @@ class DataAgent(ABC):
             return None
         
         integrations = None
+        # TODO: move these into IntegrationsFilter itself? Or create a DAO
         if IntegrationsFilter in query.components:
             integrations_filter: IntegrationsFilter = (
                 query.components[IntegrationsFilter])
@@ -664,6 +708,7 @@ class DataAgent(ABC):
             names_filter: NamesFilter = query.components[NamesFilter]
             names = set(names_filter.names)
 
+        # TODO: neo4j needs timestamps, pinecone needs date_days
         min_date_day = None
         max_date_day = None
         if AbsoluteTimeFilter in query.components:
@@ -672,6 +717,7 @@ class DataAgent(ABC):
             min_date_day = absolute_time_filter.start
             max_date_day = absolute_time_filter.end
         time_range = None
+        # TODO: make max_date_day today if not populated, min_date_day beginning of time if not populated
         if min_date_day and max_date_day:
             time_range = (min_date_day, max_date_day)
 

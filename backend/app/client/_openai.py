@@ -7,7 +7,7 @@ class OpenAI:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
         
-    def embed(self, text: str):
+    def embed(self, text: str) -> List[float]:
         if not (self._api_key and text):
             return None
         
