@@ -48,7 +48,7 @@ def handler(event: dict, context):
             graph_db=neo4j, 
             openai=openai, 
         )
-    answer: Answer = qa_agent.run(question, ['email', 'crm', 'documents', 'customer_support'])
+    answer: Answer = qa_agent.debug_run(question)
     
     return to_response_success({
         'answer': answer.content,

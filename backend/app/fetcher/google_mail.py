@@ -3,7 +3,8 @@ from typing import Generator, List
 
 import requests
 from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
-from app.model.blocks import BlockStream, BodyBlock, TitleBlock
+from app.model.blocks import (BlockStream, BodyBlock, MemberBlock, Relations,
+                              TitleBlock, entity)
 
 
 class GoogleMail(Fetcher):
@@ -59,10 +60,8 @@ class GoogleMail(Fetcher):
             ) for thread in threads],
             next_token=next_token
         )
-
-    def fetch(self, id: str) -> Generator[BlockStream, None, None]:
-        print('google_mail load!')
-        self.auth.refresh()
+    
+    def _fetch_thread(self, id: str) -> dict:
         response = requests.get(
             f'https://www.googleapis.com/gmail/v1/users/me/threads/{id}',
             headers={
@@ -75,24 +74,58 @@ class GoogleMail(Fetcher):
         last_updated_timestamp = int(int(last_updated_timestamp) / 1000) if last_updated_timestamp else None
         messages = load_response.get('messages', None) if load_response else None
         if not messages:
-            return
+            return None
         
         for message in messages:
             last_updated_timestamp = message.get('internalDate', None) if message else None
             last_updated_timestamp = int(int(last_updated_timestamp) / 1000) if last_updated_timestamp else None
-            message['last_updated_time'] = last_updated_timestamp
+            message['last_updated_timestamp'] = last_updated_timestamp
+        return messages
 
-        subjects = set()
-        title_blocks: List[TitleBlock] = []
+    def fetch(self, id: str) -> Generator[BlockStream, None, None]:
+        print('google_mail load!')
+        self.auth.refresh()
+        messages = self._fetch_thread(id)
+        if not messages:
+            return
+        
+        member_blocks_map: dict[str, MemberBlock] = {}
+        title_blocks_map: dict[str, TitleBlock] = {}
         for message in messages:
             part = message.get('payload', None) if message else None
             headers = part.get('headers', []) if part else []
-            for subject in [header.get('value', None) for header in headers if header.get('name', None) == 'Subject']:
-                if subject:
-                    subjects.add(subject)
-                    title_blocks.append(TitleBlock(title=subject, last_updated_timestamp=message['last_updated_time']))
+            last_updated_timestamp = message.get('last_updated_timestamp', None) if message else None
+            for header in headers:
+                header_name = header.get('name', None)
+                if not header_name:
+                    continue
+                if header_name == 'Subject':
+                    subject = header.get('value', None)
+                    if subject and subject not in title_blocks_map:
+                        title_blocks_map[subject] = TitleBlock(text=subject, last_updated_timestamp=last_updated_timestamp)
+                elif header_name == 'From':
+                    from_: str = header.get('value', None)
+                    if not from_:
+                        continue
+                    email = from_.split('<')[-1].split('>')[0].strip()
+                    name = from_.split('<')[0].strip()
+                    if email not in member_blocks_map:
+                        name_entity = entity(id=email, value=name)
+                        member_blocks_map[email] = MemberBlock(last_updated_timestamp=last_updated_timestamp, name=name_entity, relation=Relations.AUTHOR)
+                elif header_name == 'To':
+                    to_: str = header.get('value', None)
+                    if not to_:
+                        continue
+                    email = to_.split('<')[-1].split('>')[0].strip()
+                    name = to_.split('<')[0].strip()
+                    if email not in member_blocks_map:
+                        name_entity = entity(id=email, value=None)
+                        member_blocks_map[email] = MemberBlock(last_updated_timestamp=last_updated_timestamp, name=name_entity, relation=Relations.RECIPIENT)
 
-        for title_stream in self._streamify_blocks(TitleBlock._LABEL, title_blocks):
+        for member_stream in self._streamify_blocks(MemberBlock._LABEL, member_blocks_map.values()):
+            yield member_stream
+
+        for title_stream in self._streamify_blocks(TitleBlock._LABEL, title_blocks_map.values()):
             yield title_stream
         
         body_blocks: List[BodyBlock] = []
@@ -101,7 +134,7 @@ class GoogleMail(Fetcher):
             if not message_parts:
                 continue
 
-            last_updated_timestamp = message.get('last_updated_time', None) if message else None
+            last_updated_timestamp = message.get('last_updated_timestamp', None) if message else None
             while len(message_parts) > 0:
                 part = message_parts.pop(0)
                 if not part:
@@ -114,7 +147,7 @@ class GoogleMail(Fetcher):
                 if text:
                     mime_type = part.get('mimeType', None) if part else None
                     if mime_type and mime_type.startswith('text/plain'):
-                        body_blocks.append(BodyBlock(body=text, last_updated_timestamp=message['last_updated_time']))
+                        body_blocks.append(BodyBlock(text=text, last_updated_timestamp=last_updated_timestamp))
 
                 parts = part.get('parts', None)
                 if parts:

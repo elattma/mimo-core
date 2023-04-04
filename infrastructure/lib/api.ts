@@ -1,7 +1,6 @@
 import { CfnOutput, Duration, Fn, Stack, StackProps } from "aws-cdk-lib";
 import {
   ApiKeySourceType,
-  Cors,
   IAuthorizer,
   IModel,
   JsonSchemaType,
@@ -54,7 +53,6 @@ export class ApiStack extends Stack {
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
-    console.log(props.appsyncApi.graphqlUrl);
 
     const integrationSecretName = `${props.stageId}/Mimo/Integrations`;
     this.integrationsSecret = Secret.fromSecretNameV2(
@@ -119,7 +117,7 @@ export class ApiStack extends Stack {
         statusCode: 200,
         allowMethods: ["OPTIONS", "GET", "POST", "DELETE"],
         allowCredentials: true,
-        allowOrigins: Cors.ALL_ORIGINS, // TODO: remove
+        allowOrigins: ["https://www.mimo.team"],
       },
       apiKeySourceType: ApiKeySourceType.HEADER,
     });

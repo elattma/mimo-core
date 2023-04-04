@@ -2,10 +2,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
-from app.client._neo4j import Block, Consists, Document, Neo4j
+from app.client._neo4j import Block, Consists, Document, Mentioned, Name, Neo4j
 from app.client._openai import OpenAI
 from app.client._pinecone import Pinecone, Row, RowType
 from app.model.blocks import BlockStream, SummaryBlock
+from app.mystery.namer import Namer
 from ulid import ulid
 
 
@@ -35,13 +36,25 @@ class Ingestor:
         self._openai = openai
         self._neo4j = neo4j
         self._pinecone = pinecone
+        self._namer = Namer(openai)
+
+    def _get_block_names(self, block_streams: List[BlockStream]) -> List[Name]:
+        names = set()
+        for block_stream in block_streams:
+            block_stream_names = self._namer.get_block_names(block_stream)
+            if not block_stream_names:
+                continue
+        
+            for name in block_stream_names:
+                names.add(name)
+        return list(names)
 
     def _get_graph_blocks(self, block_streams: List[BlockStream]) -> List[Block]:
         if not (block_streams and len(block_streams) > 0):
             return []
 
         # TODO: need to handle dynamic tree children in case where the blocks dont fit
-        stringified_blocks = [block_stream.to_str() for block_stream in block_streams]
+        stringified_blocks = [str(block_stream) for block_stream in block_streams]
 
         while len(stringified_blocks) > 1:
             stringified_blocks_len = len(stringified_blocks)
@@ -63,7 +76,7 @@ class Ingestor:
         summary_last_updated_timestamp = 0
         
         for block_stream in block_streams:
-            block_str = block_stream.to_str()
+            block_str = str(block_stream)
             block_embedding = self._openai.embed(block_str)
             last_updated_timestamp = max([block.last_updated_timestamp for block in block_stream.blocks])
             summary_last_updated_timestamp = max(summary_last_updated_timestamp, last_updated_timestamp)
@@ -101,14 +114,18 @@ class Ingestor:
     def ingest(self, input: IngestInput) -> IngestResponse:
         succeeded = True
         try:
+            names = self._get_block_names(input.block_streams)
             graph_blocks = self._get_graph_blocks(input.block_streams)
             document = self._get_document(
                 document_id=input.document_id,
                 integration=input.integration,
                 blocks=graph_blocks
             )
+            name_mentioned = [Mentioned(document)]
+            for name in names:
+                name.mentioned = name_mentioned
             pinecone_response = self._pinecone_write(owner=input.owner, document=document)
-            neo4j_response = self._neo4j_write(owner=input.owner, documents=[document], timestamp=input.timestamp)
+            neo4j_response = self._neo4j_write(owner=input.owner, documents=[document], names=names, timestamp=input.timestamp)
 
             print(pinecone_response)
             print(neo4j_response)
@@ -139,5 +156,5 @@ class Ingestor:
 
         return self._pinecone.upsert(rows)
 
-    def _neo4j_write(self, documents: List[Document], owner: str, timestamp: int) -> bool:
-        return self._neo4j.create_document_blocks(documents=documents, owner=owner, timestamp=timestamp)
+    def _neo4j_write(self, documents: List[Document], names: List[Name], owner: str, timestamp: int) -> bool:
+        return self._neo4j.write(documents=documents, names=names, owner=owner, timestamp=timestamp)

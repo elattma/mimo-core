@@ -3,7 +3,8 @@ from typing import Generator, List
 
 import requests
 from app.fetcher.base import DiscoveryResponse, Fetcher, Filter, Item
-from app.model.blocks import BlockStream, BodyBlock, TitleBlock
+from app.model.blocks import (BlockStream, BodyBlock, MemberBlock, Relations,
+                              TitleBlock, entity)
 
 GOOGLE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
@@ -73,7 +74,7 @@ class GoogleDocs(Fetcher):
         response = requests.get(
             f'https://www.googleapis.com/drive/v3/files/{id}',
             params={
-                'fields': 'modifiedTime'
+                'fields': 'modifiedTime, owners'
             },
             headers={
                 'Authorization': f'Bearer {self.auth.access_token}'
@@ -81,6 +82,16 @@ class GoogleDocs(Fetcher):
         )
         file_response = response.json() if response else None
         last_updated_timestamp = self._get_timestamp_from_format(file_response.get('modifiedTime', None), GOOGLE_TIME_FORMAT) if file_response else None
+        owners = file_response.get('owners', None) if file_response else None
+        members_blocks: List[MemberBlock] = []
+        for owner in owners:
+            if not owner or 'emailAddress' not in owner:
+                continue
+            name_entity = entity(id=owner.get('emailAddress', None),value=owner.get('displayName', None))
+            members_blocks.append(MemberBlock(last_updated_timestamp=last_updated_timestamp, name=name_entity, relation=Relations.AUTHOR))
+
+        for member_stream in self._streamify_blocks(MemberBlock._LABEL, members_blocks):
+            yield member_stream
 
         response = requests.get(
             f'https://docs.googleapis.com/v1/documents/{id}',
@@ -91,7 +102,7 @@ class GoogleDocs(Fetcher):
         load_response = response.json() if response else None
         title = load_response.get('title', None) if load_response else None
         if title:
-            yield BlockStream(TitleBlock._LABEL, [TitleBlock(title=title, last_updated_timestamp=last_updated_timestamp)])
+            yield BlockStream(TitleBlock._LABEL, [TitleBlock(text=title, last_updated_timestamp=last_updated_timestamp)])
         body = load_response.get('body', None) if load_response else None
         content = body.get('content', None) if body else None
         if not content:
@@ -108,7 +119,7 @@ class GoogleDocs(Fetcher):
                     text += element['textRun']['content'] if 'textRun' in element else ''
                 text = text.strip().replace('\n', '')
                 if len(text) > 0:
-                    body_blocks.append(BodyBlock(body=text, last_updated_timestamp=last_updated_timestamp))
+                    body_blocks.append(BodyBlock(text=text, last_updated_timestamp=last_updated_timestamp))
             elif 'table' in value and 'tableRows' in value['table']:
                 for table_row in value['table']['tableRows']:
                     if not table_row or 'tableCells' not in table_row:

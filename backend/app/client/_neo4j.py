@@ -64,6 +64,40 @@ class Document(Node):
         map['integration'] = self.integration
         map['blocks'] = [consist.target.to_neo4j_map() for consist in self.consists]
         return map
+
+@dataclass
+class Mentioned:
+    target: Document
+
+@dataclass
+class Name(Node):
+    value: str
+    mentioned: List[Mentioned] = None
+    @staticmethod
+    def get_index_keys():
+        return super(Name, Name).get_index_keys()
+    
+    @staticmethod
+    def get_index_properties():
+        return ['value']
+
+    def to_neo4j_map(self):
+        map = super().to_neo4j_map()
+        map['value'] = self.value
+        map['mentioned'] = [
+            {
+                'id': mentioned.target.id,
+                'integration': mentioned.target.integration,
+            } for mentioned in self.mentioned
+        ]
+        return map
+    
+    def __hash__(self):
+        return hash((self.id, self.value, self.mentioned))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)): return NotImplemented
+        return self.id == other.id and self.value == other.value and self.mentioned == other.mentioned
     
 @dataclass
 class DocumentFilter:
@@ -115,11 +149,12 @@ class Neo4j:
     def close(self):
         self.driver.close()
 
-    def create_document_blocks(self, documents: List[Document], owner: str, timestamp: int):
+    def write(self, documents: List[Document], names: List[Name], owner: str, timestamp: int):
         with self.driver.session(database='neo4j') as session:
-            result = session.execute_write(self._create_document_blocks, documents, owner, timestamp=timestamp)
-            return result
-
+            document_result = session.execute_write(self._create_document_blocks, documents, owner, timestamp=timestamp)
+            names_result = session.execute_write(self._create_names, names, owner, timestamp=timestamp)
+            return [document_result, names_result]
+    
     @staticmethod
     def _get_document_merge():
         merge_object = ', '.join([f'{key}: document.{key}' for key in (
@@ -175,6 +210,32 @@ class Neo4j:
         )
 
         result = tx.run(documents_query, documents=neo4j_documents, owner=owner, timestamp=timestamp)
+        return result
+    
+    @staticmethod
+    def _create_names(tx, names: List[Name], owner: str, timestamp: int):
+        if not (names and len(names) > 0 and owner and timestamp):
+            return None
+        
+        neo4j_names = [name.to_neo4j_map() for name in names]
+        names_query = (
+            'UNWIND $names as name '
+            'MERGE (n: Name {id: name.id, owner: $owner}) '
+            'WITH name, n '
+            'CALL { '
+            'WITH name, n '
+            'WITH name, n '
+            'WHERE name.value IS NOT NULL and n.value IS NULL '
+            'SET n.value = name.value '
+            '} '
+            'WITH name, n '
+            'UNWIND name.mentioned as mentioned '
+            'MATCH (d: Document {id: mentioned.id, integration: mentioned.integration, owner: $owner}) '
+            'WITH n, d '
+            'MERGE (n)-[:Mentioned]->(d) '
+        )
+
+        result = tx.run(names_query, names=neo4j_names, owner=owner, timestamp=timestamp)
         return result
         
     def get_by_filter(self, query_filter: QueryFilter) -> Any:

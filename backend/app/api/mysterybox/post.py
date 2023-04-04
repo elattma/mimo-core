@@ -8,13 +8,12 @@ from app.api.util.response import (Errors, to_response_error,
                                    to_response_success)
 from app.client._neo4j import Neo4j
 from app.client._openai import OpenAI
-from app.client._pinecone import Filter as QueryFilter
 from app.client._pinecone import Pinecone
 from app.client._secrets import Secrets
 from app.client.parent_child_db import (KeyNamespaces, ParentChildDB,
                                         ParentChildItem, UserIntegrationItem)
 from app.fetcher.base import DiscoveryResponse, Fetcher, Filter
-from app.model.blocks import Block, BlockStream
+from app.model.blocks import BlockStream
 from app.mystery.ingestor import IngestInput, Ingestor, IngestResponse
 
 db: ParentChildDB = None

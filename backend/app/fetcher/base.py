@@ -97,7 +97,7 @@ class Fetcher(ABC):
         for block in blocks:
             if not block:
                 continue
-            block_size = len(block.to_str())
+            block_size = len(str(block))
             if block_size < 1:
                 continue
 
@@ -108,7 +108,7 @@ class Fetcher(ABC):
                         total_blocks_size + block_size > MAX_BLOCK_SIZE
                         and total_blocks_size > 0
                     ):
-                        total_blocks_size -= len(temporary_blocks[0].to_str())
+                        total_blocks_size -= len(str(temporary_blocks[0]))
                         temporary_blocks.pop(0)
 
             temporary_blocks.append(block)

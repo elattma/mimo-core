@@ -2,26 +2,6 @@ from typing import Dict, Generator, List, Optional, Union
 
 from openai import ChatCompletion, Completion, Embedding
 
-TRIPLETS_SUFFIX = (
-    'Text: {text}\n'
-    'Triplets:\n'
-)
-
-TRIPLETS_SYSTEM_CONTENT = (
-    'Some text is provided below. Given the text, extract '
-    'knowledge triplets in the form of ([subject] [predicate] [object]). '
-    'Avoid stopwords.\n'
-    '---------------------\n'
-    'Text: Alice is Bob\'s mother.\n'
-    'Triplets:\n'
-    '([Alice] [is mother of] [Bob])\n'
-    'Text: Philz is a coffee shop founded in Berkeley in 1982.\n'
-    'Triplets:\n'
-    '([Philz] [is] [coffee shop])\n'
-    '([Philz] [founded in] [Berkeley])\n'
-    '([Philz] [founded in] [1982])\n'
-    '---------------------\n'
-)
 
 class OpenAI:
     def __init__(self, api_key: str) -> None:
@@ -160,20 +140,30 @@ class OpenAI:
         summary = message.get('content', None) if message else None
         return summary
     
-    def triplets(self, text: str) -> str:
+    def names(self, text: str):
         if not (self._api_key and text):
-            return None
+            return []
         
-        triplets_response = ChatCompletion.create(
+        names_response = ChatCompletion.create(
             api_key=self._api_key,
             model='gpt-3.5-turbo',
             messages=[
-                { 'role': 'system', 'content': TRIPLETS_SYSTEM_CONTENT },
-                { 'role': 'user', 'content': TRIPLETS_SUFFIX.format(text=text) },
+                { 'role': 'system', 'content': 'Extract only people\'s names and company specific acronyms from the text. Your output should be in the following format:\nProperNoun1,ProperNoun2,ProperNoun3'},
+                { 'role': 'user', 'content': text },
             ],
             temperature=0
         )
-        triplets_choices = triplets_response.get('choices', None) if triplets_response else None
-        message = triplets_choices[0].get('message', None) if triplets_choices and len(triplets_choices) > 0 else None
-        triplets = message.get('content', None) if message else None
-        return triplets
+        names_choices = names_response.get('choices', None) if names_response else None
+        message = names_choices[0].get('message', None) if names_choices and len(names_choices) > 0 else None
+        names_content = message.get('content', None) if message else None
+        if not names_content:
+            return []
+        print(names_content)
+        
+        names: List[str] = []
+        for name_raw in names_content.split(','):
+            name: str = name_raw.strip()
+            if len(name) <= 64:
+                names.append(name)
+        print(names)
+        return names

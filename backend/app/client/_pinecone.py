@@ -164,5 +164,4 @@ class Pinecone:
             return None
         
         fetch_response = self._index.fetch(ids=ids)
-        vectors = fetch_response.get('vectors', None) if fetch_response else None
-        return vectors
+        return fetch_response.get('vectors', None) if fetch_response else None

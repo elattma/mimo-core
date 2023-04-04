@@ -24,18 +24,10 @@ CREATE CONSTRAINT block_timestamp_existence IF NOT EXISTS
 FOR (b:Block)
 REQUIRE (b.timestamp) IS NOT NULL;
 
-CREATE CONSTRAINT entity_uniqueness IF NOT EXISTS
-FOR (e:Entity)
-REQUIRE (e.id, e.type, e.owner) IS NODE KEY;
+CREATE CONSTRAINT name_uniqueness IF NOT EXISTS
+FOR (n:Name)
+REQUIRE (n.id, n.owner) IS NODE KEY;
 
-CREATE CONSTRAINT predicate_id_existence IF NOT EXISTS
-FOR ()-[p:Predicate]-()
-REQUIRE (p.id) IS NOT NULL;
-
-CREATE CONSTRAINT predicate_text_existence IF NOT EXISTS
-FOR ()-[p:Predicate]-()
-REQUIRE (p.text) IS NOT NULL;
-
-CREATE CONSTRAINT predicate_document_existence IF NOT EXISTS
-FOR ()-[p:Predicate]-()
-REQUIRE (p.document) IS NOT NULL;
+CREATE RANGE INDEX name_value_index IF NOT EXISTS
+FOR (n:Name)
+ON (n.value, n.owner);
