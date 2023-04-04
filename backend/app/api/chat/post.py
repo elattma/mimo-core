@@ -64,8 +64,7 @@ def handler(event: dict, context):
             password=secrets.get("GRAPH_DB_SECRET")
         )
         vector_db = Pinecone(api_key=secrets.get("PINECONE_API_KEY"), environment="us-east1-gcp", index_name='beta')
-        integrations = ['documents', 'email', 'crm', 'customer_support']
-        system = ChatSystem('test_user', graph_db, vector_db, openai, integrations)
+        system = ChatSystem('test_user', graph_db, vector_db, openai)
 
     output_chat_id = ulid()
     output_role = Roles.ASSISTANT.value
