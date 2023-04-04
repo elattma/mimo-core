@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, Set
+from enum import Enum
+from typing import Any, List, Literal, Set, Union
 
 from neo4j import GraphDatabase
 
@@ -77,10 +78,33 @@ class BlockFilter:
     time_range: tuple[int, int] = None
 
 @dataclass
+class NameFilter:
+    ids: Set[str] = None
+    names: Set[str] = None
+
+class OrderDirection(Enum):
+    ASC = 'ASC'
+    DESC = 'DESC'
+
+@dataclass
+class OrderBy:
+    direction: OrderDirection
+    node: Literal['document', 'block', 'name']
+    property: Literal['last_updated_timestamp', 'id']
+
+@dataclass
+class Limit:
+    offset: int
+    count: int
+
+@dataclass
 class QueryFilter:
     owner: str
     document_filter: DocumentFilter = None
     block_filter: BlockFilter = None
+    name_filter: NameFilter = None
+    order_by: OrderBy = None
+    limit: Limit = None
 
 class Neo4j:
     def __init__(self, uri: str, user: str, password: str):
@@ -102,10 +126,10 @@ class Neo4j:
             Document.get_index_keys())]) + ', owner: $owner'
         index_properties = Document.get_index_properties()
         if index_properties and len(index_properties) > 0:
-            set_object = ', '.join([f'd.{key} = document.{key}' for key in (
-                Document.get_index_properties())]) + ', d.timestamp = $timestamp'
+            set_object = ', '.join([f'document.{key} = document.{key}' for key in (
+                Document.get_index_properties())]) + ', document.timestamp = $timestamp'
         else:
-            set_object = 'd.timestamp = $timestamp'
+            set_object = 'document.timestamp = $timestamp'
         return (
             f'MERGE (d: Document {{{merge_object}}}) '
             'ON CREATE '
@@ -124,8 +148,8 @@ class Neo4j:
     def _get_block_merge():
         merge_object = ', '.join([f'{key}: block.{key}' for key in (
             Block.get_index_keys())]) + ', owner: $owner'
-        set_object = ', '.join([f'b.{key} = block.{key}' for key in (
-            Block.get_index_properties())]) + ', b.timestamp = $timestamp'
+        set_object = ', '.join([f'block.{key} = block.{key}' for key in (
+            Block.get_index_properties())]) + ', block.timestamp = $timestamp'
         return (
             f'MERGE (b: Block {{{merge_object}}}) '
             'ON CREATE '
@@ -164,42 +188,73 @@ class Neo4j:
             return None
 
         document_query_wheres = []
+        
         if query_filter.owner:
-            document_query_wheres.append('d.owner = $owner AND b.owner = $owner')
+            document_query_wheres.append('document.owner = $owner AND block.owner = $owner')
 
         if query_filter.document_filter:
             document_filter = query_filter.document_filter
             if document_filter.ids:
                 document_query_wheres.append(
-                    f'd.id IN {list(document_filter.ids)}')
+                    f'document.id IN {list(document_filter.ids)}')
             if document_filter.integrations:
                 document_query_wheres.append(
-                    f'(d.integration IN {list(document_filter.integrations)})')
+                    f'(document.integration IN {list(document_filter.integrations)})')
             if document_filter.time_range:
                 document_query_wheres.append(
-                    f'(d.timestamp >= {document_filter.time_range[0]} AND d.timestamp <= {document_filter.time_range[1]})')
+                    f'(document.timestamp >= {document_filter.time_range[0]} AND document.timestamp <= {document_filter.time_range[1]})')
 
         if query_filter.block_filter:
             block_filter = query_filter.block_filter
             if block_filter.ids:
                 document_query_wheres.append(
-                    f'(b.id IN {list(block_filter.ids)})')
+                    f'(block.id IN {list(block_filter.ids)})')
             if block_filter.labels:
                 document_query_wheres.append(
-                    f'(b.label IN {list(block_filter.labels)})')
+                    f'(block.label IN {list(block_filter.labels)})')
             if block_filter.time_range:
                 document_query_wheres.append(
-                    f'(d.timestamp >= {block_filter.time_range[0]} AND d.timestamp <= {block_filter.time_range[1]})')
+                    f'(block.timestamp >= {block_filter.time_range[0]} AND block.timestamp <= {block_filter.time_range[1]})')
+        
+        name_query = ''
+        if query_filter.name_filter:
+            name_query = 'MATCH (name:Name)-[:Mentioned]->(document) WHERE name.owner = $owner '
+            name_filter = query_filter.name_filter
+            if name_filter.ids:
+                name_query += f'AND (name.id IN {list(name_filter.ids)}) '
+            if name_filter.names:
+                name_query += f'AND (name.value IN {list(name_filter.names)}) '
+        
+        order_by_query = ''
+        if query_filter.order_by:
+            order_by = query_filter.order_by
+            if order_by.property and order_by.node:
+                order_by_query = f'ORDER BY {order_by.node}.{order_by.property}'
+                if query_filter.order_by.direction == OrderDirection.DESC:
+                    order_by_query += ' DESC'
+        
+        limit_query = ''
+        if query_filter.limit:
+            limit = query_filter.limit
+            if limit.offset:
+                limit_query += f'SKIP {limit.offset}'
+            if limit.count:
+                limit_query = f'LIMIT {limit.count}'
+
+        if len(limit_query) < 1:
+            limit_query = 'LIMIT 50'
 
         if len(document_query_wheres) < 1:
             return None
 
         query = ''
         query += (
-            'MATCH (d: Document)-[co:Consists]->(b: Block) '
+            'MATCH (document:Document)-[:Consists]->(block:Block) '
             f'WHERE {" AND ".join(document_query_wheres)} '
+            f'{name_query} '
+            'RETURN document, block '
+            f'{order_by_query} '
+            f'{limit_query} '
         )
-        query += 'RETURN '
-        query += 'd, co, b'
         result = tx.run(query, owner=query_filter.owner)
         return list(result)

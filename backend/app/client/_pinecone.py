@@ -158,3 +158,11 @@ class Pinecone:
         )
 
         return query_response.get('matches', None) if query_response else None
+    
+    def fetch(self, ids: List[str]):
+        if not (self._index and ids and len(ids) > 0):
+            return None
+        
+        fetch_response = self._index.fetch(ids=ids)
+        vectors = fetch_response.get('vectors', None) if fetch_response else None
+        return vectors

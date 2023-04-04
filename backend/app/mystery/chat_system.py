@@ -39,12 +39,11 @@ class ChatSystem:
     _chat_encoding: Encoding = None
 
     def __init__(self, owner: str, graph_db: Neo4j, vector_db: Pinecone,
-                 openai: OpenAI, integrations: List[str]) -> None:
+                 openai: OpenAI) -> None:
         self._owner: str = owner
         self._graph_db: Neo4j = graph_db
         self._vector_db: Pinecone = vector_db
         self._openai_client: OpenAI = openai
-        self._integrations = integrations
         if not self._gpt_4:
             self._gpt_4 = OpenAIChat(client=openai, model='gpt-4')
         if not self._chat_gpt:
@@ -70,7 +69,7 @@ class ChatSystem:
         qas: Dict[str, Answer] = {}
         for question in questions:
             yield f'Finding an answer to: {question}'
-            answer = self._qa_agent.run(question, self._integrations)
+            answer = self._qa_agent.run(question)
             yield 'Answer found!'
             qas[question] = answer
         if questions:
@@ -88,7 +87,7 @@ class ChatSystem:
         qas: Dict[str, Answer] = {}
         for question in questions:
             print('[ChatSystem] Running QuestionAnswerAgent on question...')
-            answer = self._qa_agent.debug_run(question, self._integrations)
+            answer = self._qa_agent.debug_run(question)
             print('[ChatSystem] Answer received...')
             print(answer, '\n')
             qas[question] = answer

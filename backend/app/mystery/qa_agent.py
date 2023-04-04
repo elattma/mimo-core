@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import Dict, List
-from app.mrkl.prompt import ChatPrompt, ChatPromptMessage, ChatPromptMessageRole
+from typing import List
+from app.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
+                             ChatPromptMessageRole)
 
-from app.mystery.data_agent import (BlockDescription, ContextBasket,
-                                    DataAgent, Source)
+from app.mystery.data_agent import (ContextBasket, DataAgent, Source)
 
 SYSTEM_MESSAGE_CONTENT = '''Pretend you are AnswerGPT. Your job is to answer a question using the context you are given.
 The available context can be found below.
@@ -11,45 +11,37 @@ The available context can be found below.
 {context}
 '''
 
+MAX_TOKENS = 2048
+
 @dataclass
 class Answer:
     content: str
     sources: List[Source]
 
 class QuestionAnswerAgent(DataAgent):
-    # TODO: Move data_sources and block_descriptions to the constructor
     def run(
         self,
         question: str,
-        data_sources: List[str],
     ) -> Answer:
-        query = self.create_query(
-            question,
-            data_sources,
-        )
-        context_basket = self.execute_query(query)
+        context_basket = self.generate_context(question)
+        if self._context_basket_token_size(context_basket) > MAX_TOKENS:
+            return 'I received context that was too long to respond to.'
         answer = self._use_context_to_answer_question(question, context_basket)
         return answer
 
     def debug_run(
         self,
-        question: str,
-        data_sources: List[str],
+        question: str
     ) -> Answer:
-        print('[QuestionAnswerAgent] Running debug_run...\n')
-        print('[QuestionAnswerAgent] Received question...')
-        print(question, '\n')
-        print('[QuestionAnswerAgent] Creating query...')
-        query = self.create_query(
-            question,
-            data_sources,
-        )
-        print(query, '\n')
-        print('[QuestionAnswerAgent] Executing query...')
-        context_basket = self.execute_query(query)
+        print('[QuestionAnswerAgent] Generating context...')
+        context_basket = self.generate_context(question)
+        print('[QuestionAnswerAgent] Context generated...')
         print(context_basket, '\n')
+        if self._context_basket_token_size(context_basket) > MAX_TOKENS:
+            return 'I received context that was too long to respond to.'
         print('[QuestionAnswerAgent] Using context to answer question...')
         answer = self._use_context_to_answer_question(question, context_basket)
+        print('[QuestionAnswerAgent] Answer received...')
         print(answer, '\n')
         return answer
 
