@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from math import sqrt
 from typing import Any, Dict, List, Set, Tuple, Type, Union
+from app.mystery.util import count_tokens
 
 import tiktoken
 from graph.neo4j_ import (BlockFilter, DocumentFilter, Limit, NameFilter,
@@ -219,8 +220,8 @@ class AbsoluteTimeFilter(QueryComponent):
 
     @staticmethod
     def description_for_prompt() -> str:
-        current_date = _get_today_date
-        return ('time_frame: Include time_frame if the Request implies that'
+        current_date = _get_today_date()
+        return ('time_frame: Include time_frame if the Request implies that '
                 'the requested information was created within a specific '
                 f'time frame. It is currently {current_date}.')
     
@@ -236,7 +237,7 @@ class AbsoluteTimeFilter(QueryComponent):
         '''Returns a range of timestamps for use in Neo4j.'''
         start_timestamp = (_date_day_to_timestamp(self.start)
                            if self.start else 0)
-        end_timestamp = (_date_day_to_timestamp[self.end]
+        end_timestamp = (_date_day_to_timestamp(self.end)
                          if self.end else _get_today_timestamp())
         return (start_timestamp, end_timestamp)
     
@@ -365,14 +366,6 @@ class IntegrationsFilter(QueryComponent):
         return set([_integration_name(integration)
                     for integration in self.integrations])
 
-# class Block(ABC):
-#     '''An abstract class for blocks.'''
-
-#     @abstractmethod
-#     def contextify(self) -> str:
-#         '''Returns a stringified, context-friendly version of the block.'''
-#         raise NotImplementedError
-    
 class Block(Enum):
     BODY = 'body'
     COMMENT = 'comment'
@@ -577,21 +570,15 @@ class DataAgent(ABC):
 
     def generate_context(
             self, question: str, query: Query = None) -> ContextBasket:
+        print('[DataAgent] Generating context...')
         if not query:
-            print('[DataAgent] Generating prompt...')
             prompt = self._generate_prompt(question)
-            print('[DataAgent] Prompt generated.')
-            print(prompt.prompt)
-            print('[DataAgent] Sending prompt to LLM to generate response...')
+            print('[DataAgent] Generating query string from LLM...')
             llm_response = self._llm.predict(prompt)
-            print('[DataAgent] LLM response received.')
+            print('[DataAgent] Generated query string from LLM!')
             print(llm_response)
-            print('[DataAgent] Parsing LLM response for query...')           
             query = _parse_llm_response_for_query(llm_response)
-            print('[DataAgent] Query parsed.')
-            print(query)
             query.question = question
-        print('[DataAgent] Executing query...')
         if (SearchMethod in query.components and
             query.components[SearchMethod].value == SearchMethodValue.EXACT):
             context_basket = self._fetch_exact_context(query)
@@ -604,12 +591,11 @@ class DataAgent(ABC):
             else:
                 context_basket = self._fetch_relevant_context_without_names(query)
         else:
-            print('[DataAgent] Invalid SearchMethod. Defaulting to relevant.')
+            print('[DataAgent] (Warning) Invalid SearchMethod')
             context_basket = self._fetch_relevant_context_without_names(query)
         if len(context_basket.contexts) < 1:
-            print('[DataAgent] No context found. Defaulting to relevant.')
             context_basket = self._fetch_relevant_context_without_names(query)
-        print('[DataAgent] Query executed.')
+        print('[DataAgent] Context generated!')
         for context in context_basket.contexts:
             print(context.content)
         return context_basket
@@ -618,6 +604,7 @@ class DataAgent(ABC):
         self,
         question: str
     ) -> ChatPrompt:
+        print('[DataAgent] Generating prompt...')
         system_message = ChatPromptMessage(
             role=ChatPromptMessageRole.SYSTEM.value,
             content=self._system_prompt
@@ -626,7 +613,9 @@ class DataAgent(ABC):
             role=ChatPromptMessageRole.USER.value,
             content=question
         )
-        return ChatPrompt([system_message, user_message])
+        prompt = ChatPrompt([system_message, user_message])
+        print('[DataAgent] Prompt generated!')
+        return prompt
     
     def _fetch_relevant_context_without_names(self, query: Query) -> ContextBasket:
         print('[DataAgent] Fetching relevant context without names...')
@@ -635,6 +624,7 @@ class DataAgent(ABC):
         vector_filter = self._generate_vector_filter(query)
         self._fill_basket_from_embedding(context_basket, vector_filter,
                                          question_embedding)
+        print('[DataAgent] Fetched relevant context without names!')
         return context_basket
     
     def _fetch_relevant_context_with_names(
@@ -644,8 +634,8 @@ class DataAgent(ABC):
         block_ids = []
         if results:
             for record in results:
-                block_node = record.get('block', None) if record else None
-                id_ = block_node.get('id', None) if block_node else None
+                block_node = _node_get(record, 'block')
+                id_ = _node_get(block_node, 'id')
                 if id_:
                     block_ids.append(id_)
         block_embeddings = self._vector_db.fetch(block_ids)
@@ -669,15 +659,11 @@ class DataAgent(ABC):
         context_basket = ContextBasket()
         if results:
             for record in results:
-                block_node = record.get('block', None) if record else None
-                document_node = (record.get('document', None)
-                                 if record else None)
-                page_id = (document_node.get('id', None) 
-                           if document_node else None)
-                integration = (document_node.get('integration', None)
-                               if document_node else None)
-                content = (block_node.get('content', None)
-                           if block_node else None)
+                block_node = _node_get(record, 'block')
+                document_node = _node_get(record, 'document')
+                page_id = _node_get(document_node, 'id')
+                integration = _node_get(document_node, 'integration')
+                content = _node_get(block_node, 'content')
                 if content:
                     context_basket.append(Context(
                         content=content,
@@ -686,6 +672,7 @@ class DataAgent(ABC):
         semantic_context_basket = (
             self._fetch_relevant_context_without_names(query))
         context_basket.extend(semantic_context_basket.contexts)
+        print('[DataAgent] Fetched relevant context with names!')
         return context_basket
 
     def _fetch_exact_context(self, query: Query) -> ContextBasket:
@@ -694,25 +681,22 @@ class DataAgent(ABC):
         context_basket = ContextBasket()
         if results:
             for record in results:
-                block_node = record.get('block', None) if record else None
-                document_node = (record.get('document', None) 
-                                 if record else None)
-                page_id = (document_node.get('id', None)
-                           if document_node else None)
-                integration = (document_node.get('integration', None)
-                               if document_node else None)
-                content = (block_node.get('content', None)
-                           if block_node else None)
+                block_node = _node_get(record, 'block')
+                document_node = _node_get(record, 'document')
+                page_id = _node_get(document_node, 'id')
+                integration = _node_get(document_node, 'integration')
+                content = _node_get(block_node, 'content')
                 if not content:
                     continue
                 context_basket.append(Context(
                     content=content,
                     source=Source(page_id=page_id, integration=integration)
                 ))
+        print('[DataAgent] Fetched exact context!')
         return context_basket
     
     def _fetch_relevant_to_concepts(self, query: Query) -> ContextBasket:
-        print('[DataAgent] Fetching context that is relevant to concepts...')
+        print('[DataAgent] Fetching context relevant to concepts...')
         context_basket = ContextBasket()
         if not query[Concepts]:
             return context_basket
@@ -724,12 +708,14 @@ class DataAgent(ABC):
             concept_embedding = self._openai.embed(concept)
             self._fill_basket_from_embedding(context_basket, vector_filter,
                                              concept_embedding)
+        print('[DataAgent] Fetched context relevant to concepts!')
         return context_basket
     
     def _query_neo4j(self, query: Query) -> Any:
+        print('[DataAgent] Querying Neo4j...')
         if not (query and query.components and query.question):
             return None
-
+            
         integrations = None
         names = None
         time_range = None
@@ -752,6 +738,10 @@ class DataAgent(ABC):
             rtf: RelativeTimeFilter = query.components[RelativeTimeFilter]
             order_by = rtf.neo4j_order_by
             limit = rtf.neo4j_limit
+        
+        if not (integrations or names or time_range or block_labels
+                or order_by or limit):
+            return None
 
         query_filter = QueryFilter(
             owner=self._owner,
@@ -770,6 +760,7 @@ class DataAgent(ABC):
             limit=limit
         )
         results = self._graph_db.get_by_filter(query_filter)
+        print('[DataAgent] Queried Neo4j!')
         return results
     
     def _generate_vector_filter(self, query: Query) -> VectorFilter:
@@ -811,17 +802,14 @@ class DataAgent(ABC):
             owner=self._owner,
             block_filter=BlockFilter(ids=block_ids)
         ))
+        # TODO Dedupe
         if results:
             for record in results:
-                block_node = record.get('block', None) if record else None
-                document_node = (record.get('document', None)
-                                 if record else None)
-                page_id = (document_node.get('id', None)
-                           if document_node else None)
-                integration = (document_node.get('integration', None)
-                               if document_node else None)
-                content = (block_node.get('content', None)
-                           if block_node else None)
+                block_node = _node_get(record, 'block')
+                document_node = _node_get(record, 'document')
+                page_id = _node_get(document_node, 'id')
+                integration = _node_get(document_node, 'integration')
+                content = _node_get(block_node, 'content')
                 if content:
                     context_basket.append(Context(
                         content=content,
@@ -829,16 +817,11 @@ class DataAgent(ABC):
                     ))
         return
 
-    def _count_tokens(self, text: str) -> int:
-        encoding = tiktoken.get_encoding(self._llm.encoding_name)
-        tokens = encoding.encode(text)
-        return len(tokens)
-    
     def _context_basket_token_size(
             self, context_basket: ContextBasket) -> int:
         token_count = 0
         for context in context_basket:
-            token_count += self._count_tokens(context.content)
+            token_count += count_tokens(context, self._llm.encoding_name)
         return token_count
 
 # ----------------------------------------------------------------------------
@@ -881,6 +864,9 @@ def _integration_name(integration: Integration) -> str:
         return 'google_docs'
     elif integration == Integration.EMAIL:
         return 'google_mail'
+    
+def _node_get(node: Dict, property: str) -> Any:
+    return node.get(property, None) if node else None
 
 def _euclidean_distance(row1, row2):
     distance = 0.0
