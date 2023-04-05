@@ -20,6 +20,7 @@ nltk = "^3.8.1"
 neo4j = "^5.6.0"
 pinecone-client = "^2.2.1"
 tiktoken = "^0.3.2"
+pyjwt = {extras = ["crypto"], version = "^2.6.0"}
 
 [build-system]
 requires = ["poetry-core"]

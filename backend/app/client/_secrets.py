@@ -7,10 +7,10 @@ import boto3
 class Secrets:
     map: Mapping[str, str] = None
 
-    def __init__(self, stage: str) -> None:
+    def __init__(self, stage: str, secret_id: str = 'Mimo/Integrations') -> None:
         if not self.map:
             secrets_client = boto3.client('secretsmanager')
-            response = secrets_client.get_secret_value(SecretId='{stage}/Mimo/Integrations'.format(stage=stage))
+            response = secrets_client.get_secret_value(SecretId=f'{stage}/{secret_id}')
             self.map = json.loads(response['SecretString'])
 
     def get(self, key: str) -> str:

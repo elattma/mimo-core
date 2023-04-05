@@ -1,4 +1,11 @@
-import { CfnOutput, Duration, Fn, Stack, StackProps } from "aws-cdk-lib";
+import {
+  CfnOutput,
+  CfnResource,
+  Duration,
+  Fn,
+  Stack,
+  StackProps,
+} from "aws-cdk-lib";
 import {
   ApiKeySourceType,
   IAuthorizer,
@@ -17,8 +24,10 @@ import { ITable } from "aws-cdk-lib/aws-dynamodb";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import {
+  CfnUrl,
   DockerImageCode,
   DockerImageFunction,
+  FunctionUrlAuthType,
   Runtime,
 } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -86,12 +95,66 @@ export class ApiStack extends Stack {
       props.mimoTable,
       props.uploadItemBucket
     );
+    this.createQaLambda(props.stageId);
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
       exportName: "mimo-api-id",
     });
   }
+
+  createQaLambda = (stageId: string) => {
+    const auth0SecretName = `${stageId}/Mimo/Integrations/Auth0`;
+    const auth0Secret = Secret.fromSecretNameV2(
+      this,
+      "auth0-qa-secret",
+      auth0SecretName
+    );
+
+    const qaHandler = this.getHandler({
+      method: "qa_get",
+      environment: {
+        STAGE: stageId,
+        GRAPH_DB_URI: NEO_4J_URI,
+      },
+      memorySize: 2048,
+      timeout: Duration.minutes(10),
+    });
+    this.integrationsSecret.grantRead(qaHandler);
+    auth0Secret.grantRead(qaHandler);
+
+    const qaUrl = new CfnUrl(this, "qa-url", {
+      targetFunctionArn: qaHandler.functionArn,
+      authType: FunctionUrlAuthType.NONE,
+      cors: {
+        allowHeaders: [
+          "Content-Type",
+          "X-Amz-Date",
+          "Authorization",
+          "X-Api-Key",
+          "X-Amz-Security-Token",
+        ],
+        allowCredentials: true,
+        allowMethods: ["GET"],
+        allowOrigins: ["*"],
+      },
+    });
+
+    new CfnResource(this, "lambdaPermission", {
+      type: "AWS::Lambda::Permission",
+      properties: {
+        Action: "lambda:InvokeFunctionUrl",
+        FunctionName: qaHandler.functionArn,
+        Principal: "*",
+        FunctionUrlAuthType: "NONE",
+      },
+    });
+
+    new CfnOutput(this, "api-qa-url", {
+      value: qaUrl.attrFunctionUrl,
+      exportName: "mimo-qa-url",
+    });
+  };
 
   createRestApi = (domainName: string): RestApi => {
     const zone = HostedZone.fromLookup(this, "hosted-zone", {
@@ -220,53 +283,6 @@ export class ApiStack extends Stack {
         ],
       }
     );
-
-    const qa = mysterybox.addResource("qa");
-    const qaHandler = this.getHandler({
-      method: "qa_get",
-      environment: {
-        STAGE: stageId,
-        GRAPH_DB_URI: NEO_4J_URI,
-      },
-      memorySize: 2048,
-      timeout: Duration.minutes(10),
-    });
-    this.integrationsSecret.grantRead(qaHandler);
-
-    const qaResponseModel = this.api.addModel("qaResponseModel", {
-      contentType: "application/json",
-      modelName: "qaResponse",
-      schema: {
-        type: JsonSchemaType.OBJECT,
-        properties: {
-          answer: {
-            type: JsonSchemaType.STRING,
-          },
-          sources: {
-            type: JsonSchemaType.ARRAY,
-            items: {
-              type: JsonSchemaType.STRING,
-            },
-          },
-        },
-      },
-    });
-
-    qa.addMethod("GET", new LambdaIntegration(qaHandler), {
-      authorizer: this.authorizer,
-      requestParameters: {
-        "method.request.querystring.question": true,
-      },
-      methodResponses: [
-        {
-          statusCode: "200",
-          responseModels: {
-            "application/json": qaResponseModel,
-          },
-          responseParameters: RESPONSE_PARAMS,
-        },
-      ],
-    });
   };
 
   createItemRoutes = (
