@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Dict, Generator, List
 
@@ -14,17 +15,18 @@ MAX_TOKENS = 3000
 
 GENERATE_QUESTIONS_SYSTEM_MESSAGE = '''You are ChatGPT and you only know everything that GPT-4 was trained on.
 You are chatting with a user that assumes you know everything about their company and its data. But, you don't know everything.
-Your job is to come up with a list of questions based on what you need to know more about to respond to the user.
-The questions will be used to fetch information from a database, they will not be directed to the user. So, do not ask questionst that are intended to be answered by the user.
-The list of questions should be in the format [{question1} {question2} ... {questionN}}]
+Your job is to come up with a list of requests based on what you need to know more about to respond to the user.
+The requests will be used to fetch information from a database, they will not be directed to the user.
+A request should be a description of information you need to know more about before you can respond to the user.
+The list of questions should be in the format ["request1", "request2", ..., "requestN"}]
 The examples below will show you how to think. Follow the format of the examples.
 ---------
 EXAMPLES:
 Input: Tell me about Troy's performance last quarter and what he's working on this quarter.
-Output: [{How did Troy perform last quarter?} {What is Troy working on this quarter?}]
+Output: ["Troy's performance last quarter", "Troy's work this quarter"]
 
 Input: How can we solve the problems our customers are facing with our API?
-Output: [{What problems are our customers facing with our API?}]'''
+Output: ["problems customers face with our API"]'''
 
 RESPONSE_SYSTEM_MESSAGE_WITH_QAS = '''Respond to the user's message. Use the answers to the questions below to help you where needed.
 ---------
@@ -159,8 +161,10 @@ class ChatSystem:
 
 def _parse_llm_response_for_questions(llm_response: str) -> List[str]:
     try:
-        matches = re.findall(r'{([^}]+)', llm_response)
-        questions = list(matches)    
-        return questions
+        match = re.search(r'\[[\s\S]*\]', llm_response, re.DOTALL)
+        if match:
+            stringified_list = match.group(0)
+            requests = json.loads(stringified_list)
+            return requests
     except:
         raise ValueError('llm_response is not in the correct format.') 

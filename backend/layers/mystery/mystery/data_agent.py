@@ -219,9 +219,10 @@ class AbsoluteTimeFilter(QueryComponent):
 
     @staticmethod
     def description_for_prompt() -> str:
+        current_date = _get_today_date
         return ('time_frame: Include time_frame if the Request implies that'
                 'the requested information was created within a specific '
-                'time frame.')
+                f'time frame. It is currently {current_date}.')
     
     @staticmethod
     def json_for_prompt() -> str:
@@ -564,6 +565,14 @@ class DataAgent(ABC):
         self._openai: OpenAI = openai
         if not self._llm:
             self._llm = OpenAIChat(client=openai, model='gpt-4')
+        block_descriptions = BlocksFilter.get_block_descriptions()
+        json_schema = QueryComponent.get_json_schema()
+        component_descriptions = QueryComponent.get_component_descriptions()
+        self._system_prompt = SYSTEM_PROMPT.format(
+            block_descriptions=block_descriptions,
+            json_schema=json_schema,
+            component_descriptions=component_descriptions
+        )
         print('[DataAgent] Initialized.')
 
     def generate_context(
@@ -609,16 +618,9 @@ class DataAgent(ABC):
         self,
         question: str
     ) -> ChatPrompt:
-        block_descriptions = BlocksFilter.get_block_descriptions()
-        json_schema = QueryComponent.get_json_schema()
-        component_descriptions = QueryComponent.get_component_descriptions()
         system_message = ChatPromptMessage(
             role=ChatPromptMessageRole.SYSTEM.value,
-            content=SYSTEM_PROMPT.format(
-                block_descriptions=block_descriptions,
-                json_schema=json_schema,
-                component_descriptions=component_descriptions
-            )
+            content=self._system_prompt
         )
         user_message = ChatPromptMessage(
             role=ChatPromptMessageRole.USER.value,
@@ -866,6 +868,9 @@ def _get_today_timestamp() -> int:
 
 def _get_today_date_day() -> int:
     return int(datetime.datetime.today().strftime('%Y%m%d'))
+
+def _get_today_date() -> str:
+    return datetime.datetime.today().strftime('%Y-%m-%d')
 
 def _integration_name(integration: Integration) -> str:
     if integration == Integration.CRM:
