@@ -19,13 +19,12 @@ export default function LandingPage() {
           </div>
           <h1 className="mb-theme-1/2 bg-gradient-to-r from-brand-9 to-brand-12 bg-clip-text text-center text-5xl font-bold text-transparent xl:text-6xl">
             <Balancer className="leading-snug">
-              Any Data. From Anywhere. For Your AI Agents.
+              Any Data. From Anywhere. Via Natural Language.
             </Balancer>
           </h1>
           <p className="mb-theme text-center text-2xl font-semibold leading-snug text-gray-text-contrast xl:text-3xl">
             <Balancer>
-              Power your B2B AI SaaS with Mimo's customer data integration
-              platform.
+              A unified data platform giving AI agents context from any data source in an enterprise.
             </Balancer>
           </p>
           <Dialog>
