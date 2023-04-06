@@ -77,24 +77,24 @@ class ChatSystem:
 
     def run(self, message: str) -> Generator[str, None, None]:
         print('[ChatSystem] Running...')
-        yield '[CHATSYSTEMYIELD] Interpreting message...'
+        yield 'Interpreting message...'
         requests = self._generate_requests(message)
         if not requests:
             response = self._respond_without_information(message)
-            yield '[CHATSYSTEMYIELD] ' + response
+            yield '' + response
             return
         information: Dict[str, ContextBasket] = {}
         for update in self._retrieve_information(requests, information):
-            yield '[CHATSYSTEMYIELD] ' + update
-        yield '[CHATSYSTEMYIELD] Synthesizing information...'
+            yield update
+        yield 'Synthesizing information...'
         context = self._information_to_context(information)
-        yield '[CHATSYSTEMYIELD] Responding to message...'
+        yield 'Responding to message...'
         response = self._respond_with_information(
             message,
             context
         )
         print('[ChatSystem] Ran!')
-        yield '[CHATSYSTEMYIELD] ' + response
+        yield response
         return
 
     def _generate_requests(self, message: str) -> List[str]:
