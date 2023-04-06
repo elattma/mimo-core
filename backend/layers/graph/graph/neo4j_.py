@@ -161,10 +161,10 @@ class Neo4j:
             Document.get_index_keys())]) + ', owner: $owner'
         index_properties = Document.get_index_properties()
         if index_properties and len(index_properties) > 0:
-            set_object = ', '.join([f'document.{key} = document.{key}' for key in (
-                Document.get_index_properties())]) + ', document.timestamp = $timestamp'
+            set_object = ', '.join([f'd.{key} = document.{key}' for key in (
+                Document.get_index_properties())]) + ', d.timestamp = $timestamp'
         else:
-            set_object = 'document.timestamp = $timestamp'
+            set_object = 'd.timestamp = $timestamp'
         return (
             f'MERGE (d: Document {{{merge_object}}}) '
             'ON CREATE '
@@ -183,8 +183,8 @@ class Neo4j:
     def _get_block_merge():
         merge_object = ', '.join([f'{key}: block.{key}' for key in (
             Block.get_index_keys())]) + ', owner: $owner'
-        set_object = ', '.join([f'block.{key} = block.{key}' for key in (
-            Block.get_index_properties())]) + ', block.timestamp = $timestamp'
+        set_object = ', '.join([f'b.{key} = block.{key}' for key in (
+            Block.get_index_properties())]) + ', b.timestamp = $timestamp'
         return (
             f'MERGE (b: Block {{{merge_object}}}) '
             'ON CREATE '
@@ -208,6 +208,8 @@ class Neo4j:
             'UNWIND document.blocks as block '
             f'{Neo4j._get_block_merge()} '
         )
+        print(neo4j_documents)
+        print(documents_query)
 
         result = tx.run(documents_query, documents=neo4j_documents, owner=owner, timestamp=timestamp)
         return result
@@ -234,6 +236,8 @@ class Neo4j:
             'WITH n, d '
             'MERGE (n)-[:Mentioned]->(d) '
         )
+        print(neo4j_names)
+        print(names_query)
 
         result = tx.run(names_query, names=neo4j_names, owner=owner, timestamp=timestamp)
         return result
@@ -284,7 +288,11 @@ class Neo4j:
             if name_filter.ids:
                 name_query += f'AND (name.id IN {list(name_filter.ids)}) '
             if name_filter.names:
-                name_query += f'AND (name.value IN {list(name_filter.names)}) '
+                contains = []
+                for name in name_filter.names:
+                    contains.append(f'toLower(name.value) CONTAINS "{name.lower()}"')
+                contains_sub_query = ' OR '.join(contains)
+                name_query += f'AND ({contains_sub_query})'
         
         order_by_query = ''
         if query_filter.order_by:

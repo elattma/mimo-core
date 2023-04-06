@@ -820,7 +820,7 @@ class DataAgent(ABC):
             self, context_basket: ContextBasket) -> int:
         token_count = 0
         for context in context_basket:
-            token_count += count_tokens(context, self._llm.encoding_name)
+            token_count += count_tokens(context.content, self._llm.encoding_name)
         return token_count
 
 # ----------------------------------------------------------------------------

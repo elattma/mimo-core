@@ -44,25 +44,16 @@ def handler(event: dict, context):
         Limit=100,
     )
     fetchers: List[Fetcher] = []
-    upload_item = None
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
             integration = item.get_raw_child()
-            if integration and integration == "upload":
-                upload_item = item
-            else:
-                fetchers.append(Fetcher.create(integration, {
-                    'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
-                    'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
-                    'access_token': item.access_token,
-                    'refresh_token': item.refresh_token,
-                    'expiry_timestamp': item.expiry_timestamp
-                }, last_fetch_timestamp=item.last_fetch_timestamp))
-    upload_fetcher = Fetcher.create('upload', {
-        'bucket': upload_item_bucket,
-        'prefix': f'{user}/'
-    }, last_fetch_timestamp=upload_item.last_fetch_timestamp if upload_item else None)
-    fetchers.append(upload_fetcher)
+            fetchers.append(Fetcher.create(integration, {
+                'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
+                'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
+                'access_token': item.access_token,
+                'refresh_token': item.refresh_token,
+                'expiry_timestamp': item.expiry_timestamp
+            }, last_fetch_timestamp=item.last_fetch_timestamp))
 
     openai = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
     neo4j = Neo4j(

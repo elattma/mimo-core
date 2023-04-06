@@ -55,8 +55,6 @@ def handler(event: dict, context):
     if not openai_api_key:
         return to_response_error(Errors.MISSING_SECRETS.value)
 
-    # TODO: fetch relevant context from selected items or knowledge base and use as context to prompt
-
     if not system:
         openai = OpenAI(api_key=openai_api_key)
         graph_db = Neo4j(

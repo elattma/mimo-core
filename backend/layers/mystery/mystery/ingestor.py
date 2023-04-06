@@ -6,6 +6,7 @@ from external.openai_ import OpenAI
 from graph.blocks import BlockStream, SummaryBlock
 from graph.neo4j_ import Block, Consists, Document, Mentioned, Name, Neo4j
 from graph.pinecone_ import Pinecone, Row, RowType
+from graph.translator import Translator
 from mystery.namer import Namer
 from ulid import ulid
 
@@ -37,6 +38,7 @@ class Ingestor:
         self._neo4j = neo4j
         self._pinecone = pinecone
         self._namer = Namer(openai)
+        self._translator = Translator()
 
     def _get_block_names(self, block_streams: List[BlockStream]) -> List[Name]:
         names = set()
@@ -53,45 +55,46 @@ class Ingestor:
         if not (block_streams and len(block_streams) > 0):
             return []
 
-        while len(stringified_blocks) > 1:
-            stringified_blocks_len = len(stringified_blocks)
-            temp_stringified_blocks = []
-            for i in range(0, stringified_blocks_len, MAX_TREE_BLOCKS_CHILDREN):
-                summary = self._openai.summarize(
-                    "\n\n".join(
-                        stringified_blocks[
-                            i : min(i + MAX_TREE_BLOCKS_CHILDREN, stringified_blocks_len)
-                        ]
-                    )
-                )
-                temp_stringified_blocks.append(summary)
-            stringified_blocks = temp_stringified_blocks
-        if len(stringified_blocks) != 1:
-            raise Exception("_get_graph_blocks: len(stringified_blocks) != 1")
+        tree_block_streams = [block_stream for block_stream in block_streams]
+        while len(tree_block_streams) > 1:
+            tree_blocks_len = len(tree_block_streams)
+            temp_block_streams = []
+            for i in range(0, tree_blocks_len, MAX_TREE_BLOCKS_CHILDREN):
+                block_streams = tree_block_streams[i : min(i + MAX_TREE_BLOCKS_CHILDREN, tree_blocks_len)]
+                translated = self._translator.translate_block_streams(block_streams)
+                if not translated:
+                    continue
+                summary = self._openai.summarize(translated)
+                summary_block = SummaryBlock(text=summary, last_updated_timestamp=None)
+                temp_block_streams.append(BlockStream(label=SummaryBlock._LABEL, blocks=[summary_block]))
+            tree_block_streams = temp_block_streams
+        if len(tree_block_streams) != 1:
+            raise Exception("_get_graph_blocks: len(tree_block_streams) != 1")
 
         graph_blocks: List[Block] = []
         summary_last_updated_timestamp = 0
-        
         for block_stream in block_streams:
             block_str = str(block_stream)
-            block_embedding = self._openai.embed(block_str)
+            translated = self._translator.translate_block_streams([block_stream])
+            block_embedding = self._openai.embed(translated)
             last_updated_timestamp = max([block.last_updated_timestamp for block in block_stream.blocks])
             summary_last_updated_timestamp = max(summary_last_updated_timestamp, last_updated_timestamp)
             graph_block = Block(
-                id=ulid(),
-                embedding=block_embedding,
-                label=block_stream.label,
+                id=ulid(), 
+                embedding=block_embedding, 
+                label=block_stream.label, 
                 content=block_str,
                 last_updated_timestamp=last_updated_timestamp
             )
             graph_blocks.append(graph_block)
 
-        block_embedding = self._openai.embed(stringified_blocks[0])
+        translated = self._translator.translate_block_streams(tree_block_streams)
+        block_embedding = self._openai.embed(translated)
         summary_block = Block(
             id=ulid(), 
             embedding=block_embedding, 
             label=SummaryBlock._LABEL, 
-            content=stringified_blocks[0],
+            content=str(tree_block_streams[0]),
             last_updated_timestamp=summary_last_updated_timestamp
         )
         graph_blocks.append(summary_block)

@@ -17,6 +17,8 @@ class Answer:
     content: str
     sources: List[Source]
 
+CONTEXT_TOO_LONG = Answer(content='I received context that was too long to respond to.', sources=None)
+
 class QuestionAnswerAgent(DataAgent):
     def run(
         self,
@@ -24,7 +26,10 @@ class QuestionAnswerAgent(DataAgent):
     ) -> Answer:
         context_basket = self.generate_context(question)
         if self._context_basket_token_size(context_basket) > MAX_TOKENS:
-            return 'I received context that was too long to respond to.'
+            return Answer(
+                content='I received context that was too long to respond to.', 
+                sources=[context.source for context in context_basket.contexts]
+            )
         answer = self._use_context_to_answer_question(question, context_basket)
         return answer
 
@@ -37,7 +42,10 @@ class QuestionAnswerAgent(DataAgent):
         print('[QuestionAnswerAgent] Context generated...')
         print(context_basket, '\n')
         if self._context_basket_token_size(context_basket) > MAX_TOKENS:
-            return 'I received context that was too long to respond to.'
+            return Answer(
+                content='I received context that was too long to respond to.', 
+                sources=[context.source for context in context_basket.contexts]
+            )
         print('[QuestionAnswerAgent] Using context to answer question...')
         answer = self._use_context_to_answer_question(question, context_basket)
         print('[QuestionAnswerAgent] Answer received...')

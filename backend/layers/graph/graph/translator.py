@@ -14,27 +14,37 @@ SUPPORTED_BLOCK_LABELS = set([
 ])
 
 class Translator:
-    def translate_block_stream(block_stream: BlockStream):
-        if not (block_stream and block_stream.blocks and block_stream.label and block_stream.label in SUPPORTED_BLOCK_LABELS):
+    def __init__(self) -> None:
+        pass
+
+    def translate_block_streams(self, block_streams: List[BlockStream]) -> str:
+        if not block_streams:
             return None
-
-        if block_stream.label == SummaryBlock._LABEL:
-            return Translator._translate_summary_blocks(block_stream.blocks)
-        elif block_stream.label == BodyBlock._LABEL:
-            return Translator._translate_body_blocks(block_stream.blocks)
-        elif block_stream.label == MemberBlock._LABEL:
-            return Translator._translate_member_blocks(block_stream.blocks)
-        elif block_stream.label == TitleBlock._LABEL:
-            return Translator._translate_title_blocks(block_stream.blocks)
-        elif block_stream.label == CommentBlock._LABEL:
-            return Translator._translate_comment_blocks(block_stream.blocks)
-        elif block_stream.label == DealBlock._LABEL:
-            return Translator._translate_deal_blocks(block_stream.blocks)
-        elif block_stream.label == ContactBlock._LABEL:
-            return Translator._translate_contact_blocks(block_stream.blocks)
         
-        return None
+        translated = []
+        for block_stream in block_streams:
+            if not (block_stream and block_stream.blocks and block_stream.label and block_stream.label in SUPPORTED_BLOCK_LABELS):
+                print('invalid block stream!')
+                continue
 
+            if block_stream.label == SummaryBlock._LABEL:
+                translated.append(Translator._translate_summary_blocks(block_stream.blocks))
+            elif block_stream.label == BodyBlock._LABEL:
+                translated.append(Translator._translate_body_blocks(block_stream.blocks))
+            elif block_stream.label == MemberBlock._LABEL:
+                translated.append(Translator._translate_member_blocks(block_stream.blocks))
+            elif block_stream.label == TitleBlock._LABEL:
+                translated.append(Translator._translate_title_blocks(block_stream.blocks))
+            elif block_stream.label == CommentBlock._LABEL:
+                translated.append(Translator._translate_comment_blocks(block_stream.blocks))
+            elif block_stream.label == DealBlock._LABEL:
+                translated.append(Translator._translate_deal_blocks(block_stream.blocks))
+            elif block_stream.label == ContactBlock._LABEL:
+                translated.append(Translator._translate_contact_blocks(block_stream.blocks))
+        
+        return '\n\n'.join(translated) if translated else None
+
+    @staticmethod
     def _translate_summary_blocks(summary_blocks: List[SummaryBlock]):
         summaries = []
         counter = 1
@@ -44,6 +54,7 @@ class Translator:
         summary = '\n'.join(summaries)
         return f'Page\'s summary is:\n"{summary}"'
 
+    @staticmethod
     def _translate_body_blocks(body_blocks: List[BodyBlock]):
         bodies = []
         counter = 1
@@ -53,6 +64,7 @@ class Translator:
         body = '\n'.join(bodies)
         return f'Page\'s body content includes:\n"{body}"'
 
+    @staticmethod
     def _translate_member_blocks(member_blocks: List[MemberBlock]):
         members = []
         counter = 1
@@ -62,6 +74,7 @@ class Translator:
         members = '\n'.join(members)
         return f'Page\'s members include:\n"{members}"'
 
+    @staticmethod
     def _translate_title_blocks(title_blocks: List[TitleBlock]):
         titles = []
         counter = 1
@@ -71,6 +84,7 @@ class Translator:
         titles = '\n'.join(titles)
         return f'Page\'s titles include:\n"{titles}"'
 
+    @staticmethod
     def _translate_comment_blocks(comment_blocks: List[CommentBlock]):
         comments = []
         counter = 1
@@ -80,6 +94,7 @@ class Translator:
         comments = '\n'.join(comments)
         return f'Page\'s comments include:\n"{comments}"'
 
+    @staticmethod
     def _translate_deal_blocks(deal_blocks: List[DealBlock]):
         deals = []
         counter = 1
@@ -95,6 +110,7 @@ class Translator:
         deals = '\n'.join(deals)
         return f'Page\'s deals include:\n"{deals}"'
 
+    @staticmethod
     def _translate_contact_blocks(contact_blocks: List[ContactBlock]):
         contacts = []
         counter = 1

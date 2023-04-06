@@ -65,14 +65,14 @@ class entity:
     def __str__(self) -> str:
         return f'{self.id}:{self.value}'
 
+    def __hash__(self) -> int:
+        return hash(self.id)
+    
     def get_as_dict(self) -> dict:
         return {
             'id': self.id,
             'value': self.value
         }
-    
-    def __hash__(self) -> int:
-        return hash(self.id)
 
 @dataclass
 class MemberBlock(Block):
@@ -105,7 +105,7 @@ class CommentBlock(Block):
     
     def get_as_dict(self) -> dict:
         return {
-            'author': str(self.author),
+            'author': self.author.get_as_dict(),
             'text': self.text
         }
 
