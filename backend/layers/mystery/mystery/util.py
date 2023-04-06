@@ -1,5 +1,6 @@
 import tiktoken
 
+
 def count_tokens(text: str, encoding_name: str) -> int:
     '''Counts the number of tokens in a string.
 

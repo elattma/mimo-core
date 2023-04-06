@@ -49,6 +49,7 @@ RESPOND_WITH_INFORMATION_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's messa
 
 RESPOND_WITHOUT_INFORMATION_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's message.'''
 
+
 class ChatSystem:
     _gpt_4: OpenAIChat = None
     _chat_gpt: OpenAIChat = None
@@ -74,20 +75,27 @@ class ChatSystem:
             )
         print('[ChatSystem] Initialized!')
 
-    def run(self, message: str) -> str:
+    def run(self, message: str) -> Generator[str, None, None]:
         print('[ChatSystem] Running...')
+        yield '[CHATSYSTEMYIELD] Interpreting message...'
         requests = self._generate_requests(message)
         if not requests:
             response = self._respond_without_information(message)
-            return response
-        information = self._retrieve_information(requests)
+            yield '[CHATSYSTEMYIELD] ' + response
+            return
+        information: Dict[str, ContextBasket] = {}
+        for update in self._retrieve_information(requests, information):
+            yield '[CHATSYSTEMYIELD] ' + update
+        yield '[CHATSYSTEMYIELD] Synthesizing information...'
         context = self._information_to_context(information)
+        yield '[CHATSYSTEMYIELD] Responding to message...'
         response = self._respond_with_information(
             message,
             context
         )
         print('[ChatSystem] Ran!')
-        return response
+        yield '[CHATSYSTEMYIELD] ' + response
+        return
 
     def _generate_requests(self, message: str) -> List[str]:
         print('[ChatSystem] Generating requests...')
@@ -105,18 +113,21 @@ class ChatSystem:
         print('[ChatSystem] Requests generated!')
         print(requests)
         return requests
-    
-    def _retrieve_information(self,
-                              requests: List[str]) -> Dict[str, ContextBasket]:
+
+    def _retrieve_information(
+        self,
+        requests: List[str],
+        information: Dict[str, ContextBasket]
+    ) -> Generator[str, None, None]:
         print('[ChatSystem] Retrieving information...')
-        information = {}
         for request in requests:
+            yield f'Looking up: "{request}"'
             context_basket = self._data_agent.generate_context(request)
             information[request] = context_basket
         print('[ChatSystem] Information retrieved!')
         print(information)
-        return information
-    
+        return
+
     def _information_to_context(
         self,
         information: Dict[str, ContextBasket]
@@ -144,10 +155,10 @@ class ChatSystem:
             [context.content for context in context_basket]
         )
         system_message = ChatPromptMessage(
-                role=ChatPromptMessageRole.SYSTEM.value,
-                content=CONDENSE_CONTEXT_SYSTEM_MESSAGE_CONTENT.format(
-                    raw_context=raw_context
-                )
+            role=ChatPromptMessageRole.SYSTEM.value,
+            content=CONDENSE_CONTEXT_SYSTEM_MESSAGE_CONTENT.format(
+                raw_context=raw_context
+            )
         )
         user_message = ChatPromptMessage(
             role=ChatPromptMessageRole.USER.value,
@@ -179,7 +190,7 @@ class ChatSystem:
             response = self._chat_gpt.predict(prompt)
         print('[ChatSystem] Produced response with information!')
         return response
-    
+
     def _respond_without_information(self, message: str) -> str:
         print('[ChatSystem] Producing response without information...')
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
@@ -215,7 +226,7 @@ class ChatSystem:
     #         yield 'I now have all the information I need to respond to your message.'
     #     response = self._respond_using_qas(message, qas)
     #     yield response
-    
+
     # def debug_run(self, message: str) -> str:
     #     print('[ChatSystem] Running debug_run...\n')
     #     print('[ChatSystem] Received message...')
@@ -234,7 +245,7 @@ class ChatSystem:
     #     response = self._respond_using_qas(message, qas)
     #     print(response, '\n')
     #     return response
-    
+
     # def _generate_questions_from_message(self, message: str) -> str:
     #     system_message = ChatPromptMessage(
     #         role=ChatPromptMessageRole.SYSTEM.value,
@@ -293,7 +304,8 @@ class ChatSystem:
     #     prompt = ChatPrompt([system_message, user_message])
     #     response = self._chat_gpt.predict(prompt)
     #     return response
-    
+
+
 def _parse_llm_response_for_requests(llm_response: str) -> List[str]:
     match = re.search(r'\[[\s\S]*\]', llm_response, re.DOTALL)
     if not match:

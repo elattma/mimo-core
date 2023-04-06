@@ -18,10 +18,12 @@ db: ParentChildDB = None
 secrets: Secrets = None
 system: ChatSystem = None
 
+
 def handler(event: dict, context):
     global db, secrets, system
 
-    request_context: dict = event.get('requestContext', None) if event else None
+    request_context: dict = event.get(
+        'requestContext', None) if event else None
     authorizer: dict = request_context.get(
         'authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
@@ -31,7 +33,8 @@ def handler(event: dict, context):
     graph_db_uri: str = os.environ['GRAPH_DB_URI']
 
     headers: dict = event.get('headers', None) if event else None
-    authorization: str = headers.get('Authorization', None) if headers else None
+    authorization: str = headers.get(
+        'Authorization', None) if headers else None
 
     body: str = event.get('body', None) if event else None
     body: dict = json.loads(body) if body else None
@@ -61,8 +64,9 @@ def handler(event: dict, context):
             user=secrets.get("GRAPH_DB_KEY"),
             password=secrets.get("GRAPH_DB_SECRET")
         )
-        vector_db = Pinecone(api_key=secrets.get("PINECONE_API_KEY"), environment="us-east1-gcp", index_name='beta')
-        system = ChatSystem('test_user', graph_db, vector_db, openai)
+        vector_db = Pinecone(api_key=secrets.get(
+            "PINECONE_API_KEY"), environment="us-east1-gcp", index_name='beta')
+        system = ChatSystem('google-oauth2|108573573074253667565', graph_db, vector_db, openai)
 
     output_chat_id = ulid()
     output_role = Roles.ASSISTANT.value
@@ -73,13 +77,13 @@ def handler(event: dict, context):
     for thought in response:
         print(thought)
         send_chat(
-            appsync_endpoint=appsync_endpoint, 
-            authorization=authorization, 
-            user_id=user, 
-            input_chat_id=chat_id, 
-            output_chat_id=output_chat_id, 
-            message=thought, 
-            role=Roles.ASSISTANT.value, 
+            appsync_endpoint=appsync_endpoint,
+            authorization=authorization,
+            user_id=user,
+            input_chat_id=chat_id,
+            output_chat_id=output_chat_id,
+            message=thought,
+            role=Roles.ASSISTANT.value,
             timestamp=output_timestamp
         )
         answer = thought

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generator, List, Optional, Union
 
-from layers.external.openai_ import OpenAI
+from external.openai_ import OpenAI
 
 from .llm import LLM
 from .prompt import ChatPrompt, Prompt, TextPrompt
