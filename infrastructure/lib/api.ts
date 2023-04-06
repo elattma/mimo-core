@@ -117,7 +117,6 @@ export class ApiStack extends Stack {
       if (!layer) throw Error("invalid layer name!");
       layers.push(layer);
     });
-    console.log(layers);
     return layers;
   };
 
@@ -125,7 +124,7 @@ export class ApiStack extends Stack {
     const layer = new PythonLayerVersion(this, `${stageId}-${name}-layer`, {
       entry: path.join(__dirname, `../../backend/layers/${name}`),
       bundling: {
-        assetExcludes: ["**.venv**"],
+        assetExcludes: ["**.venv**", "**pycache**"],
       },
       compatibleRuntimes: [Runtime.PYTHON_3_9],
     });
@@ -340,7 +339,7 @@ export class ApiStack extends Stack {
       },
       memorySize: 2048,
       timeout: Duration.seconds(30),
-      layers: this.getLayersSubset(["aws", "fetcher"]),
+      layers: this.getLayersSubset(["aws", "fetcher", "graph"]),
     });
     mimoTable.grantReadWriteData(getItemHandler);
     this.integrationsSecret.grantRead(getItemHandler);

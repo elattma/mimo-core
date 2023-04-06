@@ -248,6 +248,17 @@ requests = ">=2.26.0"
 blobfile = ["blobfile (>=2)"]
 
 [[package]]
+name = "ulid"
+version = "1.1"
+description = "Pyhton version of this: https://github.com/alizain/ulid"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ulid-1.1.tar.gz", hash = "sha256:0943e8a751ec10dfcdb4df2758f96dffbbfbc055d0b49288caf2f92125900d49"},
+]
+
+[[package]]
 name = "urllib3"
 version = "1.26.15"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -266,5 +277,5 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.10"
-content-hash = "b498e8cb81ba9a8fbd11005f6106768622f72b4dd43a31872896684ee6a4e6ac"
+python-versions = "^3.9"
+content-hash = "570ceabd0521e50d104f3eb5e443fd0d4e64ea92a37f8962c24c8a48b9530408"

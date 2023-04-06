@@ -1,9 +1,9 @@
 from typing import List
 
+from external.openai_ import OpenAI
 from graph.blocks import (BlockStream, BodyBlock, CommentBlock, ContactBlock,
                           DealBlock, MemberBlock, SummaryBlock, TitleBlock)
 from graph.neo4j_ import Name
-from external.openai_ import OpenAI
 
 MAX_OPENAI_LEN = 2000
 

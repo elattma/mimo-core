@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
+from external.openai_ import OpenAI
 from graph.blocks import BlockStream, SummaryBlock
 from graph.neo4j_ import Block, Consists, Document, Mentioned, Name, Neo4j
 from graph.pinecone_ import Pinecone, Row, RowType
-from external.openai_ import OpenAI
 from mystery.namer import Namer
 from ulid import ulid
 
@@ -53,9 +53,6 @@ class Ingestor:
         if not (block_streams and len(block_streams) > 0):
             return []
 
-        # TODO: need to handle dynamic tree children in case where the blocks dont fit
-        stringified_blocks = [str(block_stream) for block_stream in block_streams]
-
         while len(stringified_blocks) > 1:
             stringified_blocks_len = len(stringified_blocks)
             temp_stringified_blocks = []
@@ -81,9 +78,9 @@ class Ingestor:
             last_updated_timestamp = max([block.last_updated_timestamp for block in block_stream.blocks])
             summary_last_updated_timestamp = max(summary_last_updated_timestamp, last_updated_timestamp)
             graph_block = Block(
-                id=ulid(), 
-                embedding=block_embedding, 
-                label=block_stream.label, 
+                id=ulid(),
+                embedding=block_embedding,
+                label=block_stream.label,
                 content=block_str,
                 last_updated_timestamp=last_updated_timestamp
             )
