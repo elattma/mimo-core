@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "external"
+version = "0.1.0"
+description = ""
+authors = ["Mohamed Elattma <mo@mimo.team>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+openai = "^0.27.4"
+pyjwt = {extras = ["crypto"], version = "^2.6.0"}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

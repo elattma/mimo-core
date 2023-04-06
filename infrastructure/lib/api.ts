@@ -1,4 +1,8 @@
 import {
+  PythonFunction,
+  PythonLayerVersion,
+} from "@aws-cdk/aws-lambda-python-alpha";
+import {
   CfnOutput,
   CfnResource,
   Duration,
@@ -21,15 +25,8 @@ import {
   CertificateValidation,
 } from "aws-cdk-lib/aws-certificatemanager";
 import { ITable } from "aws-cdk-lib/aws-dynamodb";
-import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
-import {
-  CfnUrl,
-  DockerImageCode,
-  DockerImageFunction,
-  FunctionUrlAuthType,
-  Runtime,
-} from "aws-cdk-lib/aws-lambda";
+import { CfnUrl, FunctionUrlAuthType, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
 import { IBucket } from "aws-cdk-lib/aws-s3";
@@ -46,11 +43,15 @@ export interface ApiStackProps extends StackProps {
   readonly uploadItemBucket: IBucket;
 }
 
+const LAYERS = ["aws", "external", "fetcher", "graph", "mystery"];
+
 interface LambdaParams {
+  readonly route: string;
   readonly method: string;
   readonly environment?: { [key: string]: string };
   readonly memorySize?: number;
   readonly timeout?: Duration;
+  readonly layers?: PythonLayerVersion[];
 }
 
 const NEO_4J_URI = "neo4j+s://67eff9a1.databases.neo4j.io";
@@ -59,6 +60,7 @@ export class ApiStack extends Stack {
   readonly api: RestApi;
   readonly authorizer: IAuthorizer;
   readonly integrationsSecret: ISecret;
+  readonly layersMap: Map<string, PythonLayerVersion> = new Map();
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -73,6 +75,11 @@ export class ApiStack extends Stack {
     this.api = this.createRestApi(props.domainName);
     this.authorizer = this.createAuth0Authorizer(props.stageId);
     this.createDefaultApiKey();
+
+    LAYERS.forEach((layerName) => {
+      const layer = this.createLayer(props.stageId, layerName);
+      this.layersMap.set(layerName, layer);
+    });
 
     this.createChatRoutes(
       props.stageId,
@@ -103,6 +110,29 @@ export class ApiStack extends Stack {
     });
   }
 
+  getLayersSubset = (layerNames: string[]) => {
+    const layers: PythonLayerVersion[] = [];
+    layerNames.forEach((layerName) => {
+      const layer = this.layersMap.get(layerName);
+      if (!layer) throw Error("invalid layer name!");
+      layers.push(layer);
+    });
+    console.log(layers);
+    return layers;
+  };
+
+  createLayer = (stageId: string, name: string) => {
+    const layer = new PythonLayerVersion(this, `${stageId}-${name}-layer`, {
+      entry: path.join(__dirname, `../../backend/layers/${name}`),
+      bundling: {
+        assetExcludes: ["**.venv**"],
+      },
+      compatibleRuntimes: [Runtime.PYTHON_3_9],
+    });
+
+    return layer;
+  };
+
   createQaLambda = (stageId: string) => {
     const auth0SecretName = `${stageId}/Mimo/Integrations/Auth0`;
     const auth0Secret = Secret.fromSecretNameV2(
@@ -112,13 +142,15 @@ export class ApiStack extends Stack {
     );
 
     const qaHandler = this.getHandler({
-      method: "qa_get",
+      route: "qa",
+      method: "get",
       environment: {
         STAGE: stageId,
         GRAPH_DB_URI: NEO_4J_URI,
       },
       memorySize: 2048,
       timeout: Duration.minutes(10),
+      layers: this.getLayersSubset(["aws", "external", "graph", "mystery"]),
     });
     this.integrationsSecret.grantRead(qaHandler);
     auth0Secret.grantRead(qaHandler);
@@ -237,7 +269,8 @@ export class ApiStack extends Stack {
   ) => {
     const mysterybox = this.api.root.addResource("mysterybox");
     const refreshMysteryboxHandler = this.getHandler({
-      method: "mysterybox_post",
+      route: "mysterybox",
+      method: "post",
       environment: {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
@@ -245,6 +278,13 @@ export class ApiStack extends Stack {
       },
       memorySize: 2048,
       timeout: Duration.minutes(10),
+      layers: this.getLayersSubset([
+        "aws",
+        "external",
+        "fetcher",
+        "graph",
+        "mystery",
+      ]),
     });
     mimoTable.grantReadWriteData(refreshMysteryboxHandler);
     this.integrationsSecret.grantRead(refreshMysteryboxHandler);
@@ -292,13 +332,15 @@ export class ApiStack extends Stack {
   ) => {
     const item = this.api.root.addResource("item");
     const getItemHandler = this.getHandler({
-      method: "item_get",
+      route: "item",
+      method: "get",
       environment: {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
       },
       memorySize: 2048,
       timeout: Duration.seconds(30),
+      layers: this.getLayersSubset(["aws", "fetcher"]),
     });
     mimoTable.grantReadWriteData(getItemHandler);
     this.integrationsSecret.grantRead(getItemHandler);
@@ -369,67 +411,69 @@ export class ApiStack extends Stack {
       ],
     });
 
-    const uploadItemHandler = this.getHandler({
-      method: "item_post",
-      environment: {
-        STAGE: stageId,
-        UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
-      },
-      timeout: Duration.seconds(30),
-      memorySize: 1024,
-    });
-    uploadItemBucket.grantPut(uploadItemHandler);
+    // const uploadItemHandler = this.getHandler({
+    //   route: "item",
+    //   method: "post",
+    //   environment: {
+    //     STAGE: stageId,
+    //     UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
+    //   },
+    //   timeout: Duration.seconds(30),
+    //   memorySize: 1024,
+    //   layers: this.getLayersSubset(["aws"]),
+    // });
+    // uploadItemBucket.grantPut(uploadItemHandler);
 
-    const uploadItemRequestModel = this.api.addModel("UploadItemRequestModel", {
-      contentType: "application/json",
-      modelName: "UploadItemRequest",
-      schema: {
-        type: JsonSchemaType.OBJECT,
-        properties: {
-          contentType: {
-            type: JsonSchemaType.STRING,
-          },
-          name: {
-            type: JsonSchemaType.STRING,
-          },
-        },
-        required: ["contentType"],
-      },
-    });
+    // const uploadItemRequestModel = this.api.addModel("UploadItemRequestModel", {
+    //   contentType: "application/json",
+    //   modelName: "UploadItemRequest",
+    //   schema: {
+    //     type: JsonSchemaType.OBJECT,
+    //     properties: {
+    //       contentType: {
+    //         type: JsonSchemaType.STRING,
+    //       },
+    //       name: {
+    //         type: JsonSchemaType.STRING,
+    //       },
+    //     },
+    //     required: ["contentType"],
+    //   },
+    // });
 
-    const uploadItemResponseModel = this.api.addModel(
-      "uploadItemResponseModel",
-      {
-        contentType: "application/json",
-        modelName: "uploadItemResponse",
-        schema: {
-          type: JsonSchemaType.OBJECT,
-          properties: {
-            signedUrl: {
-              type: JsonSchemaType.STRING,
-            },
-          },
-          required: ["contentType"],
-        },
-      }
-    );
+    // const uploadItemResponseModel = this.api.addModel(
+    //   "uploadItemResponseModel",
+    //   {
+    //     contentType: "application/json",
+    //     modelName: "uploadItemResponse",
+    //     schema: {
+    //       type: JsonSchemaType.OBJECT,
+    //       properties: {
+    //         signedUrl: {
+    //           type: JsonSchemaType.STRING,
+    //         },
+    //       },
+    //       required: ["contentType"],
+    //     },
+    //   }
+    // );
 
-    item.addMethod("POST", new LambdaIntegration(uploadItemHandler), {
-      apiKeyRequired: true,
-      authorizer: this.authorizer,
-      requestModels: {
-        "application/json": uploadItemRequestModel,
-      },
-      methodResponses: [
-        {
-          statusCode: "200",
-          responseModels: {
-            "application/json": uploadItemResponseModel,
-          },
-          responseParameters: RESPONSE_PARAMS,
-        },
-      ],
-    });
+    // item.addMethod("POST", new LambdaIntegration(uploadItemHandler), {
+    //   apiKeyRequired: true,
+    //   authorizer: this.authorizer,
+    //   requestModels: {
+    //     "application/json": uploadItemRequestModel,
+    //   },
+    //   methodResponses: [
+    //     {
+    //       statusCode: "200",
+    //       responseModels: {
+    //         "application/json": uploadItemResponseModel,
+    //       },
+    //       responseParameters: RESPONSE_PARAMS,
+    //     },
+    //   ],
+    // });
   };
 
   createIntegrationRoutes = (
@@ -440,13 +484,15 @@ export class ApiStack extends Stack {
     // GET /integration
     const integration = this.api.root.addResource("integration");
     const getIntegrationHandler = this.getHandler({
-      method: "integration_get",
+      route: "integration",
+      method: "get",
       environment: {
         STAGE: stageId,
         INTEGRATIONS_PATH: integrationsPath,
       },
       timeout: Duration.seconds(20),
       memorySize: 512,
+      layers: this.getLayersSubset(["aws"]),
     });
     mimoTable.grantReadData(getIntegrationHandler);
     getIntegrationHandler.addToRolePolicy(
@@ -513,12 +559,14 @@ export class ApiStack extends Stack {
     });
 
     const authIntegrationHandler = this.getHandler({
-      method: "integration_post",
+      route: "integration",
+      method: "post",
       environment: {
         STAGE: stageId,
       },
       timeout: Duration.seconds(20),
       memorySize: 512,
+      layers: this.getLayersSubset(["aws", "fetcher"]),
     });
     mimoTable.grantWriteData(authIntegrationHandler);
     this.integrationsSecret.grantRead(authIntegrationHandler);
@@ -571,7 +619,8 @@ export class ApiStack extends Stack {
     // POST /chat
     const chat = this.api.root.addResource("chat");
     const chatHandler = this.getHandler({
-      method: "chat_post",
+      route: "chat",
+      method: "post",
       environment: {
         STAGE: stageId,
         APPSYNC_ENDPOINT: graphqlUrl,
@@ -580,6 +629,7 @@ export class ApiStack extends Stack {
       },
       memorySize: 1024,
       timeout: Duration.seconds(120),
+      layers: this.getLayersSubset(["aws", "graph", "external", "mystery"]),
     });
     this.integrationsSecret.grantRead(chatHandler);
     mimoTable.grantReadWriteData(chatHandler);
@@ -666,13 +716,15 @@ export class ApiStack extends Stack {
 
     // GET /chat
     const chatHistoryHandler = this.getHandler({
-      method: "chat_get",
+      route: "chat",
+      method: "get",
       environment: {
         STAGE: stageId,
         APPSYNC_ENDPOINT: graphqlUrl,
       },
       memorySize: 1024,
       timeout: Duration.seconds(20),
+      layers: this.getLayersSubset(["aws"]),
     });
     mimoTable.grantReadData(chatHistoryHandler);
 
@@ -703,16 +755,18 @@ export class ApiStack extends Stack {
   };
 
   getHandler = (params: LambdaParams) => {
-    const dockerfile = path.join(__dirname, "../../backend/");
-    return new DockerImageFunction(this, `${params.method}-lambda`, {
-      code: DockerImageCode.fromImageAsset(dockerfile, {
-        file: "lambda.Dockerfile",
-        cmd: [`app.handlers.${params.method}`],
-        platform: Platform.LINUX_AMD64,
-      }),
+    return new PythonFunction(this, `${params.route}-${params.method}-lambda`, {
+      entry: path.join(__dirname, `../../backend/api/${params.route}/`),
+      index: `${params.method}.py`,
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
       timeout: params.timeout,
       memorySize: params.memorySize,
       environment: params.environment,
+      bundling: {
+        assetExcludes: ["**.venv**", "**poetry.lock"],
+      },
+      layers: params.layers,
     });
   };
 }
