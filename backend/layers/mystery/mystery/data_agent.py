@@ -6,14 +6,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from math import sqrt
 from typing import Any, Dict, List, Set, Tuple, Type, Union
-from app.mystery.util import count_tokens
+from mystery.util import count_tokens
 
 import tiktoken
 from graph.neo4j_ import (BlockFilter, DocumentFilter, Limit, NameFilter,
                           Neo4j, OrderBy, OrderDirection, QueryFilter)
 from graph.pinecone_ import Filter as VectorFilter
 from graph.pinecone_ import Pinecone, RowType
-from layers.external.openai_ import OpenAI
+from external.openai_ import OpenAI
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)

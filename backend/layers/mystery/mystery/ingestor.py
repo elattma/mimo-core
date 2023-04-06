@@ -5,7 +5,7 @@ from typing import List
 from graph.blocks import BlockStream, SummaryBlock
 from graph.neo4j_ import Block, Consists, Document, Mentioned, Name, Neo4j
 from graph.pinecone_ import Pinecone, Row, RowType
-from layers.external.openai_ import OpenAI
+from external.openai_ import OpenAI
 from mystery.namer import Namer
 from ulid import ulid
 
