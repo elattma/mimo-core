@@ -17,7 +17,8 @@ class Translator:
     def __init__(self) -> None:
         pass
 
-    def translate_block_streams(self, block_streams: List[BlockStream]) -> str:
+    @staticmethod
+    def translate_block_streams(block_streams: List[BlockStream]) -> str:
         if not block_streams:
             return None
         

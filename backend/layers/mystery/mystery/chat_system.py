@@ -5,7 +5,6 @@ from typing import Dict, Generator, List
 from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
-
 from mystery.data_agent import ContextBasket, DataAgent
 from mystery.util import count_tokens
 

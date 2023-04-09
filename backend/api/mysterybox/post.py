@@ -1,3 +1,11 @@
+import sys
+
+sys.path.append('/Users/mo/workplace/mimo/backend/layers/aws')
+sys.path.append('/Users/mo/workplace/mimo/backend/layers/mystery')
+sys.path.append('/Users/mo/workplace/mimo/backend/layers/external')
+sys.path.append('/Users/mo/workplace/mimo/backend/layers/graph')
+sys.path.append('/Users/mo/workplace/mimo/backend/layers/fetcher')
+
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -47,6 +55,8 @@ def handler(event: dict, context):
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
             integration = item.get_raw_child()
+            if integration == 'zendesk':
+                continue
             fetchers.append(Fetcher.create(integration, {
                 'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
                 'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
@@ -139,3 +149,18 @@ def discover_fetch_ingest(
             break
 
     return DfiResponse(integration=fetcher._INTEGRATION, succeeded=succeeded)
+
+
+event = {
+    "requestContext": {
+        "authorizer": {
+            "principalId": "google-oauth2|108573573074253667565"
+        }
+    },
+}
+
+os.environ['AWS_PROFILE'] = 'mimo'
+os.environ['STAGE'] = 'beta'
+os.environ['UPLOAD_ITEM_BUCKET'] = 'mimo-beta-upload-item'
+os.environ['GRAPH_DB_URI'] = 'neo4j+s://67eff9a1.databases.neo4j.io'
+handler(event, None)

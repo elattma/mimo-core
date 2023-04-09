@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -10,27 +11,98 @@ class Block(ABC):
     last_updated_timestamp: int
     
     def __str__(self) -> str:
-        return ';'.join([f'{k}:{v}' for k, v in self.get_as_dict().items()])
+        return json.dumps(self.get_as_dict())
     
     @abstractmethod
     def get_as_dict(self) -> dict:
         raise NotImplementedError('get_as_dict not implemented')
+    
+    @staticmethod
+    def from_dict(block_dict: dict, label: str):
+        last_updated_timestamp = block_dict.get('last_updated_timestamp')
+        if label == SummaryBlock._LABEL:
+            return SummaryBlock(
+                last_updated_timestamp=last_updated_timestamp,
+                text=block_dict.get('text')
+            )
+        elif label == BodyBlock._LABEL:
+            return BodyBlock(
+                last_updated_timestamp=last_updated_timestamp,
+                text=block_dict.get('text')
+            )
+        elif label == MemberBlock._LABEL:
+            name_dict: dict = block_dict.get('name')
+            return MemberBlock(
+                last_updated_timestampstamp=last_updated_timestamp,
+                name=entity(
+                    id=name_dict.get('id'),
+                    value=name_dict.get('value')
+                ),
+                relation=Relations[block_dict.get('relation')]
+            )
+        elif label == TitleBlock._LABEL:
+            return TitleBlock(
+                last_updated_timestamp=last_updated_timestamp,
+                text=block_dict.get('text')
+            )
+        elif label == CommentBlock._LABEL:
+            author_dict: dict = block_dict.get('author')
+            return CommentBlock(
+                last_updated_timestamp=last_updated_timestamp,
+                author=entity(
+                    id=author_dict.get('id'),
+                    value=author_dict.get('value')
+                ),
+            )
+        elif label == DealBlock._LABEL:
+            owner_dict: dict = block_dict.get('owner')
+            name_dict: dict = block_dict.get('name')
+            contact_dict: dict = block_dict.get('contact')
+            return DealBlock(
+                last_updated_timestamp=last_updated_timestamp,
+                owner=entity(
+                    id=owner_dict.get('id'),
+                    value=owner_dict.get('value')
+                ),
+                name=entity(
+                    id=name_dict.get('id'),
+                    value=name_dict.get('value')
+                ),
+                contact=entity(
+                    id=contact_dict.get('id'),
+                    value=contact_dict.get('value')
+                ),
+                type=block_dict.get('type'),
+                stage=block_dict.get('stage'),
+                close_date=block_dict.get('close_date'),
+                amount=block_dict.get('amount'),
+                probability=block_dict.get('probability')
+            )
 
 class BlockStream:
-    blocks: List[Block]
     label: str
+    blocks: List[Block]
 
     def __init__(self, label: str, blocks: List[Block]):
         self.label = label
         self.blocks = [block for block in blocks]
 
     def __str__(self) -> str:
-        return '\n\n'.join([str(block) for block in self.blocks])
+        return json.dumps(self.get_as_dict())
 
     def get_as_dict(self) -> dict:
-        return {
-            'blocks': [block.get_as_dict() for block in self.blocks]
-        }
+        return [block.get_as_dict() for block in self.blocks]
+    
+    @staticmethod
+    def from_dict(block_dicts: List[dict], label: str):
+        blocks: List[Block] = []
+        for block_dict in block_dicts:
+            blocks.append(Block.from_dict())
+
+        return BlockStream(
+            label,
+            blocks
+        )
 
 @dataclass
 class SummaryBlock(Block):
@@ -62,9 +134,6 @@ class entity:
     id: str
     value: str
 
-    def __str__(self) -> str:
-        return f'{self.id}:{self.value}'
-
     def __hash__(self) -> int:
         return hash(self.id)
     
@@ -83,7 +152,7 @@ class MemberBlock(Block):
     def get_as_dict(self) -> dict:
         return {
             'name': self.name.get_as_dict(),
-            'relation': self.relation.value
+            'relation': self.relation.value if self.relation else None
         }
 
 @dataclass

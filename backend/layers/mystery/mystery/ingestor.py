@@ -81,7 +81,7 @@ class Ingestor:
             summary_last_updated_timestamp = max(summary_last_updated_timestamp, last_updated_timestamp)
             graph_block = Block(
                 id=ulid(), 
-                embedding=block_embedding, 
+                embedding=block_embedding,
                 label=block_stream.label, 
                 content=block_str,
                 last_updated_timestamp=last_updated_timestamp
