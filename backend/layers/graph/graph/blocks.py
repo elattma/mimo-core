@@ -9,14 +9,14 @@ from typing import List
 class Block(ABC):
     _LABEL = 'block'
     last_updated_timestamp: int
-    
+
     def __str__(self) -> str:
         return json.dumps(self.get_as_dict())
-    
+
     @abstractmethod
     def get_as_dict(self) -> dict:
         raise NotImplementedError('get_as_dict not implemented')
-    
+
     @staticmethod
     def from_dict(label: str, block_dict: dict):
         last_updated_timestamp = block_dict.get('last_updated_timestamp')
@@ -33,12 +33,12 @@ class Block(ABC):
         elif label == MemberBlock._LABEL:
             name_dict: dict = block_dict.get('name')
             return MemberBlock(
-                last_updated_timestampstamp=last_updated_timestamp,
+                last_updated_timestamp=last_updated_timestamp,
                 name=entity(
                     id=name_dict.get('id'),
                     value=name_dict.get('value')
                 ),
-                relation=Relations[block_dict.get('relation')]
+                relation=Relations(block_dict.get('relation'))
             )
         elif label == TitleBlock._LABEL:
             return TitleBlock(
@@ -79,6 +79,7 @@ class Block(ABC):
                 probability=block_dict.get('probability')
             )
 
+
 class BlockStream:
     label: str
     blocks: List[Block]
@@ -92,7 +93,7 @@ class BlockStream:
 
     def get_as_dict(self) -> dict:
         return [block.get_as_dict() for block in self.blocks]
-    
+
     @staticmethod
     def from_dict(label: str, block_dicts: List[dict]):
         blocks: List[Block] = []
@@ -100,6 +101,7 @@ class BlockStream:
             blocks.append(Block.from_dict(label, block_dict))
 
         return BlockStream(label, blocks)
+
 
 @dataclass
 class SummaryBlock(Block):
@@ -111,6 +113,7 @@ class SummaryBlock(Block):
             'text': self.text
         }
 
+
 @dataclass
 class BodyBlock(Block):
     _LABEL = 'body'
@@ -121,10 +124,12 @@ class BodyBlock(Block):
             'text': self.text
         }
 
+
 class Relations(Enum):
     AUTHOR = 'author'
     RECIPIENT = 'recipient'
     PARTICIPANT = 'participant'
+
 
 @dataclass
 class entity:
@@ -133,24 +138,26 @@ class entity:
 
     def __hash__(self) -> int:
         return hash(self.id)
-    
+
     def get_as_dict(self) -> dict:
         return {
             'id': self.id,
             'value': self.value
         }
 
+
 @dataclass
 class MemberBlock(Block):
     _LABEL = 'member'
     name: entity
     relation: Relations
-    
+
     def get_as_dict(self) -> dict:
         return {
             'name': self.name.get_as_dict(),
             'relation': self.relation.value if self.relation else None
         }
+
 
 @dataclass
 class TitleBlock(Block):
@@ -163,17 +170,20 @@ class TitleBlock(Block):
         }
 
 # TODO: change to 1 block for all comments, but they have a chunkify method
+
+
 @dataclass
 class CommentBlock(Block):
     _LABEL = 'comment'
     author: entity
     text: str
-    
+
     def get_as_dict(self) -> dict:
         return {
             'author': self.author.get_as_dict(),
             'text': self.text
         }
+
 
 @dataclass
 class DealBlock(Block):
@@ -186,7 +196,7 @@ class DealBlock(Block):
     close_date: str
     amount: int
     probability: int
-    
+
     def get_as_dict(self) -> dict:
         return {
             'owner': self.owner.get_as_dict(),
@@ -198,6 +208,7 @@ class DealBlock(Block):
             'amount': self.amount,
             'probability': self.probability
         }
+
 
 @dataclass
 class ContactBlock(Block):

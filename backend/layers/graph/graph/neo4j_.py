@@ -2,9 +2,12 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+import json
 from typing import Any, List, Literal, Set
 
 from neo4j import GraphDatabase, Record
+
+UNIQUE_PATTERN_MIMO_PLACEHOLDER = '<UNQIUE_PLACEHOLDER>'
 
 
 @dataclass
@@ -66,7 +69,8 @@ class Document(Node):
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
         map['integration'] = self.integration
-        map['blocks'] = [consist.target.to_neo4j_map() for consist in self.consists]
+        map['blocks'] = [consist.target.to_neo4j_map()
+                         for consist in self.consists]
         return map
 
 
@@ -137,7 +141,7 @@ class ContentMatch:
     def from_dict(matcher_dict: dict, label: str = None, filter: str = None):
         ContentMatch.replace_null_fields(matcher_dict)
         match = json.dumps(matcher_dict).replace(
-            f'"{ContentMatch.get_any_match_placeholder()}"', '.*'
+            f'"{ContentMatch.get_any_match_placeholder()}"', '"([^"]*)"'
         )
         return ContentMatch(match=f'.*{match}.*', label=label, filter=filter)
 
@@ -147,12 +151,12 @@ class ContentMatch:
 
     @staticmethod
     def get_entity_id_match_placeholder():
-        return "<ENTITY_ID_MATCH_PLACEHOLDER>"
-    
+        return '<ENTITY_ID_MATCH_PLACEHOLDER>'
+
     @staticmethod
     def get_any_match_placeholder():
         return '<ANY_MATCH_PLACEHOLDER>'
-    
+
     @staticmethod
     def replace_null_fields(dictionary: dict):
         for key, value in dictionary.items():
@@ -165,7 +169,8 @@ class ContentMatch:
         return hash((self.label))
 
     def __eq__(self, other):
-        if not isinstance(other, type(self)): return NotImplemented
+        if not isinstance(other, type(self)):
+            return NotImplemented
         return self.label == other.label
 
 
@@ -173,8 +178,10 @@ class ContentMatch:
 class BlockFilter:
     ids: Set[str] = None
     labels: Set[str] = None
+    content_items: List[ContentItem] = None
     time_range: tuple[int, int] = None
     regex_matches: Set[ContentMatch] = None
+
 
 @dataclass
 class NameFilter:
@@ -316,7 +323,7 @@ class Neo4j:
         with self.driver.session(database='neo4j') as session:
             result = session.execute_read(self._get_by_filter, query_filter)
             return result
-        
+
     @staticmethod
     def _parse_record_documents(records: List[Record]) -> List[Document]:
         documents: List[Document] = []
@@ -330,7 +337,8 @@ class Neo4j:
                 block_id = block_node.get('id')
                 block_label = block_node.get('label')
                 block_content = block_node.get('content')
-                last_updated_timestamp = block_node.get('last_updated_timestamp')
+                last_updated_timestamp = block_node.get(
+                    'last_updated_timestamp')
                 block = Block(
                     id=block_id,
                     embedding=None,
@@ -340,7 +348,7 @@ class Neo4j:
                 )
                 consists = Consists(block)
                 consists_list.append(consists)
-            
+
             document = Document(
                 id=document_id,
                 integration=document_integration,
@@ -372,7 +380,7 @@ class Neo4j:
             if document_filter.time_range:
                 query_wheres.append(
                     f'(document.timestamp >= {document_filter.time_range[0]} AND document.timestamp <= {document_filter.time_range[1]})')
-        
+
         content_filter = ''
         if query_filter.block_filter:
             block_filter = query_filter.block_filter
@@ -394,7 +402,7 @@ class Neo4j:
                     if regex_match.label:
                         matches.append(f'rblock.label = "{regex_match.label}"')
                     matches.append(f'rblock.content =~ regex_{counter}')
-                    
+
                     content_regex = f'({" AND ".join(matches)})'
                     content_regexes.append(content_regex)
                     replaced_regex_match = regex_match.match \
@@ -429,10 +437,12 @@ class Neo4j:
                 query_wheres.append(f'({contains_sub_query})')
 
         order_by_query = ''
+        order_by = ''
         if query_filter.order_by:
             order_by = query_filter.order_by
             if order_by.property and order_by.node:
-                order_by_query = f'ORDER BY {order_by.node}.{order_by.property}'
+                order_by = ', max(block.last_updated_timestamp) AS order_by'
+                order_by_query = 'ORDER BY order_by'
                 if query_filter.order_by.direction == OrderDirection.DESC:
                     order_by_query += ' DESC'
 
@@ -458,7 +468,8 @@ class Neo4j:
             f'MATCH {name_match}(document:Document)-[:Consists]->(block:Block) '
             f'WHERE {" AND ".join(query_wheres)} '
             f'{content_filter} '
-            f'RETURN document, COLLECT(block) AS blocks{additional_group_bys} '
+            f'WITH document, COLLECT(block) AS blocks{additional_group_bys}{order_by} '
+            f'RETURN document, blocks '
             f'{order_by_query} '
             f'{limit_query} '
         )
