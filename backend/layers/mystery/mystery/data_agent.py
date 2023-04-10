@@ -8,8 +8,9 @@ from math import sqrt
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
 from external.openai_ import OpenAI
-from graph.neo4j_ import (BlockFilter, DocumentFilter, Limit, NameFilter,
-                          Neo4j, OrderBy, OrderDirection, QueryFilter)
+from graph.neo4j_ import (BlockFilter, Document, DocumentFilter, Limit,
+                          NameFilter, Neo4j, OrderBy, OrderDirection,
+                          QueryFilter)
 from graph.pinecone_ import Filter as VectorFilter
 from graph.pinecone_ import Pinecone, RowType
 from mystery.mrkl.open_ai import OpenAIChat
@@ -887,3 +888,23 @@ def _get_neighbors(query_vector: Vector, block_vectors: List[Vector],
         block_vector.distance = distance
     sorted_block_vectors = sorted(block_vectors, key=lambda x: x.distance)
     return sorted_block_vectors[:num_neighbors]
+
+from graph.pinecone_ import Pinecone
+
+
+# TODO: move to somewhere that makes sense
+def _decorate_block_embeddings(_vector_db: Pinecone, documents: List[Document]) -> None:
+    ids: List[str] = []
+    for document in documents:
+        ids.extend([consists.target.id for consists in document.consists])
+    
+    embeddings = _vector_db.fetch(ids)
+    block_vectors = {}
+    for id_, vector in embeddings.items():
+        block_vectors[id_] = vector.values
+    
+    for document in documents:
+        for consists in document.consists:
+            consists.target.embedding = block_vectors.get(consists.target.id, None)
+
+pcone = Pinecone(api_key='0ca39def-1df8-46fd-8c26-abdbe593623a', environment='us-east1-gcp')

@@ -18,7 +18,7 @@ class Block(ABC):
         raise NotImplementedError('get_as_dict not implemented')
     
     @staticmethod
-    def from_dict(block_dict: dict, label: str):
+    def from_dict(label: str, block_dict: dict):
         last_updated_timestamp = block_dict.get('last_updated_timestamp')
         if label == SummaryBlock._LABEL:
             return SummaryBlock(
@@ -94,15 +94,12 @@ class BlockStream:
         return [block.get_as_dict() for block in self.blocks]
     
     @staticmethod
-    def from_dict(block_dicts: List[dict], label: str):
+    def from_dict(label: str, block_dicts: List[dict]):
         blocks: List[Block] = []
         for block_dict in block_dicts:
-            blocks.append(Block.from_dict())
+            blocks.append(Block.from_dict(label, block_dict))
 
-        return BlockStream(
-            label,
-            blocks
-        )
+        return BlockStream(label, blocks)
 
 @dataclass
 class SummaryBlock(Block):

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, List, Literal, Set
 
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, Record
 
 
 @dataclass
@@ -66,8 +66,7 @@ class Document(Node):
     def to_neo4j_map(self):
         map = super().to_neo4j_map()
         map['integration'] = self.integration
-        map['blocks'] = [consist.target.to_neo4j_map()
-                         for consist in self.consists]
+        map['blocks'] = [consist.target.to_neo4j_map() for consist in self.consists]
         return map
 
 
@@ -313,14 +312,46 @@ class Neo4j:
                         owner=owner, timestamp=timestamp)
         return result
 
-    def get_by_filter(self, query_filter: QueryFilter) -> Any:
+    def get_by_filter(self, query_filter: QueryFilter) -> List[Document]:
         with self.driver.session(database='neo4j') as session:
             result = session.execute_read(self._get_by_filter, query_filter)
             return result
+        
+    @staticmethod
+    def _parse_record_documents(records: List[Record]) -> List[Document]:
+        documents: List[Document] = []
+        for record in records:
+            document_node = record.get('document')
+            document_id = document_node.get('id')
+            document_integration = document_node.get('integration')
+
+            consists_list = []
+            for block_node in record.get('blocks'):
+                block_id = block_node.get('id')
+                block_label = block_node.get('label')
+                block_content = block_node.get('content')
+                last_updated_timestamp = block_node.get('last_updated_timestamp')
+                block = Block(
+                    id=block_id,
+                    embedding=None,
+                    label=block_label,
+                    content=block_content,
+                    last_updated_timestamp=last_updated_timestamp
+                )
+                consists = Consists(block)
+                consists_list.append(consists)
+            
+            document = Document(
+                id=document_id,
+                integration=document_integration,
+                consists=consists_list
+            )
+            documents.append(document)
+        return documents
 
     # TODO: make more efficient by using params instead of injecting
     @staticmethod
-    def _get_by_filter(tx, query_filter: QueryFilter) -> List[Block]:
+    def _get_by_filter(tx, query_filter: QueryFilter) -> List[Document]:
         if not query_filter or not query_filter.owner:
             return None
 
@@ -386,7 +417,7 @@ class Neo4j:
             name_match = '(name:Name)-[:Mentioned]->'
             name_filter = query_filter.name_filter
             query_wheres.append('name.owner = $owner')
-            group_bys.append('COUNT(name.id)')
+            group_bys.append('COUNT(name.id) AS names_count')
             if name_filter.ids:
                 query_wheres.append(f'(name.id IN {list(name_filter.ids)})')
             if name_filter.names:
@@ -427,11 +458,11 @@ class Neo4j:
             f'MATCH {name_match}(document:Document)-[:Consists]->(block:Block) '
             f'WHERE {" AND ".join(query_wheres)} '
             f'{content_filter} '
-            f'RETURN document, COLLECT(block){additional_group_bys} '
+            f'RETURN document, COLLECT(block) AS blocks{additional_group_bys} '
             f'{order_by_query} '
             f'{limit_query} '
         )
-        print(query)
         result = tx.run(query, owner=query_filter.owner)
-        return list(result)
-    
+
+        records = list(result)
+        return Neo4j._parse_record_documents(records)

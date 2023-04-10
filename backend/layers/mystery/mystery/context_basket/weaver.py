@@ -26,8 +26,15 @@ class BasketWeaver:
             blocks = [edge.target for edge in document.consists]
             block_streams: List[BlockStream] = []
             for block in blocks:
-                block_stream = json.loads(block.content)
-            translated = Translator.translate_block_streams()
+                try:
+                    block_stream_dict: List[dict] = json.loads(block.content)
+                    block_stream = BlockStream.from_dict(block.label, block_stream_dict)
+                    block_streams.append(block_stream)
+                except Exception as e:
+                    print('failed to cast to a block stream!')
+                    print(block)
+                    print(e)
+            translated = Translator.translate_block_streams(block_streams)
             tokens = count_tokens(translated, request.encoding_name)
             contexts.append(Context(
                 source=source,
