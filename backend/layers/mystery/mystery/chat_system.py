@@ -82,7 +82,7 @@ class ChatSystem:
         baskets: List[ContextBasket] = []
         for update in self._retrieve_context(requests, baskets, overrides):
             yield '[THOUGHT]' + update
-        yield 'Synthesizing information...'
+        yield '[THOUGHT]Synthesizing information...'
         context = self._stringify_context(baskets)
         yield '[THOUGHT]Responding to message...'
         response = self._respond_with_context(
