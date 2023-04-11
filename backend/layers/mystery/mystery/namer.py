@@ -1,17 +1,41 @@
-from typing import List
+from typing import List, Set
 
 from external.openai_ import OpenAI
 from graph.blocks import (BlockStream, BodyBlock, CommentBlock, ContactBlock,
                           DealBlock, MemberBlock, SummaryBlock, TitleBlock)
-from graph.neo4j_ import Name
+from graph.neo4j_ import Mentioned, Name
 
 MAX_OPENAI_LEN = 2000
+
+names = ["Henry Pereira", "Morlong Associates", "Carissa", "Support", "Mitsue Tollner", "Printing Dimensions", "Donette Foller", "Truhlar And Truhlar Attys", "Sage Wieser", "Google", "The Fivetran Team", "Mimo Admin", "OpenAI", "Alex Laubscher", "Zendesk", "\" Amazon Web Services (AWS)\"" , "Chanay", "Josephine Darakjy", "Chapman", "Simon Morasca", "James Venere", "Chemel", "Commercial Press", "Leota Dilliard", "Snowflake", "Kris Marrier", "Leota Dilliard", "Mitsue Tollner", "Simon Morasca", "Donette Foller", "James Venere", "Josephine Darakjy", "John Butt", "Capla Paprocki", "Feltz Printing Service", "Kris Marrier", "King", "Zendesk", "Zendesk", "Mimo", "The Neo4j Team", "Alan at Retool", "Fivetran Notifications", "\" Alex Laubscher (Mimo)\"" , "Hailee Draughon", "Isaia Taotua", "Zoho CRM", "Atlassian", "Webflow University", "Ivan at Notion", "Sage Wieser"]
 
 class Namer:
     def __init__(self, openai: OpenAI):
         self._openai = openai
 
     def get_block_names(self, block_stream: BlockStream) -> set[Name]:
+        if not block_stream:
+            return []
+        
+        names: set[Name] = set()
+        if block_stream.label == CommentBlock._LABEL:
+            for block in block_stream.blocks:
+                names.add(Name(id=block.author.id, value=block.author.value))
+        elif block_stream.label == DealBlock._LABEL:
+            for block in block_stream.blocks:
+                names.add(Name(id=block.name.id, value=block.name.value))
+                names.add(Name(id=block.owner.id, value=block.owner.value))
+                names.add(Name(id=block.contact.id, value=block.contact.value))
+        elif block_stream.label == ContactBlock._LABEL:
+            for block in block_stream.blocks:
+                names.add(Name(id=block.name.id, value=block.name.value))
+                names.add(Name(id=block.created_by.id, value=block.created_by.value))
+        elif block_stream.label == MemberBlock._LABEL:
+            for block in block_stream.blocks:
+                names.add(Name(id=block.name.id, value=block.name.value))
+        return names
+    
+    def infer_names(self, block_stream: BlockStream) -> set[Name]:
         if not block_stream:
             return []
         
@@ -24,39 +48,14 @@ class Namer:
             names.extend(self._get_unstructured_names([block.text for block in block_stream.blocks]))
         elif block_stream.label == CommentBlock._LABEL:
             for block in block_stream.blocks:
-                author_name = Name(id=block.author.id, value=block.author.value)
-                names.append(author_name)
+                names.append(Name(id=block.author.id, value=block.author.value))
             names.extend(self._get_unstructured_names([block.text for block in block_stream.blocks]))
-        elif block_stream.label == DealBlock._LABEL:
-            for block in block_stream.blocks:
-                names.append(Name(id=block.name.id, value=block.name.value))
-                names.append(Name(id=block.owner.id, value=block.owner.value))
-                names.append(Name(id=block.contact.id, value=block.contact.value))
-        elif block_stream.label == ContactBlock._LABEL:
-            for block in block_stream.blocks:
-                names.append(Name(id=block.name.id, value=block.name.value))
-                names.append(Name(id=block.created_by.id, value=block.created_by.value))
-        elif block_stream.label == MemberBlock._LABEL:
-            for block in block_stream.blocks:
-                names.append(Name(id=block.name.id, value=block.name.value))
         return set(names)
     
-    def _get_unstructured_names(self, unstructured_texts: List[str]) -> set[Name]:
-        return []
-        # collector = []
-        # collector_len = 0
-        # names = set()
-        # for unstructured_text in unstructured_texts:
-        #     if not unstructured_text:
-        #         continue
-        #     if collector_len + len(unstructured_text) > MAX_OPENAI_LEN:
-        #         unstructured_names = self._openai.names('\n\n'.join(collector))
-        #         names.update(unstructured_names)
-        #         collector = []
-        #         collector_len = 0
-        #     collector.append(unstructured_text)
-        #     collector_len += len(unstructured_text)
-        # if len(collector) > 0:
-        #     unstructured_names = self._openai.names('\n\n'.join(collector))
-        #     names.update(unstructured_names)
-        # return names
+    def _get_unstructured_names(self, texts: List[str]) -> set[Name]:
+        names: Set[Name] = set()
+        for text in texts:
+            for name in names:
+                if name in text:
+                    names.add(Name(id=None, value=name))
+        return names

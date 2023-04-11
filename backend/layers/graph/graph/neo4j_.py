@@ -2,8 +2,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-import json
-from typing import Any, List, Literal, Set
+from typing import List, Literal, Set
 
 from neo4j import GraphDatabase, Record
 
@@ -233,6 +232,11 @@ class Neo4j:
             names_result = session.execute_write(
                 self._create_names, names, owner, timestamp=timestamp)
             return [document_result, names_result]
+        
+    def infer(self, names: List[Name], owner: str, timestamp: int):
+        with self.driver.session(database='neo4j') as session:
+            names_result = session.execute_write(self._infer_names, names, owner)
+            return [names_result]
 
     @staticmethod
     def _get_document_merge():
@@ -288,13 +292,12 @@ class Neo4j:
             f'{Neo4j._get_block_merge()} '
         )
 
-        result = tx.run(documents_query, documents=neo4j_documents,
-                        owner=owner, timestamp=timestamp)
+        result = tx.run(documents_query, documents=neo4j_documents, owner=owner, timestamp=timestamp)
         return result
 
     @staticmethod
-    def _create_names(tx, names: List[Name], owner: str, timestamp: int):
-        if not (names and len(names) > 0 and owner and timestamp):
+    def _create_names(tx, names: List[Name], owner: str, timestamp: int = None):
+        if not (names and len(names) > 0 and owner):
             return None
 
         neo4j_names = [name.to_neo4j_map() for name in names]
@@ -315,8 +318,26 @@ class Neo4j:
             'MERGE (n)-[:Mentioned]->(d) '
         )
 
-        result = tx.run(names_query, names=neo4j_names,
-                        owner=owner, timestamp=timestamp)
+        result = tx.run(names_query, names=neo4j_names, owner=owner)
+        return result
+    
+    @staticmethod
+    def _infer_names(tx, names: List[Name], owner: str):
+        if not (names and len(names) > 0 and owner):
+            return None
+        
+        neo4j_names = [name.to_neo4j_map() for name in names]
+        names_query = (
+            'UNWIND $names as name '
+            'MATCH (n: Name {value: name.value, owner: $owner}) '
+            'WITH name, n '
+            'UNWIND name.mentioned as mentioned '
+            'MATCH (d: Document {id: mentioned.id, integration: mentioned.integration, owner: $owner}) '
+            'WITH n, d '
+            'MERGE (n)-[:Mentioned]->(d) '
+        )
+
+        result = tx.run(names_query, names=neo4j_names, owner=owner)
         return result
 
     def get_by_filter(self, query_filter: QueryFilter) -> List[Document]:

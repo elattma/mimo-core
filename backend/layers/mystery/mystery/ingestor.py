@@ -121,11 +121,12 @@ class Ingestor:
                 integration=input.integration,
                 blocks=graph_blocks
             )
+            pinecone_response = self._pinecone_write(owner=input.owner, document=document)
+            neo4j_response = self._neo4j_write(owner=input.owner, documents=[document], names=names, timestamp=input.timestamp)
+
             name_mentioned = [Mentioned(document)]
             for name in names:
                 name.mentioned = name_mentioned
-            pinecone_response = self._pinecone_write(owner=input.owner, document=document)
-            neo4j_response = self._neo4j_write(owner=input.owner, documents=[document], names=names, timestamp=input.timestamp)
 
             print(pinecone_response)
             print(neo4j_response)
@@ -133,6 +134,40 @@ class Ingestor:
             print(e)
             succeeded = False
 
+        return IngestResponse(
+            succeeded=succeeded,
+            integration=input.integration,
+        )
+    
+    def infer_names(self, input: IngestInput) -> IngestResponse:
+        succeeded = True
+        try:
+            names = set()
+            for block_stream in input.block_streams:
+                block_stream_names = self._namer.get_block_names(block_stream)
+                if not block_stream_names:
+                    continue
+            
+                for name in block_stream_names:
+                    names.add(name)
+            names: List[Name] = list(names)
+
+            document = Document(
+                id=input.document_id,
+                integration=input.integration,
+                consists=None
+            )
+            name_mentioned = [Mentioned(document)]
+            for name in names:
+                name.mentioned = name_mentioned
+
+            response = self._neo4j.infer(names=names, owner=input.owner, timestamp=input.timestamp)
+            
+            print(response)
+        except Exception as e:
+            print(e)
+            succeeded = False
+        
         return IngestResponse(
             succeeded=succeeded,
             integration=input.integration,

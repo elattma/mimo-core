@@ -1,11 +1,3 @@
-import sys
-
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/aws')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/mystery')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/external')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/graph')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/fetcher')
-
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -140,6 +132,7 @@ def discover_fetch_ingest(
                 timestamp=ingestion_timestamp
             )
             ingest_response: IngestResponse = ingestor.ingest(ingest_input)
+            ingestor.infer_names(ingest_input)
             if not ingest_response.succeeded:
                 succeeded = False
                 continue
@@ -149,18 +142,3 @@ def discover_fetch_ingest(
             break
 
     return DfiResponse(integration=fetcher._INTEGRATION, succeeded=succeeded)
-
-
-event = {
-    "requestContext": {
-        "authorizer": {
-            "principalId": "google-oauth2|108573573074253667565"
-        }
-    },
-}
-
-os.environ['AWS_PROFILE'] = 'mimo'
-os.environ['STAGE'] = 'beta'
-os.environ['UPLOAD_ITEM_BUCKET'] = 'mimo-beta-upload-item'
-os.environ['GRAPH_DB_URI'] = 'neo4j+s://67eff9a1.databases.neo4j.io'
-handler(event, None)
