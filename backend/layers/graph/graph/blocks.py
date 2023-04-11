@@ -78,6 +78,24 @@ class Block(ABC):
                 amount=block_dict.get('amount'),
                 probability=block_dict.get('probability')
             )
+        elif label == ContactBlock._LABEL:
+            name_dict: dict = block_dict.get('name')
+            created_by_dict: dict = block_dict.get('created_by')
+            return ContactBlock(
+                last_updated_timestamp=last_updated_timestamp,
+                name=entity(
+                    id=name_dict.get('id'),
+                    value=name_dict.get('value')
+                ),
+                created_by=entity(
+                    id=created_by_dict.get('id'),
+                    value=created_by_dict.get('value')
+                ),
+                department=block_dict.get('department'),
+                title=block_dict.get('title'),
+                lead_source=block_dict.get('lead_source'),
+            )
+                
 
 
 class BlockStream:

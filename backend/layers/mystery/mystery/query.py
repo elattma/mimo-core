@@ -128,7 +128,7 @@ class PageParticipant:
         elif self.role == PageParticipantRole.RECIPIENT:
             return Relations.RECIPIENT
         elif self.role == PageParticipantRole.UNKNOWN:
-            return Relations.PARTICIPANT
+            raise NotImplementedError
 
 
 @ dataclass

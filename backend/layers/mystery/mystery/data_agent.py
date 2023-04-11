@@ -5,7 +5,7 @@ from math import sqrt
 from typing import Any, Dict, List, Set
 
 from external.openai_ import OpenAI
-from graph.blocks import Block, MemberBlock, entity
+from graph.blocks import MemberBlock, entity
 from graph.neo4j_ import (BlockFilter, ContentMatch, Document, DocumentFilter,
                           Limit, NameFilter, Neo4j, QueryFilter)
 from graph.pinecone_ import Filter as VectorFilter
@@ -16,7 +16,7 @@ from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
 from mystery.query import (AbsoluteTimeFilter, BlocksFilter, Concepts, Count,
-                           IntegrationsFilter, PageParticipants, Query,
+                           IntegrationsFilter, PageParticipantRole, PageParticipants, Query,
                            QueryComponent, RelativeTimeFilter, SearchMethod,
                            SearchMethodValue)
 from mystery.util import count_tokens
@@ -146,7 +146,6 @@ class DataAgent:
             default = True
         if default:
             documents.extend(self._relevant_context(query))
-
         # Weave basket from documents
         basket = BasketWeaver.weave_context_basket(query.request, documents)
         print('[DataAgent] Context generated!')
@@ -254,6 +253,8 @@ class DataAgent:
                 names = pp.neo4j_names
                 regex_matches = set()
                 for participant in pp.values:
+                    if participant.role == PageParticipantRole.UNKNOWN:
+                        continue
                     member_block = MemberBlock(
                         last_updated_timestamp=None,
                         name=entity(

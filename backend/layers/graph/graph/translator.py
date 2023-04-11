@@ -41,6 +41,7 @@ class Translator:
             return None
         translation = Translator._get_translation_start(integration)
         blocks = Translator._get_sorted_blocks(block_streams)
+
         if 'title' in blocks and blocks['title']:
             translation += Translator._translate_title_blocks(blocks['title'])
             translation += '\n'
