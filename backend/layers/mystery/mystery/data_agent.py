@@ -151,6 +151,7 @@ class DataAgent:
             default = True
         if default:
             documents.extend(self._relevant_context(query))
+
         # Weave basket from documents
         basket = BasketWeaver.weave_context_basket(query.request, documents)
         print('[DataAgent] Context generated!')
@@ -165,7 +166,7 @@ class DataAgent:
     def _relevant_context(self, query: Query) -> List[Document]:
         print('[DataAgent] Filling basket with relevant context...')
         matches = self._query_vector_db(query)
-        block_ids = matches.keys()
+        block_ids = set(matches.keys())
         results = self._query_graph_db(block_ids=block_ids)
         print('[DataAgent] Filled basket with relevant context!')
         return results
@@ -179,7 +180,8 @@ class DataAgent:
             'page participants...'
         ))
         matches = self._query_vector_db(query, k=100, threshold=0.70)
-        documents = self._query_graph_db(query, block_ids=set(matches.keys()))
+        block_ids = set(matches.keys())
+        documents = self._query_graph_db(query, block_ids=block_ids)
         print((
             '[DataAgent] Filled basket with relevant context filtered by '
             'page participants!'
@@ -211,7 +213,7 @@ class DataAgent:
     def _query_vector_db(
         self,
         query: Query,
-        k: int = 5,
+        k: int = 10,
         threshold: float = None
     ) -> Dict[str, float]:
         print('[DataAgent] Querying vector database...')

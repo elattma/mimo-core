@@ -73,18 +73,18 @@ class ChatSystem:
 
     def run(self, message: str, overrides: List[Override] = None) -> Generator[str, None, None]:
         print('[ChatSystem] Running...')
-        yield 'Interpreting message...'
+        yield '[THOUGHT]Interpreting message...'
         requests = self._generate_requests(message)
         if not requests:
             response = self._respond_without_context(message)
-            yield '' + response
+            yield response
             return
         baskets: List[ContextBasket] = []
         for update in self._retrieve_context(requests, baskets, overrides):
-            yield update
+            yield '[THOUGHT]' + update
         yield 'Synthesizing information...'
         context = self._stringify_context(baskets)
-        yield 'Responding to message...'
+        yield '[THOUGHT]Responding to message...'
         response = self._respond_with_context(
             message,
             context
