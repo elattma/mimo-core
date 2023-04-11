@@ -10,6 +10,7 @@ from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
 from mystery.chat_system import ChatSystem
+from mystery.override import PageOverride
 from ulid import ulid
 
 MODEL = "gpt-3.5-turbo"
@@ -43,6 +44,31 @@ def handler(event: dict, context):
     message: str = chat.get('message', None) if chat else None
     timestamp: int = chat.get('timestamp', None) if chat else None
 
+    items: list = body.get('items', None) if body else None
+
+    # items: {
+    #         type: JsonSchemaType.ARRAY,
+    #         items: {
+    #           type: JsonSchemaType.OBJECT,
+    #           properties: {
+    #             integration: {
+    #               type: JsonSchemaType.STRING,
+    #             },
+    #             params: {
+    #               type: JsonSchemaType.ARRAY,
+    #               items: {
+    #                 type: JsonSchemaType.OBJECT,
+    #                 properties: {
+    #                   id: {
+    #                     type: JsonSchemaType.STRING,
+    #                   },
+    #                 },
+    #               },
+    #             },
+    #           },
+    #         },
+    #       },
+
     if not (user and stage and appsync_endpoint and authorization and chat_id and message and timestamp):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
@@ -70,7 +96,19 @@ def handler(event: dict, context):
     output_role = Roles.ASSISTANT.value
     output_timestamp = int(time.time())
 
-    response = system.run(message)
+    overrides = None
+    if items:
+        overrides = []
+        for item in items:
+            integration: str = item.get('integration', None)
+            params: list = item.get('params', None)
+            for param in params:
+                id: str = param.get('id', None)
+                if id:
+                    override = PageOverride(integration, id)
+                    overrides.append(override)
+
+    response = system.run(message, overrides=overrides)
     answer = None
     for thought in response:
         print(thought)

@@ -1,10 +1,10 @@
+import re
 from abc import ABC, abstractstaticmethod
 from dataclasses import dataclass
 from enum import Enum
-import re
 from typing import Any, Dict, List, Set, Tuple, Type, Union
-from graph.blocks import Relations
 
+from graph.blocks import Relations
 from graph.neo4j_ import Limit, OrderBy, OrderDirection
 from mystery.context_basket.model import Request
 
@@ -352,6 +352,7 @@ class IntegrationsFilter(QueryComponent):
     '''Enforces that only results from these integrations are considered. e.g.
     'gmail', 'zendesk' '''
     integrations: List[Integration]
+    page_ids: List[str] = None
 
     @ staticmethod
     def from_llm_response(llm_response: List[str]) -> 'IntegrationsFilter':

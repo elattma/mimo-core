@@ -15,12 +15,12 @@ from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
+from mystery.override import Override
 from mystery.query import (AbsoluteTimeFilter, BlocksFilter, Concepts, Count,
-                           IntegrationsFilter, PageParticipantRole, PageParticipants, Query,
-                           QueryComponent, RelativeTimeFilter, SearchMethod,
-                           SearchMethodValue)
+                           IntegrationsFilter, PageParticipantRole,
+                           PageParticipants, Query, QueryComponent,
+                           RelativeTimeFilter, SearchMethod, SearchMethodValue)
 from mystery.util import count_tokens
-
 
 # ----------------------------------------------------------------------------
 # Constants
@@ -114,12 +114,17 @@ class DataAgent:
     def generate_context(
         self,
         request: str,
-        query: Query = None
+        query: Query = None,
+        overrides: List[Override] = None
     ) -> ContextBasket:
         print('[DataAgent] Generating context...')
         # Generate query
         if not query:
             query = self._generate_query(request)
+        # Apply overrides
+        if overrides:
+            for override in overrides:
+                override.apply_to_query(query)
         query.request = Request(
             encoding_name=self._llm.encoding_name,
             text=request,
@@ -248,6 +253,10 @@ class DataAgent:
             if IntegrationsFilter in query.components:
                 if_: IntegrationsFilter = query.components[IntegrationsFilter]
                 integrations = if_.neo4j_integrations
+                if if_.page_ids:
+                    if not page_ids:
+                        page_ids = set()
+                    page_ids = page_ids.union(set(if_.page_ids))
             if PageParticipants in query.components:
                 pp: PageParticipants = query.components[PageParticipants]
                 names = pp.neo4j_names

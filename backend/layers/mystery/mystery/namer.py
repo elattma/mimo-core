@@ -3,10 +3,11 @@ from typing import List, Set
 from external.openai_ import OpenAI
 from graph.blocks import (BlockStream, BodyBlock, CommentBlock, ContactBlock,
                           DealBlock, MemberBlock, SummaryBlock, TitleBlock)
-from graph.neo4j_ import Mentioned, Name
+from graph.neo4j_ import Name
 
 MAX_OPENAI_LEN = 2000
 
+# TODO: make this dynamic
 names = ["Henry Pereira", "Morlong Associates", "Carissa", "Support", "Mitsue Tollner", "Printing Dimensions", "Donette Foller", "Truhlar And Truhlar Attys", "Sage Wieser", "Google", "The Fivetran Team", "Mimo Admin", "OpenAI", "Alex Laubscher", "Zendesk", "\" Amazon Web Services (AWS)\"" , "Chanay", "Josephine Darakjy", "Chapman", "Simon Morasca", "James Venere", "Chemel", "Commercial Press", "Leota Dilliard", "Snowflake", "Kris Marrier", "Leota Dilliard", "Mitsue Tollner", "Simon Morasca", "Donette Foller", "James Venere", "Josephine Darakjy", "John Butt", "Capla Paprocki", "Feltz Printing Service", "Kris Marrier", "King", "Zendesk", "Zendesk", "Mimo", "The Neo4j Team", "Alan at Retool", "Fivetran Notifications", "\" Alex Laubscher (Mimo)\"" , "Hailee Draughon", "Isaia Taotua", "Zoho CRM", "Atlassian", "Webflow University", "Ivan at Notion", "Sage Wieser"]
 
 class Namer:

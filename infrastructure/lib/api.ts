@@ -660,7 +660,6 @@ export class ApiStack extends Stack {
       },
     });
 
-    // @mo TODO: add contextualized
     const chatRequestModel = this.api.addModel("ChatRequestModel", {
       contentType: "application/json",
       modelName: "ChatRequest",

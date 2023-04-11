@@ -8,6 +8,7 @@ from graph.pinecone_ import Pinecone
 from mystery.context_basket.model import ContextBasket
 from mystery.context_basket.weaver import BasketWeaver
 from mystery.data_agent import DataAgent
+from mystery.override import Override
 from mystery.util import count_tokens
 
 from .mrkl.open_ai import OpenAIChat
@@ -70,7 +71,7 @@ class ChatSystem:
             )
         print('[ChatSystem] Initialized!')
 
-    def run(self, message: str) -> Generator[str, None, None]:
+    def run(self, message: str, overrides: List[Override] = None) -> Generator[str, None, None]:
         print('[ChatSystem] Running...')
         yield 'Interpreting message...'
         requests = self._generate_requests(message)
@@ -79,7 +80,7 @@ class ChatSystem:
             yield '' + response
             return
         baskets: List[ContextBasket] = []
-        for update in self._retrieve_context(requests, baskets):
+        for update in self._retrieve_context(requests, baskets, overrides):
             yield update
         yield 'Synthesizing information...'
         context = self._stringify_context(baskets)
@@ -112,12 +113,13 @@ class ChatSystem:
     def _retrieve_context(
         self,
         requests: List[str],
-        baskets: List[ContextBasket]
+        baskets: List[ContextBasket],
+        overrides: List[Override] = None
     ) -> Generator[str, None, None]:
         print('[ChatSystem] Retrieving context...')
         for request in requests:
             yield f'Looking up: "{request}"'
-            basket = self._data_agent.generate_context(request)
+            basket = self._data_agent.generate_context(request, overrides)
             if basket:
                 baskets.append(basket)
         print('[ChatSystem] Context retrieved!')
