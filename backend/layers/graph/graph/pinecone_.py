@@ -8,6 +8,7 @@ import pinecone
 class RowType(Enum):
     BLOCK = 'block'
 
+
 @dataclass
 class Row:
     id: str
@@ -30,6 +31,7 @@ class Row:
             'document_id': self.document_id,
             'block_label': self.block_label,
         }
+
 
 @dataclass
 class Filter:
@@ -71,6 +73,7 @@ class Filter:
             }
         return filter
 
+
 class Pinecone:
     def __init__(self, api_key: str, environment: str, index_name: str = 'beta'):
         pinecone.init(api_key=api_key, environment=environment)
@@ -79,18 +82,18 @@ class Pinecone:
             self._index = pinecone.Index(index_name=index_name)
         else:
             pinecone.create_index(
-                name=index_name, 
-                dimension=1536, 
+                name=index_name,
+                dimension=1536,
                 metadata_config={
                     'indexed': ['owner', 'type', 'date_day', 'integration', 'document_id', 'block_label']
                 }
             )
             self._index = pinecone.Index(index_name=index_name)
-        
+
     def _delete_old_vectors(self, rows: List[Row]) -> bool:
         if not (self._index and rows and len(rows) > 0):
             return False
-        
+
         owners = set([row.owner for row in rows])
         document_ids = set([row.document_id for row in rows])
 
@@ -112,10 +115,11 @@ class Pinecone:
     def _batched_upsert(self, vectors: List[dict], batch_size: int = 100) -> bool:
         if not vectors or len(vectors) < 1:
             return False
-        
+
         len_vectors = len(vectors)
         for batch_index in range(0, len_vectors, batch_size):
-            upsert_response = self._index.upsert(vectors=vectors[batch_index:batch_index + batch_size])
+            upsert_response = self._index.upsert(
+                vectors=vectors[batch_index:batch_index + batch_size])
             print(upsert_response)
             if hasattr(upsert_response, 'upserted_count') and upsert_response.upserted_count >= min(len_vectors - batch_index, batch_size):
                 print(upsert_response.upserted_count)
@@ -139,11 +143,11 @@ class Pinecone:
                 'metadata': row.to_metadata_dict()
             })
             print(row.to_metadata_dict())
-        
+
         deleted = self._delete_old_vectors(rows)
         upserted = self._batched_upsert(vectors=vectors)
         return deleted and upserted
-    
+
     def query(self, embedding: List[float], query_filter: Filter, k: int = 5):
         if not (self._index and embedding and len(embedding) > 0):
             return None
@@ -157,10 +161,10 @@ class Pinecone:
         )
 
         return query_response.get('matches', None) if query_response else None
-    
+
     def fetch(self, ids: List[str]):
         if not (self._index and ids and len(ids) > 0):
             return None
-        
+
         fetch_response = self._index.fetch(ids=ids)
         return fetch_response.get('vectors', None) if fetch_response else None

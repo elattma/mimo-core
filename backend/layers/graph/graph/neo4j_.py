@@ -464,16 +464,25 @@ class Neo4j:
         additional_group_bys = ''
         if group_bys:
             additional_group_bys = ', ' + ', '.join(group_bys)
+        follow_up_group_by = ''
+        if len(group_bys) > 0:
+            follow_up_group_by += ', names_count'
+        if len(order_by) > 0:
+            follow_up_group_by += ', order_by'
         query = (
             f'MATCH {name_match}(document:Document)-[:Consists]->(block:Block) '
             f'WHERE {" AND ".join(query_wheres)} '
             f'{content_filter} '
-            f'WITH document, COLLECT(block) AS blocks{additional_group_bys}{order_by} '
+            f'WITH document, block{additional_group_bys}{order_by} '
+            f'WITH document, COLLECT(block) AS blocks{follow_up_group_by} '
             f'RETURN document, blocks '
             f'{order_by_query} '
             f'{limit_query} '
         )
+        print('[Neo4j]: Executing query...')
+        print(query)
         result = tx.run(query, owner=query_filter.owner)
+        print('[Neo4j]: Query executed!')
 
         records = list(result)
         return Neo4j._parse_record_documents(records)

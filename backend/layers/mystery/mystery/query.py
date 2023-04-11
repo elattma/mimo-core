@@ -52,6 +52,7 @@ class QueryComponent(ABC):
             'page_participants': PageParticipants,
             'time_frame': AbsoluteTimeFilter,
             'time_sort': RelativeTimeFilter,
+            'count': Count,
             'sources': IntegrationsFilter,
             'blocks': BlocksFilter,
             'search_method': SearchMethod,
@@ -69,6 +70,7 @@ class QueryComponent(ABC):
             PageParticipants,
             AbsoluteTimeFilter,
             RelativeTimeFilter,
+            Count,
             IntegrationsFilter,
             BlocksFilter,
             SearchMethod,
@@ -268,13 +270,12 @@ class AbsoluteTimeFilter(QueryComponent):
 @ dataclass
 class RelativeTimeFilter(QueryComponent):
     '''Enforces relative ordering of results based on time. e.g.
-    "most recent", "the five oldest"'''
+    "most recent", "oldest"'''
     ascending: bool
-    count: int
 
     @ staticmethod
     def from_llm_response(
-            llm_response: Dict[str, Union[bool, int]]
+        llm_response: Dict[str, bool]
     ) -> 'RelativeTimeFilter':
         # llm_response should be a dictionary with two keys: 'ascending' and
         # 'count'. The value of 'ascending' should be a boolean and the value
@@ -284,8 +285,7 @@ class RelativeTimeFilter(QueryComponent):
                   llm_response)
             return None
         ascending = llm_response['ascending']
-        count = llm_response['count']
-        return RelativeTimeFilter(ascending, count)
+        return RelativeTimeFilter(ascending)
 
     @ staticmethod
     def description_for_prompt() -> str:
@@ -295,8 +295,7 @@ class RelativeTimeFilter(QueryComponent):
     @ staticmethod
     def json_for_prompt() -> str:
         return (' "time_sort": {\n'
-                '  "ascending": boolean,\n'
-                '  "count": integer\n'
+                '  "ascending": boolean\n'
                 ' }')
 
     @ property
@@ -306,24 +305,39 @@ class RelativeTimeFilter(QueryComponent):
                      if self.ascending else OrderDirection.DESC)
         return OrderBy(direction, 'block', 'last_updated_timestamp')
 
-    @ property
-    def neo4j_limit(self) -> Limit:
-        '''Returns a Limit object for use in Neo4j.'''
-        return Limit(0, self.count)
-
     @ staticmethod
     def _validate_llm_response(
         llm_response: Dict[str, Union[bool, int]]
     ) -> bool:
-        if not (llm_response and 'ascending' in llm_response and
-                'count' in llm_response):
-            return False
-        ascending = llm_response['ascending']
-        count = llm_response['count']
-        if not (isinstance(ascending, bool) and isinstance(count, int)
-                and count > 0):
-            return False
-        return True
+        return (llm_response and 'ascending' in llm_response
+                and isinstance(llm_response['ascending'], bool))
+
+
+@dataclass
+class Count(QueryComponent):
+    '''Enforces a limit on the number of results that are returned.'''
+    value: int
+
+    @ staticmethod
+    def from_llm_response(llm_response: int) -> 'Count':
+        if not isinstance(llm_response, int) or llm_response < 1:
+            print('Failed to create Count from LLM response:', llm_response)
+            return None
+        return Count(llm_response)
+
+    @ staticmethod
+    def description_for_prompt() -> str:
+        return ('count: Include count if the Request is requesting a '
+                'specific number of results.')
+
+    @ staticmethod
+    def json_for_prompt() -> str:
+        return ' "count": integer'
+
+    @ property
+    def neo4j_limit(self) -> Limit:
+        '''Returns a Limit object for use in Neo4j.'''
+        return Limit(0, self.value)
 
 
 class Integration(Enum):

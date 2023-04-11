@@ -1,14 +1,13 @@
-from graph.blocks import Block, MemberBlock, Relations, entity
-from graph.pinecone_ import Pinecone
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from math import sqrt
 from typing import Any, Dict, List, Set
 
 from external.openai_ import OpenAI
-from graph.neo4j_ import (BlockFilter, ContentMatch, Document, DocumentFilter, Limit,
-                          NameFilter, Neo4j, QueryFilter)
+from graph.blocks import Block, MemberBlock, entity
+from graph.neo4j_ import (BlockFilter, ContentMatch, Document, DocumentFilter,
+                          Limit, NameFilter, Neo4j, QueryFilter)
 from graph.pinecone_ import Filter as VectorFilter
 from graph.pinecone_ import Pinecone, RowType
 from mystery.context_basket.model import ContextBasket, Request
@@ -16,11 +15,12 @@ from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
-from mystery.query import (AbsoluteTimeFilter, BlocksFilter, Concepts,
+from mystery.query import (AbsoluteTimeFilter, BlocksFilter, Concepts, Count,
                            IntegrationsFilter, PageParticipants, Query,
-                           QueryComponent, RelativeTimeFilter, ReturnType,
-                           ReturnTypeValue, SearchMethod, SearchMethodValue)
+                           QueryComponent, RelativeTimeFilter, SearchMethod,
+                           SearchMethodValue)
 from mystery.util import count_tokens
+
 
 # ----------------------------------------------------------------------------
 # Constants
@@ -62,8 +62,8 @@ Query: {{
  ],
  "time_sort": {{
   "ascending": false,
-  "count": 5
  }},
+ "count": 5,
  "integrations": ["email"],
  "blocks": ["title"],
  "search_method": "exact",
@@ -160,7 +160,8 @@ class DataAgent:
 
     def _relevant_context(self, query: Query) -> List[Document]:
         print('[DataAgent] Filling basket with relevant context...')
-        block_ids = self._query_vector_db(query)
+        matches = self._query_vector_db(query)
+        block_ids = matches.keys()
         results = self._query_graph_db(block_ids=block_ids)
         print('[DataAgent] Filled basket with relevant context!')
         return results
@@ -173,8 +174,8 @@ class DataAgent:
             '[DataAgent] Filling basket with relevant context filtered by '
             'page participants...'
         ))
-        block_ids = self._query_vector_db(query, k=1000, threshold=0.70)
-        documents = self._query_graph_db(query, block_ids=block_ids)
+        matches = self._query_vector_db(query, k=100, threshold=0.70)
+        documents = self._query_graph_db(query, block_ids=set(matches.keys()))
         print((
             '[DataAgent] Filled basket with relevant context filtered by '
             'page participants!'
@@ -208,7 +209,7 @@ class DataAgent:
         query: Query,
         k: int = 5,
         threshold: float = None
-    ) -> Set[str]:
+    ) -> Dict[str, float]:
         print('[DataAgent] Querying vector database...')
         vector_filter = self._make_vector_filter(query)
         embeddings = []
@@ -218,17 +219,18 @@ class DataAgent:
                 embeddings.append(self._openai.embed(concept))
         if not embeddings:
             embeddings = [query.request.embedding]
-        block_ids = []
+        matches = {}
         for embedding in embeddings:
             relevant_blocks = self._vector_db.query(
                 embedding,
                 vector_filter,
                 k=k
             )
-            block_ids.extend([block.id for block in relevant_blocks
-                              if not threshold or block.score <= threshold])
+            for block in relevant_blocks:
+                if not threshold or block.score >= threshold:
+                    matches[block.id] = block.score
         print('[DataAgent] Queried vector database!')
-        return set(block_ids)
+        return matches
 
     def _make_query_filter(
         self,
@@ -274,7 +276,9 @@ class DataAgent:
             if RelativeTimeFilter in query.components:
                 rtf: RelativeTimeFilter = query.components[RelativeTimeFilter]
                 order_by = rtf.neo4j_order_by
-                limit = rtf.neo4j_limit
+            if Count in query.components:
+                c: Count = query.components[Count]
+                limit = c.neo4j_limit
 
         document_filter = DocumentFilter(
             ids=page_ids if page_ids else None,
@@ -324,19 +328,6 @@ class DataAgent:
             block_label=block_labels
         )
         return vector_filter
-
-    def _get_blocks_from_results(
-        self,
-        results: List[Document]
-    ) -> List[Block]:
-        if not results:
-            return []
-        blocks = []
-        for document in results:
-            for consists in document.consists:
-                blocks.append(consists.target)
-        for page in results:
-            ...
 
     def _get_page_ids_from_results(self, results: List[Document]) -> Set[str]:
         page_ids = [document.id for document in results]

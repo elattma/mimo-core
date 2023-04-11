@@ -118,9 +118,9 @@ class ChatSystem:
         for request in requests:
             yield f'Looking up: "{request}"'
             basket = self._data_agent.generate_context(request)
-            baskets.append(basket)
+            if basket:
+                baskets.append(basket)
         print('[ChatSystem] Context retrieved!')
-        print(baskets)
         return
 
     def _stringify_context(
