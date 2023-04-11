@@ -12,10 +12,14 @@ import {
   useState,
 } from "react";
 
+const THOUGHT_PREFIX = "[THOUGHT]";
+
 type ChatHistoryType = Chat[];
+type ThoughtsType = string[];
 type ChatHistoryContextType = {
   chatHistory: ChatHistoryType;
   addToChatHistory: (chat: Chat) => void;
+  thoughts: ThoughtsType;
 };
 
 const AddedChat = gql(`
@@ -52,18 +56,19 @@ const ChatHistoryProvider = ({
   const [chatHistory, setChatHistory] = useState<ChatHistoryType>(
     initialChatHistory?.map((chat) => Chat.fromJSON(chat))
   );
+  const [thoughts, setThoughts] = useState<ThoughtsType>([]);
+
   const [client, setClient] = useState<ApolloClient<NormalizedCacheObject>>();
 
-  useEffect(() => {
-    if (userId && accessToken) {
-      const client = getSubscribeClient(accessToken);
-      setClient(client);
-    }
-  }, [userId, accessToken]);
+  const isThought = (s: string): boolean => s.startsWith(THOUGHT_PREFIX);
+
+  const extractThought = (s: string): string =>
+    s.substring(THOUGHT_PREFIX.length);
 
   const addToChatHistory = (chat: Chat) => {
     setChatHistory((prev) => [...prev, chat]);
     if (chat.role === Chat.Role.USER) {
+      setThoughts([]);
       client
         ?.subscribe({
           query: AddedChat,
@@ -75,39 +80,45 @@ const ChatHistoryProvider = ({
         .subscribe({
           next: (result) => {
             const updatedChat = result.data.updatedChat;
-            setChatHistory((prev) => {
-              const updatedChatIndex = prev.findIndex(
-                (chat) => chat.id === updatedChat.outputChatId
-              );
-              if (updatedChatIndex === -1) {
-                return [
-                  ...prev,
-                  Chat.fromJSON({
-                    message: updatedChat.message,
-                    author: "gpt-4",
-                    id: updatedChat.outputChatId,
-                    timestamp: updatedChat.timestamp,
-                    role: Chat.Role.ASSISTANT,
-                  }),
-                ];
-              }
-              const updatedChatHistory = [...prev];
-              updatedChatHistory[updatedChatIndex] = Chat.fromJSON({
-                message: updatedChat.message,
-                author: "gpt-4",
-                id: updatedChat.outputChatId,
-                timestamp: updatedChat.timestamp,
-                role: Chat.Role.ASSISTANT,
+            console.log(updatedChat);
+            if (isThought(updatedChat.message)) {
+              const thought = extractThought(updatedChat.message);
+              console.log("New thought:");
+              console.log(updatedChat.message);
+              setThoughts((prevThoughts) => [...prevThoughts, thought]);
+            } else {
+              setChatHistory((prevChatHistory) => {
+                const newChat = Chat.fromJSON({
+                  message: updatedChat.message,
+                  author: "gpt-4",
+                  id: updatedChat.outputChatId,
+                  timestamp: updatedChat.timestamp,
+                  role: Chat.Role.ASSISTANT,
+                });
+                return [...prevChatHistory, newChat];
               });
-              return updatedChatHistory;
-            });
+            }
           },
         });
     }
   };
 
+  useEffect(() => {
+    if (userId && accessToken) {
+      const client = getSubscribeClient(accessToken);
+      setClient(client);
+    }
+  }, [userId, accessToken]);
+
+  useEffect(() => {
+    console.log("Thoughts:");
+    console.log(thoughts);
+  }, [thoughts]);
+
   return (
-    <chatHistoryContext.Provider value={{ chatHistory, addToChatHistory }}>
+    <chatHistoryContext.Provider
+      value={{ chatHistory, addToChatHistory, thoughts }}
+    >
       {children}
     </chatHistoryContext.Provider>
   );
