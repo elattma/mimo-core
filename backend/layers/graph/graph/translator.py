@@ -157,32 +157,38 @@ class Translator:
             comments.append(
                 f'{comment_block.author} said:\n"{comment_block.text}"')
         comments = '\n'.join(comments)
-        return f'Comments:\n"{comments}"'
+        return f'Comments:\n{comments}'
 
     @staticmethod
     def _translate_deal_blocks(deal_blocks: List[DealBlock]):
         deals = []
         for deal_block in deal_blocks:
             deals.append((
-                f'{deal_block.owner.value} owns the deal named {deal_block.name.value}. '
-                f'Contact involved in the deal is named {deal_block.contact.value}. '
-                f'Deal is of type {deal_block.type} and is in stage {deal_block.stage}. '
-                f'Deal is expected to close on {deal_block.close_date} and is worth {deal_block.amount} '
-                f'with a {deal_block.probability}% probability of closing.'
+                f'\t{deal_block.name.value}:\n'
+                f'\t\tOwner: {deal_block.owner.value}\n'
+                f'\t\tPrimary contact: {deal_block.contact.value}\n'
+                f'\t\tType: {deal_block.type}\n'
+                f'\t\tStage: {deal_block.stage}\n'
+                f'\t\tClose date: {deal_block.close_date}\n'
+                f'\t\tAmount: {deal_block.amount}\n'
+                f'\t\tProbability of closing: {deal_block.probability}%'
             ))
         deals = '\n'.join(deals)
-        return f'Deals:\n"{deals}"'
+        return f'Deals:\n{deals}'
 
     @staticmethod
     def _translate_contact_blocks(contact_blocks: List[ContactBlock]):
         contacts = []
         for contact_block in contact_blocks:
             contacts.append((
-                f'{contact_block.name.value} is a {contact_block.title} who works in the department {contact_block.department}. '
-                f'Contact was created by {contact_block.created_by.value} and is a {contact_block.lead_source} lead.'
+                f'\t{contact_block.name.value}:\n'
+                f'\t\tTitle: {contact_block.title}\n'
+                f'\t\tDepartment: {contact_block.department}\n'
+                f'\t\tCreated by: {contact_block.created_by.value}\n'
+                f'\t\tLead source: {contact_block.lead_source}\n'
             ))
         contacts = '\n'.join(contacts)
-        return f'Contacts:\n"{contacts}"'
+        return f'Contacts:\n{contacts}'
 
     @staticmethod
     def _get_sorted_blocks(block_streams: List[BlockStream]):
