@@ -18,14 +18,14 @@ class Filter:
 
 @dataclass
 class Item:
+    integration: str
     id: str
     title: str
+    icon: str
     link: str
 
 @dataclass
 class DiscoveryResponse:
-    integration: str
-    icon: str
     items: List[Item]
     next_token: str
 

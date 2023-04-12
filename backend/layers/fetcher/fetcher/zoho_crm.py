@@ -65,13 +65,12 @@ class Zoho(Fetcher):
         org_id = orgs[0].get('domain_name', None) if orgs and len(orgs) > 0 else None
 
         return DiscoveryResponse(
-            integration=self._INTEGRATION, 
-            icon=self.get_icon(),
             items=[Item(
+                integration=self._INTEGRATION, 
                 id=account.get('id', None) if account else None,
                 title=account.get('Account_Name', None) if account else None,
+                icon=self.get_icon(),
                 link=f'https://crm.zoho.com/crm/{org_id}/tab/Accounts/{account["id"]}' if account and org_id else None,
-                preview=None
             ) for account in accounts] if accounts else [],
             next_token=(offset + limit) if accounts and len(accounts) > 0 else None
         )

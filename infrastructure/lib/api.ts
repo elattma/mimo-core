@@ -352,20 +352,23 @@ export class ApiStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
+          integration: {
+            type: JsonSchemaType.STRING,
+          },
           id: {
             type: JsonSchemaType.STRING,
           },
           title: {
             type: JsonSchemaType.STRING,
           },
+          icon: {
+            type: JsonSchemaType.STRING,
+          },
           link: {
             type: JsonSchemaType.STRING,
           },
-          preview: {
-            type: JsonSchemaType.STRING,
-          },
         },
-        required: ["id", "title", "link"],
+        required: ["integration", "id", "title", "icon", "link"],
       },
     });
 
@@ -373,25 +376,16 @@ export class ApiStack extends Stack {
       contentType: "application/json",
       modelName: "ItemResponse",
       schema: {
-        type: JsonSchemaType.ARRAY,
-        items: {
-          type: JsonSchemaType.OBJECT,
-          properties: {
-            integration: {
-              type: JsonSchemaType.STRING,
-            },
-            icon: {
-              type: JsonSchemaType.STRING,
-            },
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          items: {
+            type: JsonSchemaType.ARRAY,
             items: {
-              type: JsonSchemaType.ARRAY,
-              items: {
-                ref: getModelRef(this.api, itemModel),
-              },
+              ref: getModelRef(this.api, itemModel),
             },
-            next_token: {
-              type: JsonSchemaType.STRING,
-            },
+          },
+          next_token: {
+            type: JsonSchemaType.STRING,
           },
         },
       },

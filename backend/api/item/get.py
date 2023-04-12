@@ -4,12 +4,19 @@ from typing import List
 
 from aws.response import Errors, to_response_error, to_response_success
 from aws.secrets import Secrets
-from fetcher.base import Item
+from fetcher.base import DiscoveryResponse, Item
 from graph.blocks import BlockStream, TitleBlock
 from graph.neo4j_ import Document, Neo4j
 
 secrets: Secrets = None
 neo4j: Neo4j = None
+
+integration_to_link = {
+    'google_docs': 'https://docs.google.com/document/d/{id}',
+    'google_mail': 'https://mail.google.com/mail/u//#inbox/{id}',
+    'slack': 'https://slack.com/channels/{id}',
+    'notion': 'https://www.notion.so/{id}'
+}
 
 def handler(event: dict, context):
     global secrets, neo4j
@@ -27,17 +34,14 @@ def handler(event: dict, context):
     if not secrets:
         secrets = Secrets(stage)
 
-    print(graph_db_uri)
-    print(secrets.get("GRAPH_DB_KEY"))
-    print(secrets.get("GRAPH_DB_SECRET"))
     if not neo4j:
         neo4j = Neo4j(
             uri=graph_db_uri,
             user=secrets.get("GRAPH_DB_KEY"),
             password=secrets.get("GRAPH_DB_SECRET"),
         )
-    documents: List[Document] = neo4j.discover(user)
-    response_items: List[Item] = []
+    documents: List[Document] = neo4j.discover('google-oauth2|108573573074253667565')
+    items_list = []
     for document in documents:
         title = 'Untitled'
         if document.consists:
@@ -52,11 +56,20 @@ def handler(event: dict, context):
                 print('failed to cast title to a block stream!')
                 print(block)
                 print(e)
+
+        link = integration_to_link.get(document.integration, None)
+        link = link.format(id=document.id) if link else None
+        icon = f'assets.mimo.team/icons/{document.integration}.svg'
         item = Item(
+            integration=document.integration,
             id=document.id,
             title=title,
-            link=f'https://docs.google.com/document/d/{document.id}',
+            icon=icon,
+            link=link,
         )
-        response_items.append(item)
-            
-    return to_response_success([response_item.__dict__ for response_item in response_items])
+        items_list.append(item)
+
+    return to_response_success({
+        'items': [item.__dict__ for item in items_list],
+        'next_token': None,
+    })

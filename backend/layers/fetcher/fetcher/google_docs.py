@@ -55,16 +55,17 @@ class GoogleDocs(Fetcher):
         
         next_token = discovery_response.get('nextPageToken', None)
         files = discovery_response.get('files', None)
-        items = [Item(
-            id=file.get('id', None) if file else None,
-            title=file.get('name', None) if file else None,
-            link=f'https://docs.google.com/document/d/{file.get("id", None)}' if file else None,
-            preview=file.get('thumbnailLink', None)) if file else None
+        items = [
+            Item(
+                integration=self._INTEGRATION,
+                id=file.get('id', None) if file else None,
+                title=file.get('name', None) if file else None,
+                icon=self.get_icon(),
+                link=f'https://docs.google.com/document/d/{file.get("id", None)}' if file else None
+            ) if file else None 
         for file in files] if files else []
 
         return DiscoveryResponse(
-            integration=self._INTEGRATION, 
-            icon=self.get_icon(),
             items=items,
             next_token=next_token
         )

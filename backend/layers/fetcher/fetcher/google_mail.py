@@ -51,13 +51,12 @@ class GoogleMail(Fetcher):
         threads = discovery_response.get('threads', None) if discovery_response else None
 
         return DiscoveryResponse(
-            integration=self._INTEGRATION, 
-            icon=self.get_icon(),
             items=[Item(
+                integration=self._INTEGRATION,
                 id=thread.get('id', None) if thread else None,
                 title=thread.get('snippet', None) if thread else None,
+                icon=self.get_icon(),
                 link=f'https://mail.google.com/mail/u//#inbox/{thread["id"]}' if thread else None,
-                preview=None
             ) for thread in threads],
             next_token=next_token
         )

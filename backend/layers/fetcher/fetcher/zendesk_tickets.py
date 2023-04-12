@@ -41,13 +41,12 @@ class Zendesk(Fetcher):
         next_token = discovery_response.get('next_page', None) if discovery_response else None
 
         return DiscoveryResponse(
-            integration=self._INTEGRATION,
-            icon=self.get_icon(),
             items=[Item(
+                integration=self._INTEGRATION,
                 id=ticket.get('id', None) if ticket else None,
                 title=ticket.get('subject', None) if ticket else None,
+                icon=self.get_icon(),
                 link=f'https://mimo8561.zendesk.com/agent/tickets/{ticket["id"]}' if ticket else None,
-                preview=None
             ) for ticket in tickets],
             next_token=next_token
         )
