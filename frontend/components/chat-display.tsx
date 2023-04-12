@@ -54,11 +54,20 @@ export default function ChatDisplay() {
             return <UserChatItem chat={chat} key={index} />;
         })}
         {chatHistory.length > 0 &&
-        chatHistory[chatHistory.length - 1].role !== Chat.Role.ASSISTANT
-          ? thoughts.map((thought, index) => (
+        chatHistory[chatHistory.length - 1].role !== Chat.Role.ASSISTANT ? (
+          <>
+            {thoughts.map((thought, index) => (
               <AssistantThought thought={thought} key={`thought-${index}`} />
-            ))
-          : null}
+            ))}
+            <div className="w-fit min-w-0 max-w-full grow-0 self-start">
+              <div className="mr-theme-2 break-words rounded-t-theme rounded-br-theme border border-neutral-5 bg-neutral-bg p-theme-1/2">
+                <p className="whitespace-pre-wrap break-words text-sm text-brand-text-contrast">
+                  ...
+                </p>
+              </div>
+            </div>
+          </>
+        ) : null}
         <div ref={chatEndRef} />
       </div>
       {showArrow && (

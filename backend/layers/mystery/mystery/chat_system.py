@@ -84,7 +84,7 @@ class ChatSystem:
             yield '[THOUGHT]' + update
         yield '[THOUGHT]Synthesizing information...'
         context = self._stringify_context(baskets)
-        yield '[THOUGHT]Responding to message...'
+        yield '[THOUGHT]Generating response...'
         response = self._respond_with_context(
             message,
             context
