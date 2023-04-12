@@ -186,8 +186,6 @@ class TitleBlock(Block):
             'text': self.text
         }
 
-# TODO: change to 1 block for all comments, but they have a chunkify method
-
 
 @dataclass
 class CommentBlock(Block):

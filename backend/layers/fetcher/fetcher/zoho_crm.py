@@ -3,7 +3,8 @@ from typing import Generator, List
 from urllib.parse import quote
 
 import requests
-from graph.blocks import Block, CommentBlock, ContactBlock, DealBlock, entity
+from graph.blocks import (Block, CommentBlock, ContactBlock, DealBlock,
+                          TitleBlock, entity)
 
 from .base import DiscoveryResponse, Fetcher, Filter, Item
 
@@ -97,6 +98,15 @@ class Zoho(Fetcher):
             return
         
         account_name: str = account['Account_Name']
+        title_blocks: List[TitleBlock] = []
+        account_last_updated_timestamp = self._get_timestamp_from_format(account.get('Modified_Time', None))
+        title_blocks.append(TitleBlock(
+            last_updated_timestamp=account_last_updated_timestamp, 
+            text=account_name
+        ))
+        for title_stream in self._streamify_blocks(TitleBlock._LABEL, title_blocks):
+            yield title_stream
+
         quoted = account_name.replace('(', '\(').replace(')', '\)').replace(',', '\,')
         quoted_starts_with = quote(quoted.split(' ')[0]) if quoted else None
 

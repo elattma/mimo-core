@@ -122,12 +122,13 @@ class Ingestor:
                 integration=input.integration,
                 blocks=graph_blocks
             )
-            pinecone_response = self._pinecone_write(owner=input.owner, document=document)
-            neo4j_response = self._neo4j_write(owner=input.owner, documents=[document], names=names, timestamp=input.timestamp)
 
             name_mentioned = [Mentioned(document)]
             for name in names:
                 name.mentioned = name_mentioned
+                
+            pinecone_response = self._pinecone_write(owner=input.owner, document=document)
+            neo4j_response = self._neo4j_write(owner=input.owner, documents=[document], names=names, timestamp=input.timestamp)
 
             print(pinecone_response)
             print(neo4j_response)
