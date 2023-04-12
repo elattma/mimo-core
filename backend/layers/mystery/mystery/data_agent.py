@@ -86,6 +86,7 @@ Query: {{
 
 class DataAgent:
     _llm: OpenAIChat = None
+    _basket_weaver: BasketWeaver = None
 
     def __init__(
         self,
@@ -101,6 +102,8 @@ class DataAgent:
         self._openai: OpenAI = openai
         if not self._llm:
             self._llm = OpenAIChat(client=openai, model='gpt-4')
+        if not self._basket_weaver:
+            self._basket_weaver = BasketWeaver()
         block_descriptions = BlocksFilter.get_block_descriptions()
         json_schema = QueryComponent.get_json_schema()
         component_descriptions = QueryComponent.get_component_descriptions()
@@ -115,7 +118,8 @@ class DataAgent:
         self,
         request: str,
         query: Query = None,
-        overrides: List[Override] = None
+        overrides: List[Override] = None,
+        max_tokens: int = None
     ) -> ContextBasket:
         print('[DataAgent] Generating context...')
         # Generate query
@@ -153,7 +157,9 @@ class DataAgent:
             documents.extend(self._relevant_context(query))
 
         # Weave basket from documents
-        basket = BasketWeaver.weave_context_basket(query.request, documents)
+        basket = self._basket_weaver.weave_context_basket(query.request, documents)
+        if max_tokens:
+            self._basket_weaver.minify_context_basket(basket, max_tokens)
         print('[DataAgent] Context generated!')
         return basket
 

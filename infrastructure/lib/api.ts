@@ -102,7 +102,7 @@ export class ApiStack extends Stack {
       props.mimoTable,
       props.uploadItemBucket
     );
-    this.createQaLambda(props.stageId);
+    this.createDataLambda(props.stageId);
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -132,17 +132,17 @@ export class ApiStack extends Stack {
     return layer;
   };
 
-  createQaLambda = (stageId: string) => {
+  createDataLambda = (stageId: string) => {
     const auth0SecretName = `${stageId}/Mimo/Integrations/Auth0`;
     const auth0Secret = Secret.fromSecretNameV2(
       this,
-      "auth0-qa-secret",
+      "auth0-data-secret",
       auth0SecretName
     );
 
-    const qaHandler = this.getHandler({
-      route: "qa",
-      method: "get",
+    const dataHandler = this.getHandler({
+      route: "external",
+      method: "data",
       environment: {
         STAGE: stageId,
         GRAPH_DB_URI: NEO_4J_URI,
@@ -151,11 +151,11 @@ export class ApiStack extends Stack {
       timeout: Duration.minutes(10),
       layers: this.getLayersSubset(["aws", "external", "graph", "mystery"]),
     });
-    this.integrationsSecret.grantRead(qaHandler);
-    auth0Secret.grantRead(qaHandler);
+    this.integrationsSecret.grantRead(dataHandler);
+    auth0Secret.grantRead(dataHandler);
 
-    const qaUrl = new CfnUrl(this, "qa-url", {
-      targetFunctionArn: qaHandler.functionArn,
+    const dataUrl = new CfnUrl(this, "data-url", {
+      targetFunctionArn: dataHandler.functionArn,
       authType: FunctionUrlAuthType.NONE,
       cors: {
         allowHeaders: [
@@ -175,15 +175,15 @@ export class ApiStack extends Stack {
       type: "AWS::Lambda::Permission",
       properties: {
         Action: "lambda:InvokeFunctionUrl",
-        FunctionName: qaHandler.functionArn,
+        FunctionName: dataHandler.functionArn,
         Principal: "*",
         FunctionUrlAuthType: "NONE",
       },
     });
 
-    new CfnOutput(this, "api-qa-url", {
-      value: qaUrl.attrFunctionUrl,
-      exportName: "mimo-qa-url",
+    new CfnOutput(this, "api-data-url", {
+      value: dataUrl.attrFunctionUrl,
+      exportName: "mimo-data-url",
     });
   };
 

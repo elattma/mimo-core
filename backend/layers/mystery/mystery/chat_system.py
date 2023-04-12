@@ -6,7 +6,6 @@ from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
 from mystery.context_basket.model import ContextBasket
-from mystery.context_basket.weaver import BasketWeaver
 from mystery.data_agent import DataAgent
 from mystery.override import Override
 from mystery.util import count_tokens
@@ -83,7 +82,9 @@ class ChatSystem:
         for update in self._retrieve_context(requests, baskets, overrides):
             yield '[THOUGHT]' + update
         yield '[THOUGHT]Synthesizing information...'
-        context = self._stringify_context(baskets)
+        context = ''
+        for basket in baskets:
+            context += str(basket)
         yield '[THOUGHT]Generating response...'
         response = self._respond_with_context(
             message,
@@ -114,35 +115,22 @@ class ChatSystem:
         self,
         requests: List[str],
         baskets: List[ContextBasket],
-        overrides: List[Override] = None
+        overrides: List[Override] = None,
     ) -> Generator[str, None, None]:
+        max_tokens_per_request = MAX_TOKENS // len(baskets)
+
         print('[ChatSystem] Retrieving context...')
         for request in requests:
             yield f'Looking up: "{request}"'
-            basket = self._data_agent.generate_context(request, overrides)
+            basket = self._data_agent.generate_context(
+                request, 
+                overrides=overrides, 
+                max_tokens=max_tokens_per_request
+            )
             if basket:
                 baskets.append(basket)
         print('[ChatSystem] Context retrieved!')
         return
-
-    def _stringify_context(
-        self,
-        baskets: List[ContextBasket]
-    ) -> str:
-        print('[ChatSystem] Stringifying context...')
-        context = ''
-        for basket in baskets:
-            BasketWeaver.minify_context_basket(
-                context_basket=basket,
-                limit_tokens=MAX_TOKENS // len(baskets)
-            )
-            context += f'{basket.request.text}\n'
-            context += '--------\n'
-            context += '\n'.join([context.translated
-                                  for context in basket.contexts])
-        print('[ChatSystem] Stringified context!')
-        print(context)
-        return context
 
     def _respond_with_context(self, message: str, context: str) -> str:
         print('[ChatSystem] Producing response with information...')

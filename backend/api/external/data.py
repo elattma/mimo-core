@@ -6,14 +6,15 @@ from external.auth0_ import Auth0
 from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
-from mystery.qa_agent import Answer, QuestionAnswerAgent
+from mystery.context_basket.model import ContextBasket
+from mystery.data_agent import DataAgent
 
 secrets: Secrets = None
-qa_agent: QuestionAnswerAgent = None
+data_agent: DataAgent = None
 auth0: Auth0 = None
 
 def handler(event: dict, context):
-    global secrets, qa_agent, auth0
+    global secrets, data_agent, auth0
 
     if not auth0:
         auth0 = Auth0(os.environ['STAGE'])
@@ -31,7 +32,7 @@ def handler(event: dict, context):
 
     if not secrets:
         secrets = Secrets(stage)
-    if not qa_agent:
+    if not data_agent:
         pinecone = Pinecone(
             api_key=secrets.get('PINECONE_API_KEY'), environment='us-east1-gcp'
         )
@@ -41,15 +42,16 @@ def handler(event: dict, context):
             password=secrets.get('GRAPH_DB_SECRET'),
         )
         openai = OpenAI(api_key=secrets.get('OPENAI_API_KEY'))
-        qa_agent = QuestionAnswerAgent(
+        data_agent = DataAgent(
             owner=user,
             vector_db=pinecone,
             graph_db=neo4j, 
             openai=openai, 
         )
-    answer: Answer = qa_agent.debug_run(question)
+    context_basket: ContextBasket = data_agent.generate_context(question, max_tokens=2000)
+    answer = str(context_basket)
     
     return to_response_success({
-        'answer': answer.content,
-        'sources': answer.sources
+        'answer': answer,
+        'sources': [context.source for context in context_basket.contexts]
     })

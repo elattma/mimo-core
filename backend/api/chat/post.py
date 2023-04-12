@@ -46,29 +46,6 @@ def handler(event: dict, context):
 
     items: list = body.get('items', None) if body else None
 
-    # items: {
-    #         type: JsonSchemaType.ARRAY,
-    #         items: {
-    #           type: JsonSchemaType.OBJECT,
-    #           properties: {
-    #             integration: {
-    #               type: JsonSchemaType.STRING,
-    #             },
-    #             params: {
-    #               type: JsonSchemaType.ARRAY,
-    #               items: {
-    #                 type: JsonSchemaType.OBJECT,
-    #                 properties: {
-    #                   id: {
-    #                     type: JsonSchemaType.STRING,
-    #                   },
-    #                 },
-    #               },
-    #             },
-    #           },
-    #         },
-    #       },
-
     if not (user and stage and appsync_endpoint and authorization and chat_id and message and timestamp):
         return to_response_error(Errors.MISSING_PARAMS.value)
 

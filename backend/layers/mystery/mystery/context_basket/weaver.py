@@ -11,8 +11,10 @@ from .model import Context, ContextBasket, Request, Source
 
 
 class BasketWeaver:
-    @staticmethod
-    def weave_context_basket(request: Request, documents: List[Document]) -> ContextBasket:
+    def __init__(self):
+        pass
+
+    def weave_context_basket(self, request: Request, documents: List[Document]) -> ContextBasket:
         if not (request and documents):
             return None
 
@@ -49,8 +51,7 @@ class BasketWeaver:
             contexts=contexts
         )
 
-    @staticmethod
-    def minify_context_basket(context_basket: ContextBasket, limit_tokens: int) -> None:
+    def minify_context_basket(self, context_basket: ContextBasket, limit_tokens: int) -> None:
         if context_basket.tokens <= limit_tokens:
             return
 
