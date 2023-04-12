@@ -669,26 +669,10 @@ export class ApiStack extends Stack {
           chat: {
             ref: getModelRef(this.api, chatModel),
           },
-          items: {
+          item_ids: {
             type: JsonSchemaType.ARRAY,
             items: {
-              type: JsonSchemaType.OBJECT,
-              properties: {
-                integration: {
-                  type: JsonSchemaType.STRING,
-                },
-                params: {
-                  type: JsonSchemaType.ARRAY,
-                  items: {
-                    type: JsonSchemaType.OBJECT,
-                    properties: {
-                      id: {
-                        type: JsonSchemaType.STRING,
-                      },
-                    },
-                  },
-                },
-              },
+              type: JsonSchemaType.STRING,
             },
           },
         },

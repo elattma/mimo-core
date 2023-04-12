@@ -43,7 +43,7 @@ def handler(event: dict, context):
     message: str = chat.get('message', None) if chat else None
     timestamp: int = chat.get('timestamp', None) if chat else None
 
-    items: list = body.get('items', None) if body else None
+    item_ids: list = body.get('item_ids', None) if body else None
 
     if not (user and stage and appsync_endpoint and authorization and chat_id and message and timestamp):
         return to_response_error(Errors.MISSING_PARAMS.value)
@@ -73,13 +73,9 @@ def handler(event: dict, context):
     output_timestamp = int(time.time())
 
     page_ids = []
-    if items:
-        for item in items:
-            params: list = item.get('params', None)
-            for param in params:
-                id: str = param.get('id', None)
-                if id:
-                    page_ids.append(id)
+    if item_ids:
+        for item_id in item_ids:
+            page_ids.append(item_id)
 
     response = system.run(message, page_ids=page_ids if page_ids else None)
     answer = None
