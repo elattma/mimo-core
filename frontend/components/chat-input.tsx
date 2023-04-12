@@ -30,7 +30,7 @@ export default function ChatInput() {
     clientPost("/chat", {
       body: JSON.stringify({
         chat: chat.toJSON(),
-        items: [{ params: { id: selectedItem } }],
+        items: selectedItem ? [selectedItem.id] : null,
       }),
     });
     setMessage("");
