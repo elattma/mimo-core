@@ -38,10 +38,6 @@ def handler(event: dict, context):
                 'refresh_token': item.refresh_token,
                 'expiry_timestamp': item.expiry_timestamp
             }))
-    fetchers.append(Fetcher.create('upload', {
-        'bucket': upload_item_bucket,
-        'prefix': f'{user}/'
-    }))
 
     response_items: List[DiscoveryResponse] = []
     futures = None

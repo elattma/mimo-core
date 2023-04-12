@@ -1,12 +1,5 @@
-import sys
 from dataclasses import dataclass, field
 from typing import List
-
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/aws')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/mystery')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/external')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/graph')
-sys.path.append('/Users/mo/workplace/mimo/backend/layers/fetcher')
 
 from graph.neo4j_ import Block
 

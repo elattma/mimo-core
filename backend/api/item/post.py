@@ -1,12 +1,14 @@
 import json
 import os
 
-# from fetcher.base import Fetcher
-# from fetcher.upload_docs import Upload
+import boto3
 from aws.response import Errors, to_response_error, to_response_success
 
+s3 = None
 
 def handler(event: dict, context):
+    global s3
+
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
@@ -20,17 +22,19 @@ def handler(event: dict, context):
     if not (user and stage and upload_item_bucket and body and content_type and name):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
-    # upload: Upload = Fetcher.create('upload', {
-    #     'bucket': upload_item_bucket,
-    #     'prefix': user
-    # })
-    # signed_url = upload.generate_presigned_url(content_type=content_type, name=name)
+    if not s3:
+        s3 = boto3.client('s3')
+    signed_url = s3.generate_presigned_url(
+        ClientMethod='put_object', 
+        Params={
+            'Bucket': upload_item_bucket,
+            'Key': f'demo/{name}',
+            'ContentType': content_type
+        },
+    )
+    if not signed_url:
+        return to_response_error(Errors.S3_ERROR.value)
 
-    # if not signed_url:
-    #     return to_response_error(Errors.S3_ERROR.value)
-
-    # return to_response_success({
-    #     'signedUrl': signed_url
-    # })
-
-    return to_response_success()
+    return to_response_success({
+        'signedUrl': signed_url
+    })

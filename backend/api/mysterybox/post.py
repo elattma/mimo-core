@@ -13,7 +13,8 @@ from fetcher.base import DiscoveryResponse, Fetcher, Filter
 from graph.blocks import BlockStream
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
-from mystery.ingestor import IngestInput, Ingestor, IngestResponse
+
+from .ingestor import IngestInput, Ingestor, IngestResponse
 
 db: ParentChildDB = None
 secrets: Secrets = None
@@ -47,15 +48,13 @@ def handler(event: dict, context):
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
             integration = item.get_raw_child()
-            if integration == 'zendesk':
-                continue
             fetchers.append(Fetcher.create(integration, {
                 'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
                 'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
                 'access_token': item.access_token,
                 'refresh_token': item.refresh_token,
                 'expiry_timestamp': item.expiry_timestamp
-            }, last_fetch_timestamp=item.last_fetch_timestamp))
+            }))
 
     openai = OpenAI(api_key=secrets.get("OPENAI_API_KEY"))
     neo4j = Neo4j(
@@ -75,7 +74,7 @@ def handler(event: dict, context):
         return to_response_success({})
     with ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
         futures = [
-            executor.submit(discover_fetch_ingest, user, fetcher, ingestor, timestamp)
+            executor.submit(discover_fetch_ingest, user, fetcher, ingestor)
             for fetcher in fetchers
         ]
     if futures:
@@ -103,9 +102,7 @@ class DfiResponse:
     integration: str
     succeeded: bool
 
-def discover_fetch_ingest(
-    user: str, fetcher: Fetcher, ingestor: Ingestor, timestamp: int
-) -> DfiResponse:
+def discover_fetch_ingest(user: str, fetcher: Fetcher, ingestor: Ingestor) -> DfiResponse:
     max_items = 2000 # TODO: remove once ready
     next_token: str = None
     succeeded: bool = True

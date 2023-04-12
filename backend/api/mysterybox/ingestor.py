@@ -7,8 +7,9 @@ from graph.blocks import BlockStream, SummaryBlock
 from graph.neo4j_ import Block, Consists, Document, Mentioned, Name, Neo4j
 from graph.pinecone_ import Pinecone, Row, RowType
 from graph.translator import Translator
-from mystery.namer import Namer
 from ulid import ulid
+
+from .namer import Namer
 
 
 @dataclass
