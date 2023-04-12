@@ -1,56 +1,62 @@
+import json
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
-from aws.dynamo import KeyNamespaces, ParentChildDB, UserIntegrationItem
 from aws.response import Errors, to_response_error, to_response_success
 from aws.secrets import Secrets
-from fetcher.base import DiscoveryResponse, Fetcher
+from fetcher.base import Item
+from graph.blocks import BlockStream, TitleBlock
+from graph.neo4j_ import Document, Neo4j
 
-db: ParentChildDB = None
 secrets: Secrets = None
+neo4j: Neo4j = None
 
 def handler(event: dict, context):
-    global db, secrets
+    global secrets, neo4j
 
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
     stage: str = os.environ['STAGE']
     upload_item_bucket: str = os.environ['UPLOAD_ITEM_BUCKET']
+    graph_db_uri: str = os.environ["GRAPH_DB_URI"]
 
     if not (user and stage and upload_item_bucket):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
-    if not db:
-        db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
     if not secrets:
         secrets = Secrets(stage)
 
-    user_integration_items: List[UserIntegrationItem] = db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
-    fetchers: List[Fetcher] = []
-    if user_integration_items and len(user_integration_items) > 0:
-        for item in user_integration_items:
-            fetchers.append(Fetcher.create(item.get_raw_child(), {
-                'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
-                'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
-                'access_token': item.access_token,
-                'refresh_token': item.refresh_token,
-                'expiry_timestamp': item.expiry_timestamp
-            }))
-
-    response_items: List[DiscoveryResponse] = []
-    futures = None
-    with ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
-        futures = []
-        for fetcher in fetchers:
-            if fetcher:
-                futures.append(executor.submit(fetcher.discover))
-
-    if futures:
-        for future in as_completed(futures):
-            response_item = future.result()
-            if response_item:
-                response_items.append(response_item)
-
+    print(graph_db_uri)
+    print(secrets.get("GRAPH_DB_KEY"))
+    print(secrets.get("GRAPH_DB_SECRET"))
+    if not neo4j:
+        neo4j = Neo4j(
+            uri=graph_db_uri,
+            user=secrets.get("GRAPH_DB_KEY"),
+            password=secrets.get("GRAPH_DB_SECRET"),
+        )
+    documents: List[Document] = neo4j.discover(user)
+    response_items: List[Item] = []
+    for document in documents:
+        title = 'Untitled'
+        if document.consists:
+            try:
+                block = document.consists[0].target
+                title_dict = json.loads(block.content)
+                title_stream = BlockStream.from_dict(block.label, title_dict)
+                if title_stream.blocks:
+                    title_block: TitleBlock = title_stream.blocks[0]
+                    title = title_block.text
+            except Exception as e:
+                print('failed to cast title to a block stream!')
+                print(block)
+                print(e)
+        item = Item(
+            id=document.id,
+            title=title,
+            link=f'https://docs.google.com/document/d/{document.id}',
+        )
+        response_items.append(item)
+            
     return to_response_success([response_item.__dict__ for response_item in response_items])

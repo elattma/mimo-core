@@ -21,7 +21,6 @@ class Item:
     id: str
     title: str
     link: str
-    preview: str
 
 @dataclass
 class DiscoveryResponse:

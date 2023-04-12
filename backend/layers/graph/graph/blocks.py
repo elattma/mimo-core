@@ -97,7 +97,6 @@ class Block(ABC):
             )
                 
 
-
 class BlockStream:
     label: str
     blocks: List[Block]

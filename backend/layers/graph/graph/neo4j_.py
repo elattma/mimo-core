@@ -344,6 +344,11 @@ class Neo4j:
         with self.driver.session(database='neo4j') as session:
             result = session.execute_read(self._get_by_filter, query_filter)
             return result
+        
+    def discover(self, owner: str) -> List[Document]:
+        with self.driver.session(database='neo4j') as session:
+            result = session.execute_read(self._discover, owner)
+            return result
 
     @staticmethod
     def _parse_record_documents(records: List[Record]) -> List[Document]:
@@ -354,7 +359,7 @@ class Neo4j:
             document_integration = document_node.get('integration')
 
             consists_list = []
-            for block_node in record.get('blocks'):
+            for block_node in record.get('blocks', []):
                 block_id = block_node.get('id')
                 block_label = block_node.get('label')
                 block_content = block_node.get('content')
@@ -506,4 +511,22 @@ class Neo4j:
         print('[Neo4j]: Query executed!')
 
         records = list(result)
+        return Neo4j._parse_record_documents(records)
+    
+    @staticmethod
+    def _discover(tx, owner: str) -> List[Document]:
+        query = (
+            'MATCH (document:Document) '
+            'WHERE document.owner = $owner '
+            'WITH document '
+            'OPTIONAL MATCH (document)-[:Consists]-(block:Block) '
+            'WHERE block.owner = $owner AND block.label = "title" '
+            'RETURN document, collect(block) as blocks '
+            'LIMIT 50'
+        )
+        print(query)
+        print(owner)
+        result = tx.run(query, owner=owner)
+        records = list(result)
+
         return Neo4j._parse_record_documents(records)
