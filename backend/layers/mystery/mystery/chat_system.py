@@ -117,7 +117,7 @@ class ChatSystem:
         baskets: List[ContextBasket],
         overrides: List[Override] = None,
     ) -> Generator[str, None, None]:
-        max_tokens_per_request = MAX_TOKENS // len(baskets)
+        max_tokens_per_request = MAX_TOKENS // len(requests)
 
         print('[ChatSystem] Retrieving context...')
         for request in requests:
