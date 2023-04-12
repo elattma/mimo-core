@@ -336,6 +336,7 @@ export class ApiStack extends Stack {
       environment: {
         STAGE: stageId,
         UPLOAD_ITEM_BUCKET: uploadItemBucket.bucketName,
+        GRAPH_DB_URI: NEO_4J_URI,
       },
       memorySize: 2048,
       timeout: Duration.seconds(30),
