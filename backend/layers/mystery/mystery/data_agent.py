@@ -15,11 +15,10 @@ from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
-from mystery.override import Override
 from mystery.query import (AbsoluteTimeFilter, BlocksFilter, Concepts, Count,
-                           IntegrationsFilter, PageParticipantRole,
+                           IntegrationsFilter, PageIds, PageParticipantRole,
                            PageParticipants, Query, QueryComponent,
-                           RelativeTimeFilter, SearchMethod, SearchMethodValue)
+                           RelativeTimeFilter, ReturnType, ReturnTypeValue, SearchMethod, SearchMethodValue)
 from mystery.util import count_tokens
 
 # ----------------------------------------------------------------------------
@@ -118,17 +117,23 @@ class DataAgent:
         self,
         request: str,
         query: Query = None,
-        overrides: List[Override] = None,
+        page_ids: List[str] = None,
         max_tokens: int = None
     ) -> ContextBasket:
         print('[DataAgent] Generating context...')
         # Generate query
+        if page_ids:
+            query = Query(
+                components={
+                    SearchMethod: SearchMethod(
+                        value=SearchMethodValue.RELEVANT
+                    ),
+                    ReturnType: ReturnType(value=ReturnTypeValue.BLOCKS),
+                    PageIds: PageIds(values=set(page_ids))
+                }
+            )
         if not query:
             query = self._generate_query(request)
-        # Apply overrides
-        if overrides:
-            for override in overrides:
-                override.apply_to_query(query)
         query.request = Request(
             encoding_name=self._llm.encoding_name,
             text=request,
@@ -157,7 +162,10 @@ class DataAgent:
             documents.extend(self._relevant_context(query))
 
         # Weave basket from documents
-        basket = self._basket_weaver.weave_context_basket(query.request, documents)
+        basket = self._basket_weaver.weave_context_basket(
+            query.request,
+            documents
+        )
         if max_tokens:
             self._basket_weaver.minify_context_basket(basket, max_tokens)
         print('[DataAgent] Context generated!')
@@ -261,10 +269,6 @@ class DataAgent:
             if IntegrationsFilter in query.components:
                 if_: IntegrationsFilter = query.components[IntegrationsFilter]
                 integrations = if_.neo4j_integrations
-                if if_.page_ids:
-                    if not page_ids:
-                        page_ids = set()
-                    page_ids = page_ids.union(set(if_.page_ids))
             if PageParticipants in query.components:
                 pp: PageParticipants = query.components[PageParticipants]
                 names = pp.neo4j_names
@@ -297,6 +301,10 @@ class DataAgent:
             if Count in query.components:
                 c: Count = query.components[Count]
                 limit = c.neo4j_limit
+            if PageIds in query.components:
+                pi: PageIds = query.components[PageIds]
+                page_ids = (page_ids.union(pi.values)
+                            if page_ids else set(pi.values))
 
         document_filter = DocumentFilter(
             ids=page_ids if page_ids else None,
@@ -326,6 +334,7 @@ class DataAgent:
         min_date_day = None
         max_date_day = None
         block_labels = None
+        document_id = None
         if IntegrationsFilter in query.components:
             if_: IntegrationsFilter = query.components[IntegrationsFilter]
             integrations = if_.pinecone_integrations
@@ -336,6 +345,9 @@ class DataAgent:
         if BlocksFilter in query.components:
             bf: BlocksFilter = query.components[BlocksFilter]
             block_labels = bf.pinecone_labels
+        if PageIds in query.components:
+            pi: PageIds = query.components[PageIds]
+            document_id = pi.values
 
         vector_filter = VectorFilter(
             owner=self._owner,
@@ -343,7 +355,8 @@ class DataAgent:
             min_date_day=min_date_day,
             max_date_day=max_date_day,
             integration=integrations,
-            block_label=block_labels
+            block_label=block_labels,
+            document_id=document_id
         )
         return vector_filter
 
@@ -364,7 +377,6 @@ class DataAgent:
         prompt = ChatPrompt([system_message, user_message])
         llm_response = self._llm.predict(prompt)
         query = _query_from_llm_response(llm_response)
-        query.request = request
         print('[DataAgent] Generated query!')
         print(query)
         return query

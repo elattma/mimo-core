@@ -1,13 +1,12 @@
 import json
 import re
-from typing import Dict, Generator, List
+from typing import Generator, List
 
 from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
 from mystery.context_basket.model import ContextBasket
 from mystery.data_agent import DataAgent
-from mystery.override import Override
 from mystery.util import count_tokens
 
 from .mrkl.open_ai import OpenAIChat
@@ -70,7 +69,11 @@ class ChatSystem:
             )
         print('[ChatSystem] Initialized!')
 
-    def run(self, message: str, overrides: List[Override] = None) -> Generator[str, None, None]:
+    def run(
+        self,
+        message: str,
+        page_ids: List[str] = None
+    ) -> Generator[str, None, None]:
         print('[ChatSystem] Running...')
         yield '[THOUGHT]Interpreting message...'
         requests = self._generate_requests(message)
@@ -79,7 +82,11 @@ class ChatSystem:
             yield response
             return
         baskets: List[ContextBasket] = []
-        for update in self._retrieve_context(requests, baskets, overrides):
+        for update in self._retrieve_context(
+            requests, 
+            baskets, 
+            page_ids=page_ids
+        ):
             yield '[THOUGHT]' + update
         yield '[THOUGHT]Synthesizing information...'
         context = ''
@@ -115,7 +122,7 @@ class ChatSystem:
         self,
         requests: List[str],
         baskets: List[ContextBasket],
-        overrides: List[Override] = None,
+        page_ids: List[str] = None,
     ) -> Generator[str, None, None]:
         max_tokens_per_request = MAX_TOKENS // len(requests)
 
@@ -124,7 +131,7 @@ class ChatSystem:
             yield f'Looking up: "{request}"'
             basket = self._data_agent.generate_context(
                 request, 
-                overrides=overrides, 
+                page_ids=page_ids,
                 max_tokens=max_tokens_per_request
             )
             if basket:
@@ -133,11 +140,13 @@ class ChatSystem:
         return
 
     def _respond_with_context(self, message: str, context: str) -> str:
-        print('[ChatSystem] Producing response with information...')
+        print('[ChatSystem] Producing response with context...')
+        print(context)
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
         context_size = count_tokens(context, self._chat_gpt.encoding_name)
         if message_size + context_size > MAX_TOKENS:
-            response = 'I received too many tokens to produce a proper response.'
+            response = ('I received too many tokens to produce a proper '
+                        'response.')
         else:
             system_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.SYSTEM.value,
@@ -151,14 +160,15 @@ class ChatSystem:
             )
             prompt = ChatPrompt([system_message, user_message])
             response = self._chat_gpt.predict(prompt)
-        print('[ChatSystem] Produced response with information!')
+        print('[ChatSystem] Produced response with context!')
         return response
 
     def _respond_without_context(self, message: str) -> str:
         print('[ChatSystem] Producing response without information...')
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
         if message_size > MAX_TOKENS:
-            response = 'I received too many tokens to produce a proper response.'
+            response = ('I received too many tokens to produce a proper '
+                        'response.')
         else:
             system_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.SYSTEM.value,

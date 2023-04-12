@@ -46,7 +46,7 @@ class ContextBasket:
         return iter(self.contexts)
 
     def __str__(self):
-        stringified = f'Context relevant to "{self.request.text}" is:\n'
-        stringified += '--------\n'
+        stringified = self.request.text
+        stringified += '\n--------\n'
         stringified += '\n'.join([context.translated for context in self.contexts])
         return stringified

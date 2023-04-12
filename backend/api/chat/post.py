@@ -10,7 +10,6 @@ from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
 from mystery.chat_system import ChatSystem
-from mystery.override import PageOverride
 from ulid import ulid
 
 MODEL = "gpt-3.5-turbo"
@@ -73,19 +72,16 @@ def handler(event: dict, context):
     output_role = Roles.ASSISTANT.value
     output_timestamp = int(time.time())
 
-    overrides = None
+    page_ids = []
     if items:
-        overrides = []
         for item in items:
-            integration: str = item.get('integration', None)
             params: list = item.get('params', None)
             for param in params:
                 id: str = param.get('id', None)
                 if id:
-                    override = PageOverride(integration, id)
-                    overrides.append(override)
+                    page_ids.append(id)
 
-    response = system.run(message, overrides=overrides)
+    response = system.run(message, page_ids=page_ids if page_ids else None)
     answer = None
     for thought in response:
         print(thought)

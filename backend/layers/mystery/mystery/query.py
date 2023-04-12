@@ -383,6 +383,7 @@ class IntegrationsFilter(QueryComponent):
     @ property
     def neo4j_integrations(self) -> Set[str]:
         '''Returns a list of integration names for use in Neo4j.'''
+        print(self.integrations)
         return set([self._get_integration_name_from_category(integration)
                     for integration in self.integrations])
 
@@ -393,6 +394,7 @@ class IntegrationsFilter(QueryComponent):
                     for integration in self.integrations])
 
     def _get_integration_name_from_category(self, category: str) -> str:
+        print(category)
         if category == Integration.CRM:
             return 'zoho'
         elif category == Integration.CUSTOMER_SUPPORT:
@@ -509,7 +511,7 @@ class ReturnTypeValue(Enum):
 
 @ dataclass
 class ReturnType(QueryComponent):
-    value: str
+    value: ReturnTypeValue
 
     @ staticmethod
     def from_llm_response(llm_response: str) -> 'ReturnType':
@@ -534,6 +536,23 @@ class ReturnType(QueryComponent):
     @ staticmethod
     def json_for_prompt() -> str:
         return ' "return_type": "pages" OR "blocks"'
+    
+
+@ dataclass
+class PageIds(QueryComponent):
+    values: Set[str]
+
+    @ staticmethod
+    def from_llm_response() -> 'PageIds':
+        raise NotImplementedError
+    
+    @ staticmethod
+    def description_for_prompt() -> str:
+        raise NotImplementedError
+    
+    @ staticmethod
+    def json_for_prompt() -> str:
+        raise NotImplementedError
 
 
 @ dataclass
