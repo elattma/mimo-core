@@ -139,6 +139,7 @@ class DataAgent:
             text=request,
             embedding=self._openai.embed(request)
         )
+        print(query)
 
         # Use query to fetch documents
         documents = []
@@ -169,6 +170,7 @@ class DataAgent:
         if max_tokens:
             self._basket_weaver.minify_context_basket(basket, max_tokens)
         print('[DataAgent] Context generated!')
+        print(basket)
         return basket
 
     def _exact_context(self, query: Query) -> List[Document]:
@@ -195,12 +197,12 @@ class DataAgent:
         ))
         matches = self._query_vector_db(query, k=100, threshold=0.70)
         block_ids = set(matches.keys())
-        documents = self._query_graph_db(query, block_ids=block_ids)
+        results = self._query_graph_db(query, block_ids=block_ids)
         print((
             '[DataAgent] Filled basket with relevant context filtered by '
             'page participants!'
         ))
-        return documents
+        return results
 
     def _query_graph_db(
         self,
@@ -227,7 +229,7 @@ class DataAgent:
     def _query_vector_db(
         self,
         query: Query,
-        k: int = 10,
+        k: int = 6,
         threshold: float = None
     ) -> Dict[str, float]:
         print('[DataAgent] Querying vector database...')
@@ -378,7 +380,6 @@ class DataAgent:
         llm_response = self._llm.predict(prompt)
         query = _query_from_llm_response(llm_response)
         print('[DataAgent] Generated query!')
-        print(query)
         return query
 
     def _generate_prompt(

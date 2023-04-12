@@ -75,10 +75,16 @@ class ChatSystem:
         page_ids: List[str] = None
     ) -> Generator[str, None, None]:
         print('[ChatSystem] Running...')
-        yield '[THOUGHT]Interpreting message...'
+        yield '[THOUGHT]Determining if I need more information...'
         requests = self._generate_requests(message)
         if not requests:
+            yield '[THOUGHT]I don\'t need more information. Thinking about my response...'
             response = self._respond_without_context(message)
+            yield response
+            return
+        if len(requests) > 4:
+            response = ('Your message requires more information than I can '
+                        'handle. Please try to be more specific.')
             yield response
             return
         baskets: List[ContextBasket] = []
@@ -88,11 +94,10 @@ class ChatSystem:
             page_ids=page_ids
         ):
             yield '[THOUGHT]' + update
-        yield '[THOUGHT]Synthesizing information...'
+        yield '[THOUGHT]Synthesizing information and thinking about my response...'
         context = ''
         for basket in baskets:
             context += str(basket)
-        yield '[THOUGHT]Generating response...'
         response = self._respond_with_context(
             message,
             context
@@ -128,7 +133,7 @@ class ChatSystem:
 
         print('[ChatSystem] Retrieving context...')
         for request in requests:
-            yield f'Looking up: "{request}"'
+            yield f'Researching: "{request}"...'
             basket = self._data_agent.generate_context(
                 request, 
                 page_ids=page_ids,
