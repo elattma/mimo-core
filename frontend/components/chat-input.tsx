@@ -2,6 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useChatHistoryContext } from "@/contexts/chat-history-context";
+import { useSelectedItemContext } from "@/contexts/selected-item-context";
 import { clientPost } from "@/lib/client-fetchers";
 import { Chat } from "@/models";
 import { useUser } from "@auth0/nextjs-auth0/client";
@@ -12,6 +13,7 @@ import TextareaAutosize from "react-textarea-autosize";
 export default function ChatInput() {
   const user = useUser();
   const { addToChatHistory } = useChatHistoryContext();
+  const { selectedItem } = useSelectedItemContext();
   const sendButtonRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState("");
@@ -25,7 +27,12 @@ export default function ChatInput() {
     if (!user.user?.sub) throw new Error("User is not logged in");
     const chat = new Chat(trimmedMessage, user?.user?.sub);
     addToChatHistory(chat);
-    clientPost("/chat", { body: JSON.stringify({ chat: chat.toJSON() }) });
+    clientPost("/chat", {
+      body: JSON.stringify({
+        chat: chat.toJSON(),
+        items: [{ params: { id: selectedItem } }],
+      }),
+    });
     setMessage("");
   };
 

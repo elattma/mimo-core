@@ -80,11 +80,8 @@ const ChatHistoryProvider = ({
         .subscribe({
           next: (result) => {
             const updatedChat = result.data.updatedChat;
-            console.log(updatedChat);
             if (isThought(updatedChat.message)) {
               const thought = extractThought(updatedChat.message);
-              console.log("New thought:");
-              console.log(updatedChat.message);
               setThoughts((prevThoughts) => [...prevThoughts, thought]);
             } else {
               setChatHistory((prevChatHistory) => {
@@ -109,11 +106,6 @@ const ChatHistoryProvider = ({
       setClient(client);
     }
   }, [userId, accessToken]);
-
-  useEffect(() => {
-    console.log("Thoughts:");
-    console.log(thoughts);
-  }, [thoughts]);
 
   return (
     <chatHistoryContext.Provider

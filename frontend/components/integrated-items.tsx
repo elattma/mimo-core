@@ -12,7 +12,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIntegrationsContext } from "@/contexts/integrations-context";
 import { useItemsContext } from "@/contexts/items-context";
-import { Integration } from "@/models";
+import { useSelectedItemContext } from "@/contexts/selected-item-context";
+import { Integration, Item } from "@/models";
 import { DropdownMenuPortal } from "@radix-ui/react-dropdown-menu";
 import { cva } from "class-variance-authority";
 import { ChevronDown, Cog, Globe, Search as SearchIcon } from "lucide-react";
@@ -20,8 +21,8 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Dispatch,
-  forwardRef,
   SetStateAction,
+  forwardRef,
   useCallback,
   useRef,
   useState,
@@ -256,12 +257,18 @@ const itemVariants = cva(
 
 function Items() {
   const { integratedItems } = useItemsContext();
+  const { setSelectedItem } = useSelectedItemContext();
   const [selected, setSelected] = useState<number | null>(null);
 
   const selectOrUnselectItem = useCallback(
-    (index: number) => {
-      if (selected === index) setSelected(null);
-      else setSelected(index);
+    (item: Item, index: number) => {
+      if (selected === index) {
+        setSelected(null);
+        setSelectedItem(null);
+      } else {
+        setSelected(index);
+        setSelectedItem(item);
+      }
     },
     [selected]
   );
@@ -296,12 +303,12 @@ function Items() {
               aria-label={item.title}
               key={index}
               onClick={(event) => {
-                selectOrUnselectItem(index);
+                selectOrUnselectItem(item, index);
                 event.currentTarget.blur();
               }}
               onKeyDown={(event) => {
                 if (event.key === " " || event.key === "Enter")
-                  selectOrUnselectItem(index);
+                  selectOrUnselectItem(item, index);
               }}
             >
               <Image

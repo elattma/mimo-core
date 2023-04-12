@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useItemsContext } from "@/contexts/items-context";
+import { useSelectedItemContext } from "@/contexts/selected-item-context";
+import { Item } from "@/models";
 import { cva } from "class-variance-authority";
 import { File, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -64,12 +66,18 @@ const itemVariants = cva(
 
 function Items() {
   const { uploadedItems } = useItemsContext();
+  const { setSelectedItem } = useSelectedItemContext();
   const [selected, setSelected] = useState<number | null>(null);
 
   const selectOrUnselectItem = useCallback(
-    (index: number) => {
-      if (selected === index) setSelected(null);
-      else setSelected(index);
+    (item: Item, index: number) => {
+      if (selected === index) {
+        setSelected(null);
+        setSelectedItem(null);
+      } else {
+        setSelected(index);
+        setSelectedItem(item);
+      }
     },
     [selected]
   );
@@ -98,12 +106,12 @@ function Items() {
               aria-label={item.title}
               key={index}
               onClick={(event) => {
-                selectOrUnselectItem(index);
+                selectOrUnselectItem(item, index);
                 event.currentTarget.blur();
               }}
               onKeyDown={(event) => {
                 if (event.key === " " || event.key === "Enter")
-                  selectOrUnselectItem(index);
+                  selectOrUnselectItem(item, index);
               }}
             >
               <File className="h-4 w-4 stroke-neutral-text" />

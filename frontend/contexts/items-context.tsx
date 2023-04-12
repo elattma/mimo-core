@@ -39,8 +39,6 @@ const ItemsProvider = ({ children, initialData }: Props) => {
     []
   );
 
-  console.log(initialItems);
-
   const [integratedItems, setIntegratedItems] = useState<ItemsType>(
     initialItems.filter((item) => item.integrationId !== "upload")
   );

@@ -15,13 +15,11 @@ export const getSubscribeClient = (accessToken: string) => {
   // or if we are running on the server.
   if (!client || typeof window === "undefined") {
     const url = process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT || "";
-    console.log(url);
     const region = "us-east-1";
     const auth = {
       type: "OPENID_CONNECT",
       jwtToken: async () => accessToken,
     };
-    console.log(auth);
 
     const httpLink = new HttpLink({ uri: url });
 
