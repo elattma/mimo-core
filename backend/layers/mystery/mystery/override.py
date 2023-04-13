@@ -42,7 +42,6 @@ class PageOverride(Override):
     
     @property
     def integration_enum(self):
-        print(self.integration)
         if self.integration == 'google_docs':
             return Integration.DOCUMENTS
         elif self.integration == 'google_mail':

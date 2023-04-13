@@ -18,7 +18,8 @@ from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
 from mystery.query import (AbsoluteTimeFilter, BlocksFilter, Concepts, Count,
                            IntegrationsFilter, PageIds, PageParticipantRole,
                            PageParticipants, Query, QueryComponent,
-                           RelativeTimeFilter, ReturnType, ReturnTypeValue, SearchMethod, SearchMethodValue)
+                           RelativeTimeFilter, ReturnType, ReturnTypeValue,
+                           SearchMethod, SearchMethodValue)
 from mystery.util import count_tokens
 
 # ----------------------------------------------------------------------------
@@ -83,6 +84,15 @@ Query: {{
 # ----------------------------------------------------------------------------
 
 
+@dataclass
+class DataAgentConfig:
+    owner: str = None
+    graph_db: Neo4j = None
+    vector_db: Pinecone = None
+    openai: OpenAI = None
+
+
+
 class DataAgent:
     _llm: OpenAIChat = None
     _basket_weaver: BasketWeaver = None
@@ -139,7 +149,7 @@ class DataAgent:
             text=request,
             embedding=self._openai.embed(request)
         )
-        print(query)
+        print(query.components)
 
         # Use query to fetch documents
         documents = []
@@ -170,7 +180,6 @@ class DataAgent:
         if max_tokens:
             self._basket_weaver.minify_context_basket(basket, max_tokens)
         print('[DataAgent] Context generated!')
-        print(basket)
         return basket
 
     def _exact_context(self, query: Query) -> List[Document]:
@@ -274,7 +283,8 @@ class DataAgent:
             if PageParticipants in query.components:
                 pp: PageParticipants = query.components[PageParticipants]
                 names = pp.neo4j_names
-                regex_matches = set()
+                if not regex_matches:
+                    regex_matches = set()
                 for participant in pp.values:
                     if participant.role == PageParticipantRole.UNKNOWN:
                         continue

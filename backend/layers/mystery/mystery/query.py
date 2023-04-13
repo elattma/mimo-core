@@ -394,7 +394,6 @@ class IntegrationsFilter(QueryComponent):
                     for integration in self.integrations])
 
     def _get_integration_name_from_category(self, category: str) -> str:
-        print(category)
         if category == Integration.CRM:
             return 'zoho'
         elif category == Integration.CUSTOMER_SUPPORT:

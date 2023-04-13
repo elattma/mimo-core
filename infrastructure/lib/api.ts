@@ -103,6 +103,7 @@ export class ApiStack extends Stack {
       props.uploadItemBucket
     );
     this.createDataLambda(props.stageId);
+    this.createAgentRoutes(integrationSecretName);
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -130,6 +131,58 @@ export class ApiStack extends Stack {
     });
 
     return layer;
+  };
+
+  createAgentRoutes = (integrationSecretName: string) => {
+    const integrationsSecret = Secret.fromSecretNameV2(
+      this,
+      "integrations-secret",
+      integrationSecretName
+    );
+    const verification_token = integrationsSecret
+      .secretValueFromJson("SLACK_VERIFICATION_TOKEN")
+      .toString();
+    const salesAgentHandler = this.getHandler({
+      route: "sales_agent",
+      method: "post",
+      environment: {
+        VERIFICATION_TOKEN: verification_token,
+      },
+      memorySize: 1024,
+      timeout: Duration.minutes(5),
+    });
+
+    const dataUrl = new CfnUrl(this, "data-url", {
+      targetFunctionArn: salesAgentHandler.functionArn,
+      authType: FunctionUrlAuthType.NONE,
+      cors: {
+        allowHeaders: [
+          "Content-Type",
+          "X-Amz-Date",
+          "Authorization",
+          "X-Api-Key",
+          "X-Amz-Security-Token",
+        ],
+        allowCredentials: true,
+        allowMethods: ["POST"],
+        allowOrigins: ["*"],
+      },
+    });
+
+    new CfnResource(this, "sales-agent-permission", {
+      type: "AWS::Lambda::Permission",
+      properties: {
+        Action: "lambda:InvokeFunctionUrl",
+        FunctionName: salesAgentHandler.functionArn,
+        Principal: "*",
+        FunctionUrlAuthType: "NONE",
+      },
+    });
+
+    new CfnOutput(this, "sales-agent-url", {
+      value: dataUrl.attrFunctionUrl,
+      exportName: "sales-agent-url",
+    });
   };
 
   createDataLambda = (stageId: string) => {
