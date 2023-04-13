@@ -38,7 +38,7 @@ export default function ChatDisplay() {
           if (chat.role === Chat.Role.ASSISTANT) {
             const displayThoughts = index === chatHistory.length - 1;
             return (
-              <>
+              <div className="contents" key={`assistant-chat-${index}`}>
                 {displayThoughts
                   ? thoughts.map((thought, thoughtIndex) => (
                       <AssistantThought
@@ -48,7 +48,7 @@ export default function ChatDisplay() {
                     ))
                   : null}
                 <AssistantChatItem chat={chat} key={index} />
-              </>
+              </div>
             );
           } else if (chat.role === Chat.Role.USER)
             return <UserChatItem chat={chat} key={index} />;

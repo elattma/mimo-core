@@ -16,7 +16,7 @@ const Page = () => {
     );
     clientPost("/integration", {
       body: JSON.stringify({
-        id: state.integrationId,
+        id: state.integration,
         code: searchParams.get("code"),
         redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/auth`,
       }),

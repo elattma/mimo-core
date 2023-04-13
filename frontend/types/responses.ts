@@ -22,15 +22,15 @@ export type GetIntegrationResponse = {
 }[];
 
 export type GetItemResponse = {
-  integration: string;
-  icon: string;
   items: {
+    integration: string;
     id: string;
     title: string;
+    icon: string;
     link: string;
-    preview: string;
   }[];
-}[];
+  next_token: string;
+};
 
 export type PostEndpoints = {
   "/chat": PostChatResponse;

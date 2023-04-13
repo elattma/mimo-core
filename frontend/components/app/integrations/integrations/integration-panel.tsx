@@ -14,7 +14,7 @@ const IntegrationPanel = ({ integration }: Props) => {
           process.env.NEXT_PUBLIC_BASE_URL
         }/auth&state=${Buffer.from(
           JSON.stringify({
-            integrationId: integration.id,
+            integration: integration.id,
           })
         ).toString("base64")}`,
       };

@@ -20,12 +20,6 @@ class Item extends Model {
   public readonly link: string;
 
   /**
-   * A preview of the content in the item
-   * @readonly
-   */
-  public readonly preview: string;
-
-  /**
    * The icon to display alongside this item
    * @readonly
    */
@@ -35,23 +29,21 @@ class Item extends Model {
    * The id of the integration this item originated from
    * @readonly
    */
-  public readonly integrationId: string;
+  public readonly integration: string;
 
   constructor(
     id: string,
     title: string,
     link: string,
-    preview: string,
     icon: string,
-    integrationId: string
+    integration: string
   ) {
     super();
     this.id = id;
     this.title = title;
     this.link = link;
-    this.preview = preview;
     this.icon = icon;
-    this.integrationId = integrationId;
+    this.integration = integration;
   }
 
   /**
@@ -65,17 +57,15 @@ class Item extends Model {
     id: string;
     title: string;
     link: string;
-    preview: string;
     icon: string;
-    integrationId: string;
+    integration: string;
   }): Item {
     return new Item(
       json.id,
       json.title,
       json.link,
-      json.preview,
       json.icon,
-      json.integrationId
+      json.integration
     );
   }
 }

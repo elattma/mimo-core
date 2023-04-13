@@ -20,31 +20,23 @@ type Props = {
 };
 
 const ItemsProvider = ({ children, initialData }: Props) => {
-  const initialItems = initialData.reduce(
-    (acc: Item[], integrationAndItsItems) => {
-      integrationAndItsItems.items.forEach((itemData) =>
-        acc.push(
-          new Item(
-            itemData.id,
-            itemData.title,
-            itemData.link,
-            itemData.preview,
-            integrationAndItsItems.icon,
-            integrationAndItsItems.integration
-          )
-        )
-      );
-      return acc;
-    },
-    []
+  const initialItems = initialData.items.map(
+    (itemData) =>
+      new Item(
+        itemData.id,
+        itemData.title,
+        itemData.link,
+        itemData.icon,
+        itemData.integration
+      )
   );
 
   const [integratedItems, setIntegratedItems] = useState<ItemsType>(
-    initialItems.filter((item) => item.integrationId !== "upload")
+    initialItems.filter((item) => item.integration !== "upload")
   );
 
   const [uploadedItems, setUploadedItems] = useState<ItemsType>(
-    initialItems.filter((item) => item.integrationId === "upload")
+    initialItems.filter((item) => item.integration === "upload")
   );
 
   const addIntegratedItems = (items: Item[]) => {
