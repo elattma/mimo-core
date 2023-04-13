@@ -116,10 +116,10 @@ class EmailSystem:
         recipient_match = re.search(r'To:(.*)', output).group(1)
         subject_match = re.search(r'Subject:(.*)', output).group(1)
         body_match = re.search(r'Subject:.*\n([\s\S]*)', output).group(1)
-        recipient = quote(recipient_match.strip())
-        subject = quote(subject_match.strip())
-        body = quote(body_match.strip())
-        link = f'mailto:{recipient}?subject={subject}&body={body}'
+        recipient = recipient_match.strip()
+        subject = subject_match.strip()
+        body = body_match.strip()
+        link = quote(f'mailto:{recipient}?subject={subject}&body={body}')
         return EmailSystemResponse(recipient, subject, body, link)
     
 def _query_mimo_api(message: str, mimo_test_token: str) -> str:
@@ -128,8 +128,6 @@ def _query_mimo_api(message: str, mimo_test_token: str) -> str:
             'test_token': mimo_test_token
         }
     )
-    print(response)
     response = response.json() if response else None
-    print(response)
     answer = response.get('answer', None) if response else None
     return answer
