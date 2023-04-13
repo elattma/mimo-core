@@ -25,10 +25,9 @@ def handler(event: dict, context):
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
     stage: str = os.environ['STAGE']
-    upload_item_bucket: str = os.environ['UPLOAD_ITEM_BUCKET']
     graph_db_uri: str = os.environ["GRAPH_DB_URI"]
 
-    if not (user and stage and upload_item_bucket):
+    if not (user and stage):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if not secrets:
@@ -43,7 +42,7 @@ def handler(event: dict, context):
     documents: List[Document] = neo4j.discover('google-oauth2|108573573074253667565')
     items_list = []
     for document in documents:
-        title = 'Untitled'
+        title = None
         if document.consists:
             try:
                 block = document.consists[0].target
@@ -56,6 +55,8 @@ def handler(event: dict, context):
                 print('failed to cast title to a block stream!')
                 print(block)
                 print(e)
+        if not title:
+            continue
 
         link = integration_to_link.get(document.integration, None)
         link = link.format(id=document.id) if link else None

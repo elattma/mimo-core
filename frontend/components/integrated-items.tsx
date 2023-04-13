@@ -313,7 +313,7 @@ function Items() {
             >
               <Image
                 draggable={false}
-                src={item.icon}
+                src={`https://${item.icon}`}
                 alt="Item icon"
                 width={20}
                 height={20}
