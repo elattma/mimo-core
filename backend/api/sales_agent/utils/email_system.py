@@ -124,7 +124,7 @@ class EmailSystem:
     
 def _query_mimo_api(message: str, mimo_test_token: str) -> str:
     response = requests.get(MIMO_DATA_AGENT_TMP_ENDPOINT, params={
-            'message': message,
+            'question': message,
             'test_token': mimo_test_token
         }
     )

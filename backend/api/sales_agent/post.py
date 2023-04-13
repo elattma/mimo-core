@@ -5,8 +5,7 @@ from enum import Enum
 import boto3
 import requests
 from pyparsing import Mapping
-
-from .email_system import EmailSystem
+from utils.email_system import EmailSystem
 
 
 class Secrets:
@@ -59,6 +58,8 @@ def handler(event: dict, context):
     print(event)
     print(context)
     global email_system, secrets
+    if not secrets:
+        secrets = Secrets(os.environ['STAGE'])
     verification_token = secrets.get('SLACK_VERIFICATION_TOKEN')
 
     if not verification_token:
@@ -93,6 +94,18 @@ def handler(event: dict, context):
                 openai_api_key=openai_api_key,
                 mimo_test_token=mimo_test_token
             )
+        
+        message = {
+            'channel': channel,
+            'text': 'Give me just a few moments :)'
+        }
+        response = requests.get('https://slack.com/api/chat.postMessage', params=message, headers={
+            'Authorization': f'Bearer {access_token}', 
+            'Content-type': 'application/x-www-form-urlencoded'
+        })
+        response = response.json() if response else None
+        if not (response and response.get('ok', False)):
+            return to_response_error(response.get('error', 'An error occurred'))
 
         response = email_system.run(text)
         blocks = [
@@ -114,7 +127,7 @@ def handler(event: dict, context):
                 'type': 'section',
                 'text': {
                     'type': 'mrkdwn',
-                    'text': response.body
+                    'text': f'{response.body}'
                 }
             },
             {
@@ -130,7 +143,7 @@ def handler(event: dict, context):
                         'text': 'Open'
                     },
                     'value': 'open_email',
-                    'url': response.link,
+                    'url': f'{response.link}',
                     'action_id': 'open_email'
                 }
             }
@@ -138,7 +151,7 @@ def handler(event: dict, context):
 
         message = {
             'channel': channel,
-            'blocks': blocks
+            'blocks': json.dumps(blocks)
         }
         response = requests.get('https://slack.com/api/chat.postMessage', params=message, headers={
             'Authorization': f'Bearer {access_token}', 

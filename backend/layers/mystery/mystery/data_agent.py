@@ -149,7 +149,7 @@ class DataAgent:
             text=request,
             embedding=self._openai.embed(request)
         )
-        print(query.components)
+        print(f'[DataAgent] Query Components: {query.components}')
 
         # Use query to fetch documents
         documents = []

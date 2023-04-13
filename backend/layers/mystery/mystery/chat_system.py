@@ -119,8 +119,7 @@ class ChatSystem:
         prompt = ChatPrompt([system_message, user_message])
         llm_response = self._gpt_4.predict(prompt)
         requests = _parse_llm_response_for_requests(llm_response)
-        print('[ChatSystem] Requests generated!')
-        print(requests)
+        print(f'[ChatSystem] Requests generated! {requests}'.replace('\n', '\r'))
         return requests
 
     def _retrieve_context(
@@ -145,8 +144,7 @@ class ChatSystem:
         return
 
     def _respond_with_context(self, message: str, context: str) -> str:
-        print('[ChatSystem] Producing response with context...')
-        print(context)
+        print(f'[ChatSystem] Producing response with context... {context}'.replace('\n', '\r'))
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
         context_size = count_tokens(context, self._chat_gpt.encoding_name)
         if message_size + context_size > MAX_TOKENS:
@@ -193,8 +191,7 @@ def _parse_llm_response_for_requests(llm_response: str) -> List[str]:
     match = re.search(r'\[[\s\S]*\]', llm_response, re.DOTALL)
     if not match:
         print('[ChatSystem] Failed to parse LLM response')
-        print('[ChatSystem]: LLM response:')
-        print(llm_response)
+        print(f'[ChatSystem] LLM response: {llm_response}'.replace('\n', '\r'))
         return []
     stringified_list = match.group(0)
     requests = json.loads(stringified_list)

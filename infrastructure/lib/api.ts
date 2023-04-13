@@ -105,7 +105,7 @@ export class ApiStack extends Stack {
       props.uploadItemBucket
     );
     this.createDataLambda(props.stageId);
-    this.createAgentRoutes(this.integrationsSecret);
+    this.createAgentRoutes(props.stageId, this.integrationsSecret);
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -135,22 +135,18 @@ export class ApiStack extends Stack {
     return layer;
   };
 
-  createAgentRoutes = (integrationsSecret: ISecret) => {
-    const verification_token = integrationsSecret
-      .secretValueFromJson("SLACK_VERIFICATION_TOKEN")
-      .unsafeUnwrap();
-    const access_token = integrationsSecret
-      .secretValueFromJson("SLACK_ACCESS_TOKEN")
-      .unsafeUnwrap();
+  createAgentRoutes = (stage: string, integrationsSecret: ISecret) => {
     const salesAgentHandler = this.getHandler({
       route: "sales_agent",
       method: "post",
       environment: {
         TEST_TOKEN: TEST_TOKEN,
+        STAGE: stage,
       },
       memorySize: 1024,
       timeout: Duration.minutes(5),
     });
+    integrationsSecret.grantRead(salesAgentHandler);
 
     const dataUrl = new CfnUrl(this, "sales-agent-url", {
       targetFunctionArn: salesAgentHandler.functionArn,

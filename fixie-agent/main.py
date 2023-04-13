@@ -37,14 +37,12 @@ def qa(query: Message, oauth_handler: OAuthHandler, user_storage: UserStorage) -
         user_token = oauth_handler.user_token()
     except Exception as e:
         # TODO: generalize a bit more. currently only exceptions during refresh it looks like
-        print(e)
         user_storage[OAuthHandler.OAUTH_TOKEN_KEY] = None
 
     if user_token is None:
         url = oauth_handler.get_authorization_url()
         return url + f'&audience=https%3A%2F%2Fapi.mimo.team%2F'
     
-    print('hi??')
     response = requests.get(
         'https://ztsl6igv66ognn6qpvsfict6y40qocst.lambda-url.us-east-1.on.aws/',
         headers={
@@ -55,7 +53,5 @@ def qa(query: Message, oauth_handler: OAuthHandler, user_storage: UserStorage) -
         },
         timeout=300
     )
-    print(response)
     qa_response = response.json()
-    print(qa_response)
     return qa_response.get('answer', 'Sorry, I don\'t know.') if qa_response else 'Sorry, Mimo is unavailable.'

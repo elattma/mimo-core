@@ -90,7 +90,7 @@ class Translator:
             if not (block_stream and block_stream.blocks
                     and block_stream.label
                     and block_stream.label in SUPPORTED_BLOCK_LABELS):
-                print('invalid block stream!')
+                print('[Translator] Invalid block stream!')
                 continue
 
             if block_stream.label == SummaryBlock._LABEL:

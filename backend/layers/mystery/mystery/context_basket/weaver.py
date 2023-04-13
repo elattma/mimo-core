@@ -34,9 +34,7 @@ class BasketWeaver:
                         block.label, block_stream_dict)
                     block_streams.append(block_stream)
                 except Exception as e:
-                    print('failed to cast to a block stream!')
-                    print(block)
-                    print(e)
+                    print(f'[Weaver] Failed to cast to a block stream! {block}. Exception: {e}'.replace('\n', '\r'))
             translated = Translator.translate_document(
                 document.integration, block_streams)
             tokens = count_tokens(translated, request.encoding_name)
@@ -80,7 +78,7 @@ def euclidean_distance(row1, row2) -> float:
 
 def sort_list_embeddings(focal_embedding: List[float], _list: List[Any], embeddings: List[List[float]]) -> None:
     if not (focal_embedding and _list and embeddings and len(_list) == len(embeddings)):
-        print('sort_list_embeddings: invalid input!')
+        print('[Weaver] Invalid input in sort list embeddings!')
         return
 
     element_distance_tuples = List[tuple[Any, float]] = []

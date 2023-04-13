@@ -505,12 +505,11 @@ class Neo4j:
             f'{order_by_query} '
             f'{limit_query} '
         )
-        print('[Neo4j]: Executing query...')
-        print(query)
+        print(f'[Neo4j]: Executing query... {query}')
         result = tx.run(query, owner=query_filter.owner)
-        print('[Neo4j]: Query executed!')
-
         records = list(result)
+        print('[Neo4j]: Query completed!')
+
         return Neo4j._parse_record_documents(records)
     
     @staticmethod

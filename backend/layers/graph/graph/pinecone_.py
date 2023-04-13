@@ -107,8 +107,7 @@ class Pinecone:
                 }
             }
         )
-        print('delete response!')
-        print(delete_response)
+        print(f'[Pinecone] Delete response: {delete_response}')
 
         return True
 
@@ -120,9 +119,9 @@ class Pinecone:
         for batch_index in range(0, len_vectors, batch_size):
             upsert_response = self._index.upsert(
                 vectors=vectors[batch_index:batch_index + batch_size])
-            print(upsert_response)
+            print(f'[Pinecone] Upsert response: {upsert_response}')
             if hasattr(upsert_response, 'upserted_count') and upsert_response.upserted_count >= min(len_vectors - batch_index, batch_size):
-                print(upsert_response.upserted_count)
+                print(f'[Pinecone] Upsert response count: {upsert_response.upserted_count}')
             else:
                 return False
         return True
@@ -142,7 +141,6 @@ class Pinecone:
                 'values': row.embedding,
                 'metadata': row.to_metadata_dict()
             })
-            print(row.to_metadata_dict())
 
         deleted = self._delete_old_vectors(rows)
         upserted = self._batched_upsert(vectors=vectors)
