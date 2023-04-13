@@ -3,10 +3,10 @@ from dataclasses import dataclass
 from typing import List
 from urllib.parse import quote
 
-from langchain.agents import ZeroShotAgent, Tool, AgentExecutor
-from langchain import LLMChain
-from langchain.chat_models import ChatOpenAI
 import requests
+from langchain import LLMChain
+from langchain.agents import AgentExecutor, Tool, ZeroShotAgent
+from langchain.chat_models import ChatOpenAI
 
 PREFIX = '''You are an expert at writing emails. Based on the request from the user, write an email to the best of your ability.
 The user will assume you know everything about their company and its customers. Since you don't, use the tools you have access to to look up information you don't know.
@@ -25,6 +25,8 @@ Question: {input}
 
 INPUT_VARIABLES = ['input', 'agent_scratchpad']
 
+MIMO_DATA_AGENT_TMP_ENDPOINT = 'https://ztsl6igv66ognn6qpvsfict6y40qocst.lambda-url.us-east-1.on.aws'
+
 @dataclass
 class EmailSystemResponse:
     recipient: str
@@ -41,7 +43,9 @@ class EmailSystem:
 
     def __init__(self,
         openai_api_key: str,
+        mimo_test_token: str
     ) -> None:
+        self._mimo_test_token = mimo_test_token
         if not self._llm:
             self._llm = ChatOpenAI(
                 openai_api_key=openai_api_key,
@@ -101,11 +105,12 @@ class EmailSystem:
         return tools
     
     def _fetch_context(self, input: str) -> str:
-        return _query_mimo_api(input)
+        return _query_mimo_api(input, self._mimo_test_token)
 
     def _look_up_email(self, input: str) -> str:
         name = input.strip()
-        return _query_mimo_api(f'What is the email of {name} from the CRM?')
+        input = f'What is the email of {name} from the CRM?'
+        return _query_mimo_api(input, self._mimo_test_token)
     
     def _parse_output(self, output: str) -> EmailSystemResponse:
         recipient_match = re.search(r'To:(.*)', output).group(1)
@@ -117,9 +122,14 @@ class EmailSystem:
         link = f'mailto:{recipient}?subject={subject}&body={body}'
         return EmailSystemResponse(recipient, subject, body, link)
     
-def _query_mimo_api(self, message: str) -> str:
-    response = requests.get('')
+def _query_mimo_api(message: str, mimo_test_token: str) -> str:
+    response = requests.get(MIMO_DATA_AGENT_TMP_ENDPOINT, params={
+            'message': message,
+            'test_token': mimo_test_token
+        }
+    )
+    print(response)
     response = response.json() if response else None
+    print(response)
     answer = response.get('answer', None) if response else None
-    sources = response.get('sources', None) if response else None
     return answer

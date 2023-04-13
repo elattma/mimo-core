@@ -55,6 +55,8 @@ interface LambdaParams {
 }
 
 const NEO_4J_URI = "neo4j+s://67eff9a1.databases.neo4j.io";
+// TODO: remove
+const TEST_TOKEN = "82dab942-f0f4-4721-953d-200e0a750639";
 
 export class ApiStack extends Stack {
   readonly api: RestApi;
@@ -103,7 +105,7 @@ export class ApiStack extends Stack {
       props.uploadItemBucket
     );
     this.createDataLambda(props.stageId);
-    this.createAgentRoutes(integrationSecretName);
+    this.createAgentRoutes(this.integrationsSecret);
 
     new CfnOutput(this, "api-gateway-id", {
       value: this.api.restApiId,
@@ -133,26 +135,24 @@ export class ApiStack extends Stack {
     return layer;
   };
 
-  createAgentRoutes = (integrationSecretName: string) => {
-    const integrationsSecret = Secret.fromSecretNameV2(
-      this,
-      "integrations-secret",
-      integrationSecretName
-    );
+  createAgentRoutes = (integrationsSecret: ISecret) => {
     const verification_token = integrationsSecret
       .secretValueFromJson("SLACK_VERIFICATION_TOKEN")
-      .toString();
+      .unsafeUnwrap();
+    const access_token = integrationsSecret
+      .secretValueFromJson("SLACK_ACCESS_TOKEN")
+      .unsafeUnwrap();
     const salesAgentHandler = this.getHandler({
       route: "sales_agent",
       method: "post",
       environment: {
-        VERIFICATION_TOKEN: verification_token,
+        TEST_TOKEN: TEST_TOKEN,
       },
       memorySize: 1024,
       timeout: Duration.minutes(5),
     });
 
-    const dataUrl = new CfnUrl(this, "data-url", {
+    const dataUrl = new CfnUrl(this, "sales-agent-url", {
       targetFunctionArn: salesAgentHandler.functionArn,
       authType: FunctionUrlAuthType.NONE,
       cors: {
@@ -179,7 +179,7 @@ export class ApiStack extends Stack {
       },
     });
 
-    new CfnOutput(this, "sales-agent-url", {
+    new CfnOutput(this, "api-sales-agent-url", {
       value: dataUrl.attrFunctionUrl,
       exportName: "sales-agent-url",
     });
@@ -199,6 +199,7 @@ export class ApiStack extends Stack {
       environment: {
         STAGE: stageId,
         GRAPH_DB_URI: NEO_4J_URI,
+        TEST_TOKEN: TEST_TOKEN,
       },
       memorySize: 2048,
       timeout: Duration.minutes(10),
