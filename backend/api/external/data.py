@@ -23,6 +23,7 @@ def handler(event: dict, context):
     query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     question: str = query_string_parameters.get('question', None) if query_string_parameters else None
     test_token: str = query_string_parameters.get('test_token', None) if query_string_parameters else None
+    user = 'google-oauth2|108573573074253667565'
     if not test_token or test_token != mimo_test_token:
         if not auth0:
             auth0 = Auth0(os.environ['STAGE'])
