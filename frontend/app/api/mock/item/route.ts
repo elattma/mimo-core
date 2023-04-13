@@ -7,29 +7,27 @@ const UPLOADED_ITEMS_COUNT = 10;
 
 const GET = async (request: NextRequest) => {
   mock_logRequest(request);
+  const mockIntegratedItem = {
+    integration: "google",
+    id: ulid(),
+    title: "Mock Integrated Item Title",
+    icon: "www.gstatic.com/images/branding/product/1x/drive_512dp.png",
+    link: "https://www.mimo.team",
+  };
+  const mockUploadedItem = {
+    integration: "upload",
+    id: ulid(),
+    title: "Mock Uploaded Item Title",
+    link: "https://www.mimo.team",
+  };
+  const items = Array(INTEGRATED_ITEMS_COUNT + UPLOADED_ITEMS_COUNT)
+    .fill(mockIntegratedItem)
+    .fill(mockUploadedItem, INTEGRATED_ITEMS_COUNT);
   const response = new Response(
-    JSON.stringify([
-      {
-        integration: "google",
-        icon: "https://www.gstatic.com/images/branding/product/1x/drive_512dp.png",
-        items: Array(INTEGRATED_ITEMS_COUNT).fill({
-          id: ulid(),
-          title: "Mock Item Title",
-          link: "https://www.mimo.team",
-          preview: "Mock item preview",
-        }),
-      },
-      {
-        integration: "upload",
-        icon: "https://www.gstatic.com/images/branding/product/1x/drive_512dp.png",
-        items: Array(UPLOADED_ITEMS_COUNT).fill({
-          id: ulid(),
-          title: "Mock Uploaded Item Title",
-          link: "https://www.mimo.team",
-          preview: "Mock uploaded item preview",
-        })
-      } 
-    ]),
+    JSON.stringify({
+      items,
+      next_token: "MOCK_NEXT_TOKEN",
+    }),
     {
       status: 200,
       statusText: "OK",

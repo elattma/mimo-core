@@ -290,10 +290,10 @@ function Items() {
   } else {
     return (
       <ScrollArea
-        className="rounded-theme border border-neutral-border bg-neutral-bg-subtle"
-        innerClassName="max-h-52"
+        className="w-full rounded-theme border border-neutral-border bg-neutral-bg-subtle"
+        innerClassName="max-h-52 [&>div]:!block"
       >
-        <div className="flex flex-col divide-y divide-neutral-border">
+        <div className="flex w-full flex-col divide-y divide-neutral-border">
           {integratedItems.map((item, index) => (
             <div
               className={itemVariants({ selected: selected === index })}

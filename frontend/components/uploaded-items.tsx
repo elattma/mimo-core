@@ -94,7 +94,7 @@ function Items() {
     return (
       <ScrollArea
         className="rounded-theme border border-neutral-border bg-neutral-bg-subtle"
-        innerClassName="max-h-52"
+        innerClassName="max-h-52 [&>div]:!block"
       >
         <div className="flex flex-col divide-y divide-neutral-border">
           {uploadedItems.map((item, index) => (
