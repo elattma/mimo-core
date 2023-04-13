@@ -16,7 +16,11 @@ const ScrollArea = forwardRef<
     { children, className, onScroll, innerClassName = "", ...props },
     forwardedRef
   ) => (
-    <Primitive.Root ref={forwardedRef} className={cn(className)} {...props}>
+    <Primitive.Root
+      ref={forwardedRef}
+      className={cn("overflow-hidden", className)}
+      {...props}
+    >
       <Primitive.Viewport
         className={cn("h-full w-full", innerClassName)}
         onScroll={onScroll}
