@@ -790,6 +790,7 @@ export class ApiStack extends Stack {
       timeout: params.timeout,
       memorySize: params.memorySize,
       environment: params.environment,
+      retryAttempts: 0,
       bundling: {
         assetExcludes: ["**.venv**", "**poetry.lock"],
       },
