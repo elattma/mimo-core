@@ -182,6 +182,7 @@ class Translator:
         for contact_block in contact_blocks:
             contacts.append((
                 f'\t{contact_block.name.value}:\n'
+                f'\t\tEmail: {contact_block.name.id}\n'
                 f'\t\tTitle: {contact_block.title}\n'
                 f'\t\tDepartment: {contact_block.department}\n'
                 f'\t\tCreated by: {contact_block.created_by.value}\n'

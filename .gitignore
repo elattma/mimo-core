@@ -5,6 +5,7 @@ node_modules
 /backend/dist*
 **pycache**
 **scratch_paper.py
+**.env**
 
 /infrastructure/*.js
 /infrastructure/!jest.config.js
