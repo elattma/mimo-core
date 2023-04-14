@@ -5,18 +5,16 @@ from typing import List
 from urllib.parse import quote
 
 import requests
-from langchain import LLMChain
 from langchain.agents import AgentExecutor, Tool, ZeroShotAgent
 from langchain.chat_models import ChatOpenAI
 
 PREFIX = '''You are an expert at writing emails. Based on the request from the user, write an email to the best of your ability.
-The user will assume you know everything about their company and its customers. Since you don't, use the tools you have access to to look up information you don't know.
-Your final answer should always be in the following form.
---------
-To: <EMAIL ADDRESS>
-Subject: <SUBJECT>
-<BODY>
---------
+The user will assume you know everything about their company and its customers. Since you don't, use your tools to look up information as needed.
+Your Final Answer should be in the following form.
+
+To: EMAIL ADDRESS
+Subject: SUBJECT
+BODY
 
 You have access to the following tools:'''
 
@@ -58,17 +56,10 @@ class EmailSystem:
         if not self._llm:
             self._llm = ChatOpenAI(
                 openai_api_key=openai_api_key,
-                model_name='gpt-3.5-turbo',
-                temperature=0.0
+                temperature=0.2
             )
         if not self._tools:
             self._tools = self._make_tools()
-            prompt = ZeroShotAgent.create_prompt(
-                self._tools,
-                prefix=PREFIX,
-                suffix=SUFFIX,
-                input_variables=INPUT_VARIABLES
-            )
         if not self._agent:
             self._agent = ZeroShotAgent.from_llm_and_tools(
                 llm=self._llm,
@@ -102,19 +93,21 @@ class EmailSystem:
         data_fetcher = Tool(
             'Context Fetcher',
             self._fetch_context,
-            ('Used to look up information that the user would like to '
-             'include in the email, but you do not know enough about. For '
-             'example, if the user wants you to write an email about the '
-             'upcoming offsite, you can use this tool to look up the details '
-             'of the offsite. Input should be a description of what you want '
-             'to know more about. Output will be the information you need.')
+            (
+                'Used to look up information from the user\'s knowledge base '
+                'that you should include in the email. Input should be a '
+                'description of what you want to know more about. Output will '
+                'be relevant information from the user\'s knowledge base.'
+            )
         )
         directory = Tool(
             'Directory',
             self._look_up_email,
-            ('Used to look up an email address of a person. Input should be '
-             'the name of the person. Output will be the email address, if '
-             'it exists.')
+            (
+                'Used to look up an email address of a person in the user\'s '
+                'CRM. Input should be the name of the person. Output will be '
+                'the person\'s contact from the user\'s CRM.'
+            )
         )
         tools = [
             data_fetcher, directory
@@ -136,7 +129,7 @@ class EmailSystem:
         subject = subject_match.group(1).strip() if subject_match else None
         body_match = re.search(r'Subject:.*\n([\s\S]*)', output)
         body = body_match.group(1).strip() if body_match else None
-        link = 'mailto:'
+        link = ''
         if recipient:
             link += recipient
         link += '?'
@@ -146,7 +139,8 @@ class EmailSystem:
             if subject:
                 link += '&'
             link += f'body={body}'
-        return EmailSystemResponse(recipient, subject, body, link)
+        link = 'mailto:' + quote(link)
+        return EmailSystemSuccess(recipient, subject, body, link)
     
 def _query_mimo_api(message: str, mimo_test_token: str) -> str:
     response = requests.get(MIMO_DATA_AGENT_TMP_ENDPOINT, params={

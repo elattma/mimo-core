@@ -46,7 +46,7 @@ class Translator:
             translation += Translator._translate_title_blocks(blocks['title'])
             translation += '\n'
         if 'member' in blocks and blocks['member']:
-            translation += Translator._get_translation_end(integration)
+            translation += Translator._translate_member_blocks(integration)
             translation += '\n'
         if 'summary' in blocks and blocks['summary']:
             translation += Translator._translate_summary_blocks(
