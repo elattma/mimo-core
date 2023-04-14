@@ -15,7 +15,8 @@ from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
-from mystery.query import (AbsoluteTimeFilter, BlocksFilter, Concepts, Count,
+from mystery.query import (AbsoluteTimeFilter, BlocksFilter, BlocksToReturn,
+                           BlocksToSearch, Concepts, Count,
                            IntegrationsFilter, PageIds, PageParticipantRole,
                            PageParticipants, Query, QueryComponent,
                            RelativeTimeFilter, ReturnType, ReturnTypeValue,
@@ -64,18 +65,20 @@ Query: {{
   "ascending": false,
  }},
  "count": 5,
- "integrations": ["email"],
- "blocks": ["title"],
+ "sources": ["email"],
  "search_method": "exact",
- "return_type": "blocks"
+ "return_type": "blocks",
+ "blocks_to_return": ["title"]
 }}
 
 EXAMPLE 2
-Request: John Doe\'s strengths as an employee
+Request: Zendesk tickets with a comment about the API
 Query: {{
- "concepts": ["John Doe\'s strengths as an employee"],
+ "concepts": ["the API"],
+ "sources": ["customer_support"],
  "search_method": "relevant",
- "return_type": "blocks"
+ "blocks_to_search": ["comment"],
+ "return_type": "pages"
 }}'''
 
 
@@ -90,7 +93,6 @@ class DataAgentConfig:
     graph_db: Neo4j = None
     vector_db: Pinecone = None
     openai: OpenAI = None
-
 
 
 class DataAgent:
@@ -171,11 +173,12 @@ class DataAgent:
             default = True
         if default:
             documents.extend(self._relevant_context(query))
+        filtered_documents = self._apply_return_filters(documents, query)
 
         # Weave basket from documents
         basket = self._basket_weaver.weave_context_basket(
             query.request,
-            documents
+            filtered_documents
         )
         print(f'[DataAgent] Context generated! Raw: {str(basket)}'.replace('\n', '\r'))
         if max_tokens:
@@ -191,10 +194,17 @@ class DataAgent:
 
     def _relevant_context(self, query: Query) -> List[Document]:
         print('[DataAgent] Filling basket with relevant context...')
-        matches = self._query_vector_db(query)
+        if Count in query.components:
+            c = query.components[Count]
+            k = c.value
+            matches = self._query_vector_db(query, k=k)
+        else:
+            matches = self._query_vector_db(query)
         block_ids = set(matches.keys())
         results = self._query_graph_db(block_ids=block_ids)
         print('[DataAgent] Filled basket with relevant context!')
+        print('RESULTS FROM RELEVANT SEARCH')
+        print(results)
         return results
 
     def _relevant_context_by_page_participants(
@@ -213,6 +223,37 @@ class DataAgent:
             'page participants!'
         ))
         return results
+    
+    def _apply_return_filters(
+        self,
+        documents: List[Document],
+        query: Query
+    ) -> List[Document]:
+        print('[DataAgent] Applying return filters...')
+        filtered_documents = documents
+        if ReturnType in query.components:
+            rt: ReturnType = query.components[ReturnType]
+            page_ids = set([document.id for document in documents])
+            if rt.value == ReturnTypeValue.PAGES:
+                filtered_documents = self._query_graph_db(page_ids=page_ids)
+            elif rt.value == ReturnTypeValue.BLOCKS:
+                if BlocksToReturn in query.components:
+                    btr: BlocksToReturn = query.components[BlocksToReturn]
+                    blocks_to_search = BlocksToSearch(
+                        blocks=btr.blocks
+                    )
+                    new_query = Query(
+                        components={
+                            BlocksToSearch: blocks_to_search,
+                        },
+                        request=query.request
+                    )
+                    filtered_documents = self._query_graph_db(
+                        query=new_query,
+                        page_ids=page_ids
+                    )
+        print('[DataAgent] Applied return filters!')
+        return filtered_documents
 
     def _query_graph_db(
         self,
@@ -278,9 +319,6 @@ class DataAgent:
         limit = Limit(0, DEFAULT_LIMIT)
         regex_matches = None
         if query and query.components and query.request:
-            if IntegrationsFilter in query.components:
-                if_: IntegrationsFilter = query.components[IntegrationsFilter]
-                integrations = if_.neo4j_integrations
             if PageParticipants in query.components:
                 pp: PageParticipants = query.components[PageParticipants]
                 names = pp.neo4j_names
@@ -305,15 +343,18 @@ class DataAgent:
             if AbsoluteTimeFilter in query.components:
                 atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
                 time_range = atf.neo4j_time_range
-            if BlocksFilter in query.components:
-                bf: BlocksFilter = query.components[BlocksFilter]
-                block_labels = bf.neo4j_labels
             if RelativeTimeFilter in query.components:
                 rtf: RelativeTimeFilter = query.components[RelativeTimeFilter]
                 order_by = rtf.neo4j_order_by
             if Count in query.components:
                 c: Count = query.components[Count]
                 limit = c.neo4j_limit
+            if IntegrationsFilter in query.components:
+                if_: IntegrationsFilter = query.components[IntegrationsFilter]
+                integrations = if_.neo4j_integrations
+            if BlocksToSearch in query.components:
+                bts: BlocksToSearch = query.components[BlocksToSearch]
+                block_labels = bts.neo4j_blocks
             if PageIds in query.components:
                 pi: PageIds = query.components[PageIds]
                 page_ids = (page_ids.union(pi.values)
@@ -348,16 +389,16 @@ class DataAgent:
         max_date_day = None
         block_labels = None
         document_id = None
-        if IntegrationsFilter in query.components:
-            if_: IntegrationsFilter = query.components[IntegrationsFilter]
-            integrations = if_.pinecone_integrations
         if AbsoluteTimeFilter in query.components:
             atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
             min_date_day = atf.pinecone_min_date_day
             max_date_day = atf.pinecone_max_date_day
-        if BlocksFilter in query.components:
-            bf: BlocksFilter = query.components[BlocksFilter]
-            block_labels = bf.pinecone_labels
+        if IntegrationsFilter in query.components:
+            if_: IntegrationsFilter = query.components[IntegrationsFilter]
+            integrations = if_.pinecone_integrations
+        if BlocksToSearch in query.components:
+            bts: BlocksToSearch = query.components[BlocksToSearch]
+            block_labels = bts.pinecone_blocks
         if PageIds in query.components:
             pi: PageIds = query.components[PageIds]
             document_id = pi.values
@@ -428,11 +469,18 @@ class DataAgent:
 
 def _query_from_llm_response(llm_response: str) -> Query:
     match = re.search(r'{[\s\S]*}', llm_response, re.DOTALL)
-    if match:
+    # TODO: TRY CATCH
+    try:
         stringified_json = match.group(0)
         query_json = json.loads(stringified_json)
         query = Query.from_llm_response(query_json)
         return query
+    except:
+        print((
+            '[DataAgent] Error parsing query from LLM response!\n'
+            f'LLM response:\n{llm_response}'
+        ))
+        return Query()
 
 
 def _node_get(node: Dict, property: str) -> Any:
@@ -451,39 +499,3 @@ class Vector:
     id_: str
     embedding: List[float]
     distance = float = None
-
-
-def _get_neighbors(
-    query_vector: Vector,
-    block_vectors: List[Vector],
-    num_neighbors: int = 5
-) -> List[Vector]:
-    query_embedding = query_vector.embedding
-    for block_vector in block_vectors:
-        distance = _euclidean_distance(
-            query_embedding,
-            block_vector.embedding
-        )
-        block_vector.distance = distance
-    sorted_block_vectors = sorted(block_vectors, key=lambda x: x.distance)
-    return sorted_block_vectors[:num_neighbors]
-
-
-# TODO: move to somewhere that makes sense
-def _decorate_block_embeddings(
-    _vector_db: Pinecone,
-    documents: List[Document]
-) -> None:
-    ids: List[str] = []
-    for document in documents:
-        ids.extend([consists.target.id for consists in document.consists])
-
-    embeddings = _vector_db.fetch(ids)
-    block_vectors = {}
-    for id_, vector in embeddings.items():
-        block_vectors[id_] = vector.values
-
-    for document in documents:
-        for consists in document.consists:
-            consists.target.embedding = block_vectors.get(
-                consists.target.id, None)

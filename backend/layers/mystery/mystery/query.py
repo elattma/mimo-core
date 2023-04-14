@@ -54,9 +54,10 @@ class QueryComponent(ABC):
             'time_sort': RelativeTimeFilter,
             'count': Count,
             'sources': IntegrationsFilter,
-            'blocks': BlocksFilter,
             'search_method': SearchMethod,
+            'blocks_to_search': BlocksToSearch,
             'return_type': ReturnType,
+            'blocks_to_return': BlocksToReturn
         }
         if key not in lookup:
             raise ValueError(f'Invalid key: {key}')
@@ -72,9 +73,10 @@ class QueryComponent(ABC):
             RelativeTimeFilter,
             Count,
             IntegrationsFilter,
-            BlocksFilter,
             SearchMethod,
+            BlocksToSearch,
             ReturnType,
+            BlocksToReturn
         ]
 
 
@@ -86,7 +88,10 @@ class Concepts(QueryComponent):
     @ staticmethod
     def from_llm_response(llm_response: List[str]) -> 'Concepts':
         if not Concepts._validate_llm_response(llm_response):
-            print(f'Failed to create Concepts from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create Concepts from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         return Concepts(llm_response)
 
@@ -142,7 +147,10 @@ class PageParticipants(QueryComponent):
         # llm_response should be a list of dictionaries with each entry
         # containing keys "name" and "role" that map to strings
         if not PageParticipants._validate_llm_response(llm_response):
-            print(f'Failed to create PageParticipants from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create PageParticipants from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         values = []
         for item in llm_response:
@@ -167,10 +175,10 @@ class PageParticipants(QueryComponent):
 
     @ staticmethod
     def json_for_prompt() -> str:
-        return (' "page_participants": {'
-                '  "name": string,'
-                '  "role": "author" OR "recipient" OR "unknown"'
-                ' }')
+        return (' "page_participants": {\n'
+                '  "name": string,\n'
+                '  "role": "author" OR "recipient" OR "unknown"\n'
+                ' }[]')
 
     @ property
     def neo4j_names(self) -> Set[str]:
@@ -186,12 +194,10 @@ class PageParticipants(QueryComponent):
         for item in llm_response:
             if not (item and 'name' in item):
                 return False
-
             if ('role' not in item or not
-                (item['role'] == PageParticipantRole.AUTHOR.value or
-                    item['role'] == PageParticipantRole.RECIPIENT.value)):
+                (item['role'] == PageParticipantRole.AUTHOR.value
+                 or item['role'] == PageParticipantRole.RECIPIENT.value)):
                 item['role'] = PageParticipantRole.UNKNOWN.value
-
         return True
 
 
@@ -213,7 +219,10 @@ class AbsoluteTimeFilter(QueryComponent):
         start_valid = AbsoluteTimeFilter._validate_date(start)
         end_valid = AbsoluteTimeFilter._validate_date(end)
         if not (start_valid or end_valid):
-            print(f'Failed to create AbsoluteTimeFilter from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create AbsoluteTimeFilter from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         start = date_string_to_date_day(
             llm_response['start']
@@ -278,14 +287,17 @@ class RelativeTimeFilter(QueryComponent):
         # 'count'. The value of 'ascending' should be a boolean and the value
         # of 'count' should be an integer.
         if not RelativeTimeFilter._validate_llm_response(llm_response):
-            print(f'Failed to create RelativeTimeFilter from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create RelativeTimeFilter from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         ascending = llm_response['ascending']
         return RelativeTimeFilter(ascending)
 
     @ staticmethod
     def description_for_prompt() -> str:
-        return ('time_sort: Inlude a time_sort if the Request is requesting '
+        return ('time_sort: Include a time_sort if the Request is requesting '
                 'information based on a relative ordering of time.')
 
     @ staticmethod
@@ -317,7 +329,10 @@ class Count(QueryComponent):
     @ staticmethod
     def from_llm_response(llm_response: int) -> 'Count':
         if not isinstance(llm_response, int) or llm_response < 1:
-            print(f'Failed to create Count from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create Count from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         return Count(llm_response)
 
@@ -348,7 +363,6 @@ class IntegrationsFilter(QueryComponent):
     '''Enforces that only results from these integrations are considered. e.g.
     'gmail', 'zendesk' '''
     integrations: List[Integration]
-    page_ids: List[str] = None
 
     @ staticmethod
     def from_llm_response(llm_response: List[str]) -> 'IntegrationsFilter':
@@ -358,7 +372,10 @@ class IntegrationsFilter(QueryComponent):
             integrations = [Integration(integration) for integration in
                             llm_response]
         except ValueError:
-            print(f'Failed to create IntegrationFilter from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create IntegrationsFilter from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         return IntegrationsFilter(integrations)
 
@@ -378,7 +395,6 @@ class IntegrationsFilter(QueryComponent):
     @ property
     def neo4j_integrations(self) -> Set[str]:
         '''Returns a list of integration names for use in Neo4j.'''
-        print(f'[Query] {self.integrations}')
         return set([self._get_integration_name_from_category(integration)
                     for integration in self.integrations])
 
@@ -399,71 +415,6 @@ class IntegrationsFilter(QueryComponent):
             return 'google_mail'
 
 
-class Block(Enum):
-    BODY = 'body'
-    COMMENT = 'comment'
-    CONTACT = 'contact'
-    DEAL = 'deal'
-    MEMBER = 'member'
-    SUMMARY = 'summary'
-    TITLE = 'title'
-
-
-@ dataclass
-class BlocksFilter(QueryComponent):
-    '''Enforces that only results from these blocks are considered. e.g.
-    "title contains", "summarize"'''
-    blocks: List[Block]
-    block_ids: List[str] = None
-
-    @ staticmethod
-    def from_llm_response(llm_response: List[str]) -> 'BlocksFilter':
-        if not llm_response:
-            return None
-        try:
-            blocks = [Block(block) for block in llm_response]
-        except ValueError:
-            print(f'Failed to create BlocksFilter from LLM response: {llm_response}'.replace('\n', '\r'))
-            return None
-        return BlocksFilter(blocks)
-
-    @ staticmethod
-    def description_for_prompt() -> str:
-        blocks = ', '.join([f'"{block.value}"' for block in Block])
-        blocks = f'[{blocks}]'
-        return ('blocks: Include this field only if the information relevant '
-                'to the Request is guaranteed to be contained within a '
-                'specific block or set of blocks. '
-                f'The possible blocks are: {blocks}.')
-
-    @ staticmethod
-    def json_for_prompt() -> str:
-        return ' "blocks": string[]'
-
-    @ staticmethod
-    def get_block_descriptions() -> str:
-        return ('"body": The body of the page, e.g. the text in a '
-                'Microsoft Word document.\n'
-                '"comment": A comment on the page, e.g. a comment on a Jira '
-                'ticket.\n'
-                '"contact": A contact associated with an account in a CRM.\n'
-                '"deal": A deal associated with an account in a CRM.\n'
-                '"member": A list of members associated with the page, e.g. '
-                'the author, recipients, etc.\n'
-                '"summary": A summary of the page.\n'
-                '"title": The title of the page.')
-
-    @ property
-    def neo4j_labels(self) -> Set[str]:
-        '''Returns a list of block labels for use in Neo4j.'''
-        return set([block.value for block in self.blocks])
-
-    @ property
-    def pinecone_labels(self) -> Set[str]:
-        '''Returns a list of block labels for use in Pinecone.'''
-        return set([block.value for block in self.blocks])
-
-
 class SearchMethodValue(Enum):
     RELEVANT = 'relevant'
     EXACT = 'exact'
@@ -482,7 +433,10 @@ class SearchMethod(QueryComponent):
         try:
             value = SearchMethodValue(llm_response)
         except ValueError:
-            print(f'Failed to create SearchMethod from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create SearchMethod from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         return SearchMethod(value)
 
@@ -494,7 +448,7 @@ class SearchMethod(QueryComponent):
     @ staticmethod
     def json_for_prompt() -> str:
         return ' "search_method": "exact" OR "relevant"'
-
+    
 
 class ReturnTypeValue(Enum):
     PAGES = 'pages'
@@ -510,7 +464,10 @@ class ReturnType(QueryComponent):
         try:
             value = ReturnTypeValue(llm_response)
         except ValueError:
-            print(f'Failed to create ReturnType from LLM response: {llm_response}'.replace('\n', '\r'))
+            print((
+                'Failed to create ReturnType from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
             return None
         return ReturnType(value)
 
@@ -525,6 +482,96 @@ class ReturnType(QueryComponent):
     @ staticmethod
     def json_for_prompt() -> str:
         return ' "return_type": "pages" OR "blocks"'
+    
+
+class Block(Enum):
+    BODY = 'body'
+    COMMENT = 'comment'
+    CONTACT = 'contact'
+    DEAL = 'deal'
+    MEMBER = 'member'
+    SUMMARY = 'summary'
+    TITLE = 'title'
+
+
+@ dataclass
+class BlocksFilter(QueryComponent, ABC):
+    '''Abstract class for blocks filters.'''
+    blocks: List[Block]
+
+    @ classmethod
+    def from_llm_response(cls, llm_response: List[str]) -> 'BlocksFilter':
+        if not llm_response:
+            return None
+        try:
+            blocks = [Block(block) for block in llm_response]
+        except ValueError:
+            print((
+                f'Failed to create {cls.__name__} from LLM response:\n'
+                f'{llm_response}'
+            ).replace('\n', '\r'))
+            return None
+        return cls(blocks)
+    
+    @ staticmethod
+    def get_block_descriptions() -> str:
+        return ('"body": The body of the page, e.g. the text in a '
+                'Microsoft Word document.\n'
+                '"comment": A comment on the page, e.g. a comment on a Jira '
+                'ticket.\n'
+                '"contact": A contact associated with an account in a CRM.\n'
+                '"deal": A deal associated with an account in a CRM.\n'
+                '"member": A list of members associated with the page, e.g. '
+                'the author, recipients, etc.\n'
+                '"summary": A summary of the page.\n'
+                '"title": The title of the page.')
+    
+    @ property
+    def neo4j_blocks(self) -> Set[str]:
+        '''Returns a list of block names for use in Neo4j.'''
+        return set([block.value for block in self.blocks])
+    
+    @ property
+    def pinecone_blocks(self) -> Set[str]:
+        '''Returns a list of block names for use in Pinecone.'''
+        return set([block.value for block in self.blocks])
+
+
+@ dataclass
+class BlocksToSearch(BlocksFilter):
+    '''Enforces that only these blocks are searched.'''
+    @ staticmethod
+    def description_for_prompt() -> str:
+        block_names = ', '.join([f'"{block.value}"' for block in Block])
+        block_names = '[' + block_names + ']'
+        return (
+            'blocks_to_search: A list of blocks to search. Used if you want '
+            'to search for information based on specific blocks. The '
+            f'possible blocks are: {block_names}'
+        )
+
+    @ staticmethod
+    def json_for_prompt() -> str:
+        return ' "blocks_to_search": string[]'
+
+
+@ dataclass
+class BlocksToReturn(BlocksFilter):
+    '''Enforces that only these blocks are returned.'''
+    @ staticmethod
+    def description_for_prompt() -> str:
+        block_names = ', '.join([f'"{block.value}"' for block in Block])
+        block_names = '[' + block_names + ']'
+        return (
+            'blocks_to_return: A list of blocks to return. Used if '
+            '"return_type" is "blocks" and it is clear that only specific '
+            'blocks should be returned. The possible blocks are: '
+            f'{block_names}'
+        )
+
+    @ staticmethod
+    def json_for_prompt() -> str:
+        return ' "blocks_to_return": string[]'
     
 
 @ dataclass
@@ -558,7 +605,12 @@ class Query:
                     key
                 )
             except ValueError:
-                print(f'LLM produced invalid query component: {key}'.replace('\n', '\r'))
+                print(
+                    f'LLM produced invalid query component: {key}'.replace(
+                        '\n',
+                        '\r'
+                    )
+                )
                 continue
             component = component_class.from_llm_response(value)
             if component:
