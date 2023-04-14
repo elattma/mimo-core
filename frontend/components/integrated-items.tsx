@@ -95,21 +95,28 @@ function Filters() {
   );
 }
 
-interface RadioProps {
+type RadioProps = {
   selection: SelectionType;
   setSelection: Dispatch<SetStateAction<SelectionType>>;
-}
+};
+
+const allRadioVariants = cva(
+  "flex items-center space-x-theme-1/8 rounded-theme border px-theme-1/4 py-theme-1/8 text-sm transition-colors hover:cursor-pointer",
+  {
+    variants: {
+      selected: {
+        true: "border-brand-border bg-brand-bg text-brand-text",
+        false: "border-neutral-border bg-neutral-bg text-gray-text",
+      },
+    },
+  }
+);
 
 const All = forwardRef<HTMLDivElement, RadioProps>(
   ({ selection, setSelection }, forwardedRef) => {
     return (
       <div
-        className={[
-          "flex items-center space-x-theme-1/8 rounded-theme border px-theme-1/4 py-theme-1/8 text-sm transition-colors hover:cursor-pointer",
-          selection === "all"
-            ? "border-brand-border bg-brand-bg text-brand-text"
-            : "border-neutral-border bg-neutral-bg text-gray-text",
-        ].join(" ")}
+        className={allRadioVariants({ selected: selection === "all" })}
         ref={forwardedRef}
         role="radio"
         aria-checked={selection === "all"}
@@ -129,6 +136,32 @@ const All = forwardRef<HTMLDivElement, RadioProps>(
   }
 );
 All.displayName = "All";
+
+const customRadioVariants = cva(
+  "flex cursor-pointer items-center space-x-theme-1/8 rounded-l-theme border-r px-theme-1/4 py-theme-1/8 transition-colors",
+  {
+    variants: {
+      selected: {
+        true: "border-brand-border hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active",
+        false:
+          "border-neutral-border hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
+      },
+    },
+  }
+);
+
+const customerDropdownTriggerVariants = cva(
+  "flex cursor-pointer items-center justify-center rounded-r-theme px-theme-1/8 transition-colors",
+  {
+    variants: {
+      selected: {
+        true: "hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active",
+        false:
+          "hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
+      },
+    },
+  }
+);
 
 const Custom = forwardRef<
   HTMLDivElement,
@@ -153,12 +186,7 @@ const Custom = forwardRef<
     >
       <div
         ref={forwardedRef}
-        className={[
-          "flex cursor-pointer items-center space-x-theme-1/8 rounded-l-theme border-r px-theme-1/4 py-theme-1/8 transition-colors",
-          selection === "custom"
-            ? "border-brand-border hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
-            : "border-neutral-border hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
-        ].join(" ")}
+        className={customRadioVariants({ selected: selection === "custom" })}
         role="radio"
         aria-checked={selection === "custom"}
         aria-label="custom"
@@ -176,12 +204,9 @@ const Custom = forwardRef<
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <div
-            className={[
-              "flex cursor-pointer items-center justify-center rounded-r-theme px-theme-1/8 transition-colors",
-              selection === "custom"
-                ? "hover:bg-brand-bg-hover focus:bg-brand-bg-hover active:bg-brand-bg-active"
-                : "hover:bg-neutral-bg-hover focus:bg-neutral-bg-hover active:bg-neutral-bg-active",
-            ].join(" ")}
+            className={customerDropdownTriggerVariants({
+              selected: selection === "custom",
+            })}
             role="button"
             tabIndex={0}
             aria-label="configure custom filter for integrations"
