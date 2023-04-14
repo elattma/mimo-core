@@ -52,7 +52,7 @@ def handler(event: dict, context):
             graph_db=neo4j, 
             openai=openai, 
         )
-    context_basket: ContextBasket = data_agent.generate_context(question, max_tokens=2000)
+    context_basket: ContextBasket = data_agent.generate_context(question, max_tokens=400)
     answer = str(context_basket)
     
     return to_response_success({
