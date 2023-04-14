@@ -165,13 +165,10 @@ class PageParticipants(QueryComponent):
 
     @ staticmethod
     def description_for_prompt() -> str:
-        return ('page_participants: A list of entities , e.g. people or '
-                'organizations, that are linked to the creation of the '
+        return ('page_participants: A list of entities, e.g. people or '
+                'organizations, that are linked to the '
                 'information you are searching for. They should be paired '
-                'with their role in the creation of the information. This '
-                'can either be "author" or "recipient". If you know someone '
-                'is a page_participant, but don\'t know their role, put '
-                '"unknown".')
+                'with their relationship to the information.')
 
     @ staticmethod
     def json_for_prompt() -> str:

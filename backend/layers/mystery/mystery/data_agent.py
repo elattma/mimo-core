@@ -79,6 +79,26 @@ Query: {{
  "search_method": "relevant",
  "blocks_to_search": ["comment"],
  "return_type": "pages"
+}}
+
+EXAMPLE 3
+Request: Deals with Acme Inc. from Q2 2021
+Query: {{
+ "page_participants": [
+  {{
+   "name": "Acme Inc.",
+   "role": "unknown"
+  }}
+ ],
+ "time_frame": {{
+  "start": "2021-04-01",
+  "end": "2021-06-30"
+ }},
+ "sources": ["crm"],
+ "search_method": "exact",
+ "blocks_to_search": ["deal"],
+ "return_type": "blocks",
+ "blocks_to_return": ["deal"]
 }}'''
 
 
