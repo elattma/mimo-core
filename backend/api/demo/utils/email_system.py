@@ -139,17 +139,16 @@ class EmailSystem:
         subject = subject_match.group(1).strip() if subject_match else None
         body_match = re.search(r'Subject:.*\n([\s\S]*)', output)
         body = body_match.group(1).strip() if body_match else None
-        link = ''
+        link = 'mailto:'
         if recipient:
-            link += recipient
+            link += quote(recipient)
         link += '?'
         if subject:
-            link += f'subject={subject}'
+            link += f'subject={quote(subject)}'
         if body:
             if subject:
                 link += '&'
-            link += f'body={body}'
-        link = 'mailto:' + quote(link)
+            link += f'body={quote(body)}'
         return EmailSystemSuccess(recipient, subject, body, link)
     
 def _query_mimo_api(message: str, mimo_test_token: str) -> str:
