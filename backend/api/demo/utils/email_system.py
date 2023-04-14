@@ -5,8 +5,9 @@ from typing import List
 from urllib.parse import quote
 
 import requests
-from langchain.agents import AgentExecutor, Tool, ZeroShotAgent
+from langchain.agents import AgentExecutor, load_tools, Tool, ZeroShotAgent
 from langchain.chat_models import ChatOpenAI
+from langchain.llms import OpenAI
 
 PREFIX = '''You are an expert at writing emails. Based on the request from the user, write an email to the best of your ability.
 The user will assume you know everything about their company and its customers. Since you don't, use your tools to look up information as needed.
@@ -62,7 +63,12 @@ class EmailSystem:
                 temperature=0.2
             )
         if not self._tools:
-            self._tools = self._make_tools()
+            math_llm = OpenAI(
+                openai_api_key=openai_api_key,
+                temperature=0.0
+            )
+            math_tool = load_tools(tool_names=['llm-math'], llm=math_llm)
+            self._tools = self._make_tools() + math_tool
         if not self._agent:
             self._agent = ZeroShotAgent.from_llm_and_tools(
                 llm=self._llm,
