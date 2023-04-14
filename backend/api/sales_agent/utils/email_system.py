@@ -1,4 +1,5 @@
 import re
+from abc import ABC
 from dataclasses import dataclass
 from typing import List
 from urllib.parse import quote
@@ -10,7 +11,7 @@ from langchain.chat_models import ChatOpenAI
 
 PREFIX = '''You are an expert at writing emails. Based on the request from the user, write an email to the best of your ability.
 The user will assume you know everything about their company and its customers. Since you don't, use the tools you have access to to look up information you don't know.
-Your final answer should be in the following form.
+Your final answer should always be in the following form.
 --------
 To: <EMAIL ADDRESS>
 Subject: <SUBJECT>
@@ -25,18 +26,26 @@ Question: {input}
 
 INPUT_VARIABLES = ['input', 'agent_scratchpad']
 
+MAX_ITERATIONS = 5
+
 MIMO_DATA_AGENT_TMP_ENDPOINT = 'https://ztsl6igv66ognn6qpvsfict6y40qocst.lambda-url.us-east-1.on.aws'
 
-@dataclass
 class EmailSystemResponse:
+    pass
+
+@dataclass
+class EmailSystemSuccess(EmailSystemResponse):
     recipient: str
     subject: str
     body: str
     link: str
 
+@dataclass
+class EmailSystemError(EmailSystemResponse):
+    message: str
+
 class EmailSystem:
     _llm: ChatOpenAI = None
-    _llm_chain: LLMChain = None
     _tools: List[Tool] = None
     _agent: ZeroShotAgent = None
     _agent_executor: AgentExecutor = None
@@ -49,36 +58,44 @@ class EmailSystem:
         if not self._llm:
             self._llm = ChatOpenAI(
                 openai_api_key=openai_api_key,
-                temperature=0.2
+                model_name='gpt-3.5-turbo',
+                temperature=0.0
             )
         if not self._tools:
             self._tools = self._make_tools()
-        if not self._llm_chain:
             prompt = ZeroShotAgent.create_prompt(
                 self._tools,
                 prefix=PREFIX,
                 suffix=SUFFIX,
                 input_variables=INPUT_VARIABLES
             )
-            self._llm_chain = LLMChain(llm=self._llm, prompt=prompt)
         if not self._agent:
-            tool_names = [tool.name for tool in self._tools]
-            self._agent = ZeroShotAgent(
-                llm_chain=self._llm_chain,
-                allowed_tools=tool_names
+            self._agent = ZeroShotAgent.from_llm_and_tools(
+                llm=self._llm,
+                tools=self._tools,
+                prefx=PREFIX,
+                suffix=SUFFIX,
+                input_variables=INPUT_VARIABLES
             )
         if not self._agent_executor:
             self._agent_executor = AgentExecutor.from_agent_and_tools(
                 self._agent,
                 self._tools,
+                max_iterations=MAX_ITERATIONS,
                 verbose=True
             )
         self._recipients = []
         self._context = ''
 
     def run(self, message: str) -> EmailSystemResponse:
-        agent_output = self._agent_executor.run(input=message)
-        response = self._parse_output(agent_output)
+        try:
+            agent_output = self._agent_executor.run(input=message)
+            response = self._parse_output(agent_output)
+        except Exception as e:
+            print(e)
+            message = ('Something went wrong. Please try again. It might '
+                       'help to rephrase your message.')
+            response = EmailSystemError(message)
         return response
 
     def _make_tools(self) -> List[Tool]:
@@ -109,17 +126,26 @@ class EmailSystem:
 
     def _look_up_email(self, input: str) -> str:
         name = input.strip()
-        input = f'What is the email of {name} from the CRM?'
+        input = f'{name}\'s email address from the CRM'
         return _query_mimo_api(input, self._mimo_test_token)
     
     def _parse_output(self, output: str) -> EmailSystemResponse:
-        recipient_match = re.search(r'To:(.*)', output).group(1)
-        subject_match = re.search(r'Subject:(.*)', output).group(1)
-        body_match = re.search(r'Subject:.*\n([\s\S]*)', output).group(1)
-        recipient = recipient_match.strip()
-        subject = subject_match.strip()
-        body = body_match.strip()
-        link = quote(f'mailto:{recipient}?subject={subject}&body={body}')
+        recipient_match = re.search(r'To:(.*)', output)
+        recipient = recipient_match.group(1).strip() if recipient_match else None
+        subject_match = re.search(r'Subject:(.*)', output)
+        subject = subject_match.group(1).strip() if subject_match else None
+        body_match = re.search(r'Subject:.*\n([\s\S]*)', output)
+        body = body_match.group(1).strip() if body_match else None
+        link = 'mailto:'
+        if recipient:
+            link += recipient
+        link += '?'
+        if subject:
+            link += f'subject={subject}'
+        if body:
+            if subject:
+                link += '&'
+            link += f'body={body}'
         return EmailSystemResponse(recipient, subject, body, link)
     
 def _query_mimo_api(message: str, mimo_test_token: str) -> str:

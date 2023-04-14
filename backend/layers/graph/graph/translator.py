@@ -1,7 +1,7 @@
 from typing import List
 
 from .blocks import (BlockStream, BodyBlock, CommentBlock, ContactBlock,
-                     DealBlock, MemberBlock, SummaryBlock, TitleBlock)
+                     DealBlock, MemberBlock, Relations, SummaryBlock, TitleBlock)
 
 SUPPORTED_BLOCK_LABELS = set([
     SummaryBlock._LABEL,
@@ -137,8 +137,11 @@ class Translator:
     def _translate_member_blocks(member_blocks: List[MemberBlock]):
         members = []
         for member_block in member_blocks:
-            members.append(
-                f'{member_block.name} is a {member_block.relation.value}')
+            members.append((
+                f'\t{member_block.name.value}:\n'
+                f'\t\tEmail: {member_block.name.id}\n'
+                f'\t\tRole: {member_block.relation.value}'
+            ))
         members = '\n'.join(members)
         return f'Members:\n{members}'
 
