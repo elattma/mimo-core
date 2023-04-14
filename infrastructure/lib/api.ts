@@ -45,7 +45,7 @@ export interface ApiStackProps extends StackProps {
   readonly uploadItemBucket: IBucket;
 }
 
-const LAYERS = ["aws", "external", "fetcher", "graph", "mystery"];
+const LAYERS = ["aws", "external", "fetcher", "graph", "mystery", "cold"];
 
 interface LambdaParams {
   readonly route: string;
@@ -164,6 +164,7 @@ export class ApiStack extends Stack {
         AGENT_QUEUE_URL: queue.queueUrl,
       },
       timeout: Duration.minutes(10),
+      layers: this.getLayersSubset(["cold"]),
     });
     integrationsSecret.grantRead(slackHandler);
     eventSource.queue.grantSendMessages(slackHandler);

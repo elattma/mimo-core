@@ -94,8 +94,6 @@ def handler(event: dict, context):
     
     if IS_COLD_START:
         IS_COLD_START = False
-        import time
-        time.sleep(5)
         return 400
 
     access_token = secrets.get('SLACK_ACCESS_TOKEN')    
