@@ -564,9 +564,8 @@ class BlocksToReturn(BlocksFilter):
         block_names = '[' + block_names + ']'
         return (
             'blocks_to_return: A list of blocks to return. Used if '
-            '"return_type" is "blocks" and it is clear that only specific '
-            'blocks should be returned. The possible blocks are: '
-            f'{block_names}'
+            'it is explicitly specified that the results should be '
+            f'certain block type(s). The possible blocks are: {block_names}'
         )
 
     @ staticmethod
