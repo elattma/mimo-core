@@ -177,9 +177,10 @@ class DataAgent:
             query.request,
             documents
         )
+        print(f'[DataAgent] Context generated! Raw: {str(basket)}'.replace('\n', '\r'))
         if max_tokens:
             self._basket_weaver.minify_context_basket(basket, max_tokens)
-        print('[DataAgent] Context generated!')
+        print(f'[DataAgent] Context generated! Minified: {str(basket)}'.replace('\n', '\r'))
         return basket
 
     def _exact_context(self, query: Query) -> List[Document]:

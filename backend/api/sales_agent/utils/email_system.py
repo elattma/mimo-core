@@ -29,7 +29,7 @@ MAX_ITERATIONS = 5
 
 MIMO_DATA_AGENT_TMP_ENDPOINT = 'https://ztsl6igv66ognn6qpvsfict6y40qocst.lambda-url.us-east-1.on.aws'
 
-class EmailSystemResponse:
+class EmailSystemResponse(ABC):
     pass
 
 @dataclass

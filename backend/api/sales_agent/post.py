@@ -5,7 +5,7 @@ from enum import Enum
 import boto3
 import requests
 from pyparsing import Mapping
-from utils.email_system import EmailSystem
+from utils.email_system import EmailSystem, EmailSystemSuccess
 
 
 class Secrets:
@@ -95,39 +95,41 @@ def handler(event: dict, context):
                 mimo_test_token=mimo_test_token
             )
         
-        message = {
-            'channel': channel,
-            'text': 'Give me just a few moments :)'
-        }
-        response = requests.get('https://slack.com/api/chat.postMessage', params=message, headers={
-            'Authorization': f'Bearer {access_token}', 
-            'Content-type': 'application/x-www-form-urlencoded'
-        })
-        response = response.json() if response else None
-        if not (response and response.get('ok', False)):
-            return to_response_error(response.get('error', 'An error occurred'))
+        wait_response = requests.get('https://slack.com/api/chat.postMessage', 
+            params={
+                'channel': channel,
+                'text': 'Give me just a few moments :)'
+            }, 
+            headers={
+                'Authorization': f'Bearer {access_token}', 
+                'Content-type': 'application/x-www-form-urlencoded'
+            }
+        )
+        wait_response = wait_response.json() if wait_response else None
+        if not (wait_response and wait_response.get('ok', False)):
+            return to_response_error(wait_response.get('error', 'An error occurred'))
 
-        response = email_system.run(text)
+        system_response: EmailSystemSuccess = email_system.run(text)
         blocks = [
             {
                 'type': 'section',
                 'text': {
                     'type': 'mrkdwn',
-                    'text': f'*To*: {response.recipient}'
+                    'text': f'*To*: {system_response.recipient}'
                 }
             },
             {
                 'type': 'section',
                 'text': {
                     'type': 'mrkdwn',
-                    'text': f'*Subject*: {response.subject}'
+                    'text': f'*Subject*: {system_response.subject}'
                 }
             },
             {
                 'type': 'section',
                 'text': {
                     'type': 'mrkdwn',
-                    'text': f'{response.body}'
+                    'text': f'{system_response.body}'
                 }
             },
             {
@@ -143,7 +145,7 @@ def handler(event: dict, context):
                         'text': 'Open'
                     },
                     'value': 'open_email',
-                    'url': f'{response.link}',
+                    'url': f'{system_response.link}',
                     'action_id': 'open_email'
                 }
             }
@@ -153,16 +155,22 @@ def handler(event: dict, context):
             'channel': channel,
             'blocks': json.dumps(blocks)
         }
-        response = requests.get('https://slack.com/api/chat.postMessage', params=message, headers={
+        chat_response = requests.get('https://slack.com/api/chat.postMessage', params=message, headers={
             'Authorization': f'Bearer {access_token}', 
             'Content-type': 'application/x-www-form-urlencoded'
         })
-        response = response.json() if response else None
-        if response and response.get('ok', False):
-            return to_response_success(response)
+        chat_response = chat_response.json() if chat_response else None
+        if chat_response and chat_response.get('ok', False):
+            return to_response_success(chat_response)
         else:
-            return to_response_error(response.get('error', 'An error occurred'))
+            return to_response_error(chat_response.get('error', 'An error occurred'))
     
     return to_response_success({
         'message': 'Is bot or not a direct message'
     })
+
+event = {'version': '2.0', 'routeKey': '$default', 'rawPath': '/', 'rawQueryString': '', 'headers': {'content-length': '1375', 'x-amzn-tls-version': 'TLSv1.2', 'x-forwarded-proto': 'https', 'x-forwarded-port': '443', 'x-forwarded-for': '54.205.187.4', 'accept': '*/*', 'x-amzn-tls-cipher-suite': 'ECDHE-RSA-AES128-GCM-SHA256', 'x-amzn-trace-id': 'Root=1-6438cda6-069949fd68d0d6d97a1962c5', 'host': 'h6wtrhef5d6hhtzovni3eqtx4m0rzdht.lambda-url.us-east-1.on.aws', 'content-type': 'application/json', 'x-slack-request-timestamp': '1681444262', 'x-slack-signature': 'v0=2a4a191f1a61add6f068eebd28f82a76676978dbd26d8e9490d5dea7d6e16264', 'accept-encoding': 'gzip,deflate', 'user-agent': 'Slackbot 1.0 (+https://api.slack.com/robots)'}, 'requestContext': {'accountId': 'anonymous', 'apiId': 'h6wtrhef5d6hhtzovni3eqtx4m0rzdht', 'domainName': 'h6wtrhef5d6hhtzovni3eqtx4m0rzdht.lambda-url.us-east-1.on.aws', 'domainPrefix': 'h6wtrhef5d6hhtzovni3eqtx4m0rzdht', 'http': {'method': 'POST', 'path': '/', 'protocol': 'HTTP/1.1', 'sourceIp': '54.205.187.4', 'userAgent': 'Slackbot 1.0 (+https://api.slack.com/robots)'}, 'requestId': '3310818b-d8c1-4084-aef7-2e399eb98f0d', 'routeKey': '$default', 'stage': '$default', 'time': '14/Apr/2023:03:51:02 +0000', 'timeEpoch': 1681444262478}, 'body': '{"token":"7dMibSNCxREUyNPpE6STcyLL","team_id":"T03R7BR3RGF","context_team_id":"T03R7BR3RGF","context_enterprise_id":null,"api_app_id":"A052TNLPX1U","event":{"bot_id":"B053Q2PM7S4","type":"message","text":"Give me just a few moments :)","user":"U052KRAG4MV","ts":"1681444262.072099","app_id":"A052TNLPX1U","blocks":[{"type":"rich_text","block_id":"MZ6","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"Give me just a few moments :)"}]}]}],"team":"T03R7BR3RGF","bot_profile":{"id":"B053Q2PM7S4","deleted":false,"name":"Email Agent","updated":1681409978,"app_id":"A052TNLPX1U","icons":{"image_36":"https:\\/\\/avatars.slack-edge.com\\/2023-04-13\\/5104200659333_cdd707d22181402387da_36.png","image_48":"https:\\/\\/avatars.slack-edge.com\\/2023-04-13\\/5104200659333_cdd707d22181402387da_48.png","image_72":"https:\\/\\/avatars.slack-edge.com\\/2023-04-13\\/5104200659333_cdd707d22181402387da_72.png"},"team_id":"T03R7BR3RGF"},"channel":"D0532RVSDFE","event_ts":"1681444262.072099","channel_type":"im"},"type":"event_callback","event_id":"Ev0530M2L0LW","event_time":1681444262,"authorizations":[{"enterprise_id":null,"team_id":"T03R7BR3RGF","user_id":"U052KRAG4MV","is_bot":true,"is_enterprise_install":false}],"is_ext_shared_channel":false,"event_context":"4-eyJldCI6Im1lc3NhZ2UiLCJ0aWQiOiJUMDNSN0JSM1JHRiIsImFpZCI6IkEwNTJUTkxQWDFVIiwiY2lkIjoiRDA1MzJSVlNERkUifQ"}', 'isBase64Encoded': False}
+
+os.environ['STAGE'] = 'beta'
+os.environ['TEST_TOKEN'] = '82dab942-f0f4-4721-953d-200e0a750639'
+mimo_test_token = os.environ.get('TEST_TOKEN', None)
