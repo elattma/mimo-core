@@ -40,6 +40,7 @@ class Sqs:
             MessageBody=json.dumps(message_body)
         )
 
+IS_COLD_START = True
 secrets: Secrets = None
 sqs: Sqs = None
 
@@ -91,6 +92,12 @@ def handler(event: dict, context):
             'response_action': 'clear',
         })
     
+    if IS_COLD_START:
+        IS_COLD_START = False
+        import time
+        time.sleep(3)
+        return 400
+
     access_token = secrets.get('SLACK_ACCESS_TOKEN')    
     event = body.get('event', None)
     text = event.get('text', None) if event else None

@@ -4,7 +4,8 @@ import os
 import requests
 from utils.common import (Errors, Secrets, to_response_error,
                           to_response_success)
-from utils.email_system import EmailSystem, EmailSystemSuccess
+from utils.email_system import EmailSystem
+from utils.model import EmailSystemSuccess
 
 email_system: EmailSystem = None
 secrets: Secrets = None
