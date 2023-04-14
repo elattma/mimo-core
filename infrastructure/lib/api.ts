@@ -27,10 +27,12 @@ import {
 import { ITable } from "aws-cdk-lib/aws-dynamodb";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { CfnUrl, FunctionUrlAuthType, Runtime } from "aws-cdk-lib/aws-lambda";
+import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { ISecret, Secret } from "aws-cdk-lib/aws-secretsmanager";
+import { Queue } from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import path = require("path");
 
@@ -137,8 +139,8 @@ export class ApiStack extends Stack {
 
   createAgentRoutes = (stage: string, integrationsSecret: ISecret) => {
     const salesAgentHandler = this.getHandler({
-      route: "sales_agent",
-      method: "post",
+      route: "demo",
+      method: "sales_agent",
       environment: {
         TEST_TOKEN: TEST_TOKEN,
         STAGE: stage,
@@ -147,9 +149,27 @@ export class ApiStack extends Stack {
       timeout: Duration.minutes(5),
     });
     integrationsSecret.grantRead(salesAgentHandler);
+    const queue = new Queue(this, "slack-sales-agent-queue", {
+      visibilityTimeout: Duration.minutes(30),
+    });
+    const eventSource = new SqsEventSource(queue);
+    salesAgentHandler.addEventSource(eventSource);
 
-    const dataUrl = new CfnUrl(this, "sales-agent-url", {
-      targetFunctionArn: salesAgentHandler.functionArn,
+    const slackHandler = this.getHandler({
+      route: "slack",
+      method: "post",
+      environment: {
+        TEST_TOKEN: TEST_TOKEN,
+        STAGE: stage,
+        AGENT_QUEUE_URL: queue.queueUrl,
+      },
+      timeout: Duration.minutes(10),
+    });
+    integrationsSecret.grantRead(slackHandler);
+    eventSource.queue.grantSendMessages(slackHandler);
+
+    const slackUrl = new CfnUrl(this, "slack-url", {
+      targetFunctionArn: slackHandler.functionArn,
       authType: FunctionUrlAuthType.NONE,
       cors: {
         allowHeaders: [
@@ -165,19 +185,19 @@ export class ApiStack extends Stack {
       },
     });
 
-    new CfnResource(this, "sales-agent-permission", {
+    new CfnOutput(this, "api-slack-url", {
+      value: slackUrl.attrFunctionUrl,
+      exportName: "api-slack-url",
+    });
+
+    new CfnResource(this, "slack-permission", {
       type: "AWS::Lambda::Permission",
       properties: {
         Action: "lambda:InvokeFunctionUrl",
-        FunctionName: salesAgentHandler.functionArn,
+        FunctionName: slackHandler.functionArn,
         Principal: "*",
         FunctionUrlAuthType: "NONE",
       },
-    });
-
-    new CfnOutput(this, "api-sales-agent-url", {
-      value: dataUrl.attrFunctionUrl,
-      exportName: "sales-agent-url",
     });
   };
 

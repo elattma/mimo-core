@@ -53,6 +53,7 @@ class Block(ABC):
                     id=author_dict.get('id'),
                     value=author_dict.get('value')
                 ),
+                text=block_dict.get('text')
             )
         elif label == DealBlock._LABEL:
             owner_dict: dict = block_dict.get('owner')

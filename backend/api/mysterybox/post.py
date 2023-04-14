@@ -115,6 +115,8 @@ def discover_fetch_ingest(user: str, fetcher: Fetcher, ingestor: Ingestor) -> Df
             break
         next_token = discovery_response.next_token
         for item in discovery_response.items:
+            if item.id != '5695700000000417097':
+                continue
             max_items -= 1
             ingestion_timestamp = int(time())
             blocks_generator = fetcher.fetch(item.id)
