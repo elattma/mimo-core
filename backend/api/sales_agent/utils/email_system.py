@@ -10,11 +10,12 @@ from langchain.chat_models import ChatOpenAI
 
 PREFIX = '''You are an expert at writing emails. Based on the request from the user, write an email to the best of your ability.
 The user will assume you know everything about their company and its customers. Since you don't, use your tools to look up information as needed.
-Your Final Answer should be in the following form.
-
-To: EMAIL ADDRESS
-Subject: SUBJECT
-BODY
+Your Final Answer should always have the following structure:
+--------
+To: <EMAIL ADDRESS>
+Subject: <SUBJECT>
+<BODY>
+--------
 
 You have access to the following tools:'''
 
@@ -64,7 +65,7 @@ class EmailSystem:
             self._agent = ZeroShotAgent.from_llm_and_tools(
                 llm=self._llm,
                 tools=self._tools,
-                prefx=PREFIX,
+                prefix=PREFIX,
                 suffix=SUFFIX,
                 input_variables=INPUT_VARIABLES
             )
@@ -97,7 +98,8 @@ class EmailSystem:
                 'Used to look up information from the user\'s knowledge base '
                 'that you should include in the email. Input should be a '
                 'description of what you want to know more about. Output will '
-                'be relevant information from the user\'s knowledge base.'
+                'be relevant information from the user\'s knowledge base, if '
+                'it exists.'
             )
         )
         directory = Tool(
@@ -106,7 +108,7 @@ class EmailSystem:
             (
                 'Used to look up an email address of a person in the user\'s '
                 'CRM. Input should be the name of the person. Output will be '
-                'the person\'s contact from the user\'s CRM.'
+                'a contact from the CRM, if it exists.'
             )
         )
         tools = [
