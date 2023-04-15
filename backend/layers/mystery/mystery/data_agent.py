@@ -496,7 +496,6 @@ class DataAgent:
 
 def _query_from_llm_response(llm_response: str) -> Query:
     match = re.search(r'{[\s\S]*}', llm_response, re.DOTALL)
-    # TODO: TRY CATCH
     try:
         stringified_json = match.group(0)
         query_json = json.loads(stringified_json)
@@ -508,21 +507,4 @@ def _query_from_llm_response(llm_response: str) -> Query:
             f'LLM response:\n{llm_response}'
         ))
         return Query()
-
-
-def _node_get(node: Dict, property: str) -> Any:
-    return node.get(property, None) if node else None
-
-
-def _euclidean_distance(row1, row2):
-    distance = 0.0
-    for i in range(len(row1)-1):
-        distance += (row1[i] - row2[i])**2
-    return sqrt(distance)
-
-
-@ dataclass
-class Vector:
-    id_: str
-    embedding: List[float]
-    distance = float = None
+    
