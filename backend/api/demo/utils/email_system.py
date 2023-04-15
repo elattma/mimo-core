@@ -16,7 +16,7 @@ class EmailSystem:
     ) -> None:
         self._openai_api_key = openai_api_key
         self._mimo_test_token = mimo_test_token
-        self._llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.2)
+        self._llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.0)
         self._tools = self._make_tools()
         self._agent = ZeroShotAgent.from_llm_and_tools(
             self._llm,
