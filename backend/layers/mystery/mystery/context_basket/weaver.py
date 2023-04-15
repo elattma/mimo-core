@@ -18,7 +18,7 @@ class BasketWeaver:
         if not (request and documents):
             return None
 
-        contexts: List[Context] = []
+        context_basket = ContextBasket(request=request)
         for document in documents:
             source = Source(
                 page_id=document.id,
@@ -38,34 +38,32 @@ class BasketWeaver:
             translated = Translator.translate_document(
                 document.integration, block_streams)
             tokens = count_tokens(translated, request.encoding_name)
-            contexts.append(Context(
+            context_basket.append(Context(
                 source=source,
                 blocks=blocks,
                 translated=translated,
                 tokens=tokens
             ))
-        return ContextBasket(
-            request=request,
-            contexts=contexts
-        )
+        return context_basket
 
     def minify_context_basket(self, context_basket: ContextBasket, limit_tokens: int) -> None:
+        print(f'[Weaver] Minifying context basket with {len(context_basket.contexts)} contexts and {context_basket.tokens} tokens. Limit: {limit_tokens} tokens.')
         if context_basket.tokens <= limit_tokens:
             return
 
         request = context_basket.request
         encoding_name = request.encoding_name
-        sort_contexts(request.embedding, context_basket.contexts)
-        remaining_tokens = limit_tokens
+        context_basket.contexts = sort_contexts(request.embedding, context_basket.contexts)
+        remaining_tokens = context_basket.tokens - limit_tokens
         context_counter = 0
         contexts_len = len(context_basket.contexts)
         while remaining_tokens > 0 and context_counter < contexts_len - 1:
             context = context_basket.contexts[0]
-            context_tokens = count_tokens(context, encoding_name)
+            context_tokens = count_tokens(context.translated, encoding_name)
             remaining_tokens -= context_tokens
             if remaining_tokens < 0:
                 break
-            context_basket.contexts.pop(0)
+            context = context_basket.pop(0)
             context_counter += 1
 
 
@@ -76,23 +74,24 @@ def euclidean_distance(row1, row2) -> float:
     return sqrt(distance)
 
 
-def sort_list_embeddings(focal_embedding: List[float], _list: List[Any], embeddings: List[List[float]]) -> None:
+def sort_list_embeddings(focal_embedding: List[float], _list: List[Any], embeddings: List[List[float]]) -> List[Any]:
     if not (focal_embedding and _list and embeddings and len(_list) == len(embeddings)):
         print('[Weaver] Invalid input in sort list embeddings!')
         return
 
-    element_distance_tuples = List[tuple[Any, float]] = []
+    element_distance_tuples: List[tuple[Any, float]] = []
     for element, embedding in zip(_list, embeddings):
         distance: float = euclidean_distance(focal_embedding, embedding)
         element_distance_tuples.append((element, distance))
 
     element_distance_tuples.sort(key=lambda x: x[1], reverse=True)
+    return [tuple[0] for tuple in element_distance_tuples]
 
 
-def sort_contexts(focal_embedding: List[float], contexts: List[Context]) -> None:
+def sort_contexts(focal_embedding: List[float], contexts: List[Context]) -> List[Context]:
     context_embeddings = []
     for context in contexts:
-        sort_list_embeddings(focal_embedding, context.blocks, [
+        context.blocks = sort_list_embeddings(focal_embedding, context.blocks, [
                              block.embedding for block in context.blocks])
         context_embeddings.append(context.blocks[-1].embedding)
-    sort_list_embeddings(focal_embedding, contexts, context_embeddings)
+    return sort_list_embeddings(focal_embedding, contexts, context_embeddings)

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Set
 
 from external.openai_ import OpenAI
 from graph.blocks import MemberBlock, entity
-from graph.neo4j_ import (BlockFilter, ContentMatch, Document, DocumentFilter,
+from graph.neo4j_ import (Block, BlockFilter, ContentMatch, Document, DocumentFilter,
                           Limit, NameFilter, Neo4j, QueryFilter)
 from graph.pinecone_ import Filter as VectorFilter
 from graph.pinecone_ import Pinecone, RowType
@@ -195,6 +195,15 @@ class DataAgent:
             documents.extend(self._relevant_context(query))
         filtered_documents = self._apply_return_filters(documents, query)
 
+        block_id_to_block: dict[str, Block] = {}
+        for document in filtered_documents:
+            for block in document.consists:
+                block_id_to_block[block.target.id] = block.target
+        vectors = self._vector_db.fetch(list(block_id_to_block.keys()))
+        for vector_id, vector in vectors.items():
+            print(len(vector.values))
+            block_id_to_block[vector_id].embedding = vector.values
+
         # Weave basket from documents
         basket = self._basket_weaver.weave_context_basket(
             query.request,
@@ -223,8 +232,6 @@ class DataAgent:
         block_ids = set(matches.keys())
         results = self._query_graph_db(block_ids=block_ids)
         print('[DataAgent] Filled basket with relevant context!')
-        print('RESULTS FROM RELEVANT SEARCH')
-        print(results)
         return results
 
     def _relevant_context_by_page_participants(

@@ -41,6 +41,7 @@ class ContextBasket:
         if self.contexts:
             context = self.contexts.pop(pos)
             self.tokens -= context.tokens
+            return context
 
     def __iter__(self):
         return iter(self.contexts)

@@ -22,6 +22,7 @@ def handler(event: dict, context):
     graph_db_uri: str = os.environ['GRAPH_DB_URI']
     query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     question: str = query_string_parameters.get('question', None) if query_string_parameters else None
+    max_tokens: int = query_string_parameters.get('max_tokens', 1600) if query_string_parameters else 1600
     test_token: str = query_string_parameters.get('test_token', None) if query_string_parameters else None
     user = 'google-oauth2|108573573074253667565'
     if not test_token or test_token != mimo_test_token:
@@ -52,7 +53,7 @@ def handler(event: dict, context):
             graph_db=neo4j, 
             openai=openai, 
         )
-    context_basket: ContextBasket = data_agent.generate_context(question, max_tokens=400)
+    context_basket: ContextBasket = data_agent.generate_context(question, max_tokens=max_tokens)
     answer = str(context_basket)
     
     return to_response_success({
