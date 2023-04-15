@@ -149,10 +149,21 @@ export class ApiStack extends Stack {
       timeout: Duration.minutes(5),
     });
     integrationsSecret.grantRead(salesAgentHandler);
+
+    const deadLetterQueue = new Queue(this, "dlq", {
+      deliveryDelay: Duration.millis(0),
+      contentBasedDeduplication: true,
+      retentionPeriod: Duration.days(14),
+    });
+
     const queue = new Queue(this, "slack-sales-agent-queue", {
       visibilityTimeout: Duration.minutes(6),
+      deadLetterQueue: {
+        maxReceiveCount: 1,
+        queue: deadLetterQueue,
+      },
     });
-    const eventSource = new SqsEventSource(queue, {});
+    const eventSource = new SqsEventSource(queue);
     salesAgentHandler.addEventSource(eventSource);
 
     const slackHandler = this.getHandler({
