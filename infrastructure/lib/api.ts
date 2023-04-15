@@ -146,7 +146,7 @@ export class ApiStack extends Stack {
         STAGE: stage,
       },
       memorySize: 1024,
-      timeout: Duration.minutes(5),
+      timeout: Duration.minutes(15),
     });
     integrationsSecret.grantRead(salesAgentHandler);
 
@@ -155,7 +155,7 @@ export class ApiStack extends Stack {
     // });
 
     const queue = new Queue(this, "slack-sales-agent-queue", {
-      visibilityTimeout: Duration.minutes(6),
+      visibilityTimeout: Duration.minutes(20),
       // deadLetterQueue: {
       //   maxReceiveCount: 1,
       //   queue: deadLetterQueue,

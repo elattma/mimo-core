@@ -31,3 +31,26 @@ REQUIRE (n.id, n.owner) IS NODE KEY;
 CREATE RANGE INDEX name_value_index IF NOT EXISTS
 FOR (n:Name)
 ON (n.value, n.owner);
+
+Decision Tree 4/15/2023:
+
+1. if pages are specified
+   1a. query(relevant, blocks, page_ids) and return
+2. generate query and populate request
+   2a. call llm with prompt to generate query components
+   2a1. if call fails, then print error and return empty query
+3. search or relevant?
+   3a. if search then call graph with query
+   3b if relevant
+   3a1. if page participants then relevant + names
+   3a2. if no page participants then relevant
+4. Apply return filters
+5. Weave context basket and minify if max_tokens is given
+
+decisions to change:
+
+1. instead of relevant 1 time with list of blocks, each block is a separate call?
+
+waterfall fallback:
+
+1.

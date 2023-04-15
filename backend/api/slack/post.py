@@ -104,7 +104,8 @@ def handler(event: dict, context):
     channel = event.get('channel', None) if event else None
     channel_type = event.get('channel_type', None) if event else None
     bot_id = event.get('bot_id', None) if event else None
-    if not bot_id and channel_type == 'im':
+    subtype = event.get('subtype', None) if event else None
+    if not bot_id and channel_type == 'im' and not subtype:
         wait_response = requests.get('https://slack.com/api/chat.postMessage', 
             params={
                 'channel': channel,
