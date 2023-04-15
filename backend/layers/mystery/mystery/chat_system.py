@@ -2,6 +2,7 @@ import json
 import re
 from typing import Generator, List
 
+import mystery.constants as constants
 from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
@@ -11,38 +12,6 @@ from mystery.util import count_tokens
 
 from .mrkl.open_ai import OpenAIChat
 from .mrkl.prompt import ChatPrompt, ChatPromptMessage, ChatPromptMessageRole
-
-MAX_TOKENS = 2000
-
-GENERATE_REQUESTS_SYSTEM_MESSAGE_CONTENT = '''You are ChatGPT and you only know everything that ChatGPT was trained on.
-You are chatting with a user that assumes you know everything about their company and its data.
-You have access to a database of all the company's data that can be queried with natural language.
-Your job is to think about what parts of the user's message require information from the database to answer.
-Then, you should create a list of natural language requests that describe the information you need from the database.
-Remember that the database only contains information about the company. You should not generate requests that are about common knowledge or things you already know.
-Requests should be a specific description of the information you need from the database. They should not include the tasks that the user has asked you to perform based on the information.
-The list of requests should look like ["request1", "request2", ..., "requestN"].
-
-Here are some examples to further guide your thinking:
-EXAMPLE 1
-Message: Summarize the complaints from my last 5 Zendesk tickets
-Requests: ["last 5 Zendesk tickets"]
-
-EXAMPLE 2
-Message: How many days of PTO can I take this year?
-Requests: ["vacation policy"]
-
-EXAMPLE 3
-Message: What is the capital of Italy?
-Requests: []
-'''
-
-RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's message. Use the information below as context for your response. Do not use try to follow the formatting of the context.
---------
-{context}
---------'''
-
-RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's message.'''
 
 
 class ChatSystem:
@@ -111,7 +80,7 @@ class ChatSystem:
         print('[ChatSystem] Generating requests...')
         system_message = ChatPromptMessage(
             role=ChatPromptMessageRole.SYSTEM,
-            content=GENERATE_REQUESTS_SYSTEM_MESSAGE_CONTENT
+            content=constants.CHAT_SYSTEM_SYSTEM_MESSAGE
         )
         user_message = ChatPromptMessage(
             role=ChatPromptMessageRole.USER,
@@ -129,7 +98,7 @@ class ChatSystem:
         baskets: List[ContextBasket],
         page_ids: List[str] = None,
     ) -> Generator[str, None, None]:
-        max_tokens_per_request = MAX_TOKENS // len(requests)
+        max_tokens = constants.CHAT_SYSTEM_MAX_CONTEXT_SIZE // len(requests)
 
         print('[ChatSystem] Retrieving context...')
         for request in requests:
@@ -137,7 +106,7 @@ class ChatSystem:
             basket = self._data_agent.generate_context(
                 request, 
                 page_ids=page_ids,
-                max_tokens=max_tokens_per_request
+                max_tokens=max_tokens
             )
             if basket:
                 baskets.append(basket)
@@ -148,13 +117,14 @@ class ChatSystem:
         print(f'[ChatSystem] Producing response with context... {context}'.replace('\n', '||'))
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
         context_size = count_tokens(context, self._chat_gpt.encoding_name)
-        if message_size + context_size > MAX_TOKENS:
+        size = message_size + context_size
+        if size > constants.CHAT_SYSTEM_MAX_PROMPT_SIZE:
             response = ('I received too many tokens to produce a proper '
                         'response.')
         else:
             system_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.SYSTEM,
-                content=RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE_CONTENT.format(
+                content=constants.CHAT_SYSTEM_RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE.format(
                     context=context
                 )
             )
@@ -170,13 +140,13 @@ class ChatSystem:
     def _respond_without_context(self, message: str) -> str:
         print('[ChatSystem] Producing response without information...')
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
-        if message_size > MAX_TOKENS:
+        if message_size > constants.CHAT_SYSTEM_MAX_PROMPT_SIZE:
             response = ('I received too many tokens to produce a proper '
                         'response.')
         else:
             system_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.SYSTEM,
-                content=RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE_CONTENT
+                content=constants.CHAT_SYSTEM_RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE
             )
             user_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.USER,

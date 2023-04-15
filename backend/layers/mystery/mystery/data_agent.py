@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Set
 
+import mystery.constants as constants
 from external.openai_ import OpenAI
 from graph.blocks import MemberBlock, entity
 from graph.neo4j_ import (Block, BlockFilter, ContentMatch, Document,
@@ -23,89 +24,6 @@ from mystery.query import (BlocksFilter, BlocksToReturn, BlocksToSearch,
                            QueryComponent, RelativeTimeFilter, ReturnType,
                            ReturnTypeValue, SearchMethod, SearchMethodValue)
 from mystery.util import count_tokens
-
-# ----------------------------------------------------------------------------
-# Constants
-# ----------------------------------------------------------------------------
-
-
-DEFAULT_LIMIT = 20
-'''The default limit on results for Neo4j queries.'''
-
-SYSTEM_PROMPT = '''Pretend you are a data agent for a large company.
-You have access to a specialized database that contains all of the company's data.
-The database is represented as a graph, with three types of nodes: pages, blocks, and names.
-A page is a high-level document from a data source, like an email from Google Mail or a customer account from Salesforce.
-A block is a component of a page. For example, an email has a title block to store the subject, a body block to store the main message, and a member block to store the to, from, cc, and bcc.
-A name is a person or organization that is linked to a page or block.
-Below are descriptions about the different block types:
-
-{block_descriptions}
-
-Given a Request for information, your job is to create a well-formed Query to retrieve the requested information from the database.
-The Query must be formatted in a specific way, and the values must make sense based on the Request.
-All fields in the Query are optional, so you can leave any field blank if you don't know what to put there.
-Below is the schema for a Query and explanations for what each field means:
-
-{json_schema}
-
-{component_descriptions}
-
-Use the examples below to improve your understanding.
---------
-EXAMPLE 1
-Request: The subjects of my last 5 emails from Troy Wilkerson
-Query: {{
- "page_participants": [
-  {{
-   "name": "Troy Wilkerson",
-   "role": "author"
-  }}
- ],
- "time_sort": {{
-  "ascending": false,
- }},
- "count": 5,
- "sources": ["email"],
- "search_method": "exact",
- "return_type": "blocks",
- "blocks_to_return": ["title"]
-}}
-
-EXAMPLE 2
-Request: Zendesk tickets with a comment about the API
-Query: {{
- "concepts": ["the API"],
- "sources": ["customer_support"],
- "search_method": "relevant",
- "blocks_to_search": ["comment"],
- "return_type": "pages"
-}}
-
-EXAMPLE 3
-Request: Deals with Acme Inc. from Q2 2021
-Query: {{
- "page_participants": [
-  {{
-   "name": "Acme Inc.",
-   "role": "unknown"
-  }}
- ],
- "time_frame": {{
-  "start": "2021-04-01",
-  "end": "2021-06-30"
- }},
- "sources": ["crm"],
- "search_method": "exact",
- "blocks_to_search": ["deal"],
- "return_type": "blocks",
- "blocks_to_return": ["deal"]
-}}'''
-
-
-# ----------------------------------------------------------------------------
-# Data Agent
-# ----------------------------------------------------------------------------
 
 
 @dataclass
@@ -139,7 +57,7 @@ class DataAgent:
         block_descriptions = BlocksFilter.get_block_descriptions()
         json_schema = QueryComponent.get_json_schema()
         component_descriptions = QueryComponent.get_component_descriptions()
-        self._system_prompt = SYSTEM_PROMPT.format(
+        self._system_message = constants.DATA_AGENT_SYSTEM_MESSAGE.format(
             block_descriptions=block_descriptions,
             json_schema=json_schema,
             component_descriptions=component_descriptions
@@ -154,24 +72,22 @@ class DataAgent:
         max_tokens: int = None
     ) -> ContextBasket:
         print('[DataAgent] Generating context...')
-        # Generate query
-        if page_ids:
-            query = Query(
-                components={
-                    SearchMethod: SearchMethod(
-                        value=SearchMethodValue.RELEVANT
-                    ),
-                    ReturnType: ReturnType(value=ReturnTypeValue.BLOCKS),
-                    PageIds: PageIds(values=set(page_ids))
-                }
-            )
-        if not query:
-            query = self._generate_query(request)
-        query.request = Request(
+        request = Request(
             encoding_name=self._llm.encoding_name,
             text=request,
             embedding=self._openai.embed(request)
         )
+        # Generate query
+        if page_ids:
+            query = Query(
+                components={
+                    SearchMethod: SearchMethod(SearchMethodValue.RELEVANT),
+                    ReturnType: ReturnType(ReturnTypeValue.BLOCKS),
+                    PageIds: PageIds(set(page_ids))
+                }
+            )
+        if not query:
+            query = self._generate_query(request)
         print(f'[DataAgent] Query Components: {query.components}')
 
         # Use query to fetch documents
@@ -349,7 +265,7 @@ class DataAgent:
         time_range = None
         block_labels = None
         order_by = None
-        limit = Limit(0, DEFAULT_LIMIT)
+        limit = Limit(0, constants.DATA_AGENT_GRAPH_DB_LIMIT)
         regex_matches = None
         if query and query.components and query.request:
             if PageParticipants in query.components:
@@ -451,38 +367,21 @@ class DataAgent:
         page_ids = [document.id for document in results]
         return set(page_ids)
 
-    def _generate_query(self, request: str) -> Query:
+    def _generate_query(self, request: Request) -> Query:
         print('[DataAgent] Generating query...')
         system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM,
-            content=self._system_prompt
+            ChatPromptMessageRole.SYSTEM,
+            self._system_message
         )
         user_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.USER,
-            content=request
+            ChatPromptMessageRole.USER,
+            request.text
         )
         prompt = ChatPrompt([system_message, user_message])
         llm_response = self._llm.predict(prompt)
-        query = _query_from_llm_response(llm_response)
+        query = Query.from_string_and_request(llm_response, request)
         print('[DataAgent] Generated query!')
         return query
-
-    def _generate_prompt(
-        self,
-        request: str
-    ) -> ChatPrompt:
-        print('[DataAgent] Generating prompt...')
-        system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM,
-            content=self._system_prompt
-        )
-        user_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.USER,
-            content=request
-        )
-        prompt = ChatPrompt([system_message, user_message])
-        print('[DataAgent] Prompt generated!')
-        return prompt
 
     def _context_basket_token_size(
         self,
