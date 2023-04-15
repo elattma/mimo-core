@@ -3,6 +3,7 @@ from abc import ABC
 from dataclasses import dataclass
 from urllib.parse import quote
 
+
 class EmailSystemResponse(ABC):
     @classmethod
     def from_agent_output(self, agent_output: str) -> 'EmailSystemResponse':
@@ -26,7 +27,8 @@ class EmailSystemResponse(ABC):
                     link += '&'
                 link += f'body={quote(body)}'
             return EmailSystemSuccess(recipient, subject, body, link)
-        except:
+        except Exception as e:
+            print(e)
             return EmailSystemError('Failed to parse agent\'s output.')
 
 @dataclass

@@ -1,12 +1,13 @@
-import requests
 from typing import List
 
-from langchain.agents import AgentExecutor, load_tools, Tool, ZeroShotAgent
+import requests
+from langchain.agents import AgentExecutor, Tool, ZeroShotAgent, load_tools
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 
 from . import constants
 from .model import EmailSystemError, EmailSystemResponse
+
 
 class EmailSystem:
     def __init__(self,
@@ -34,7 +35,8 @@ class EmailSystem:
     def run(self, message: str) -> EmailSystemResponse:
         try:
             agent_output = self._agent_executor.run(input=message)
-        except:
+        except Exception as e:
+            print(e)
             message = ('Something went wrong. Please try again. It might '
                        'help to rephrase your message.')
             return EmailSystemError(message)

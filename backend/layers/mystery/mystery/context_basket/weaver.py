@@ -66,7 +66,6 @@ class BasketWeaver:
             context = context_basket.pop(0)
             context_counter += 1
 
-
 def euclidean_distance(row1, row2) -> float:
     distance = 0.0
     for i in range(len(row1)-1):

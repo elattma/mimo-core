@@ -47,8 +47,6 @@ def handler(event: dict, context):
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
             integration = item.get_raw_child()
-            if integration != 'zoho':
-                continue
             fetchers.append(Fetcher.create(integration, {
                 'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
                 'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
@@ -115,8 +113,6 @@ def discover_fetch_ingest(user: str, fetcher: Fetcher, ingestor: Ingestor) -> Df
             break
         next_token = discovery_response.next_token
         for item in discovery_response.items:
-            if item.id != '5695700000000417097':
-                continue
             max_items -= 1
             ingestion_timestamp = int(time())
             blocks_generator = fetcher.fetch(item.id)
@@ -124,6 +120,7 @@ def discover_fetch_ingest(user: str, fetcher: Fetcher, ingestor: Ingestor) -> Df
             block_streams: List[BlockStream] = []
             for block_stream in blocks_generator:
                 block_streams.append(block_stream)
+                print(block_stream)
             ingest_input = IngestInput(
                 owner=user,
                 integration=fetcher._INTEGRATION,

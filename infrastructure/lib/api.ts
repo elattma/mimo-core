@@ -150,9 +150,9 @@ export class ApiStack extends Stack {
     });
     integrationsSecret.grantRead(salesAgentHandler);
     const queue = new Queue(this, "slack-sales-agent-queue", {
-      visibilityTimeout: Duration.minutes(30),
+      visibilityTimeout: Duration.minutes(6),
     });
-    const eventSource = new SqsEventSource(queue);
+    const eventSource = new SqsEventSource(queue, {});
     salesAgentHandler.addEventSource(eventSource);
 
     const slackHandler = this.getHandler({

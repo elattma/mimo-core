@@ -31,7 +31,7 @@ class Zoho(Fetcher):
         print('zoho discovery!')
 
         offset = filter.next_token if filter and filter.next_token else 1
-        limit = filter.limit if filter and filter.limit else 10
+        limit = filter.limit if filter and filter.limit else 100
         filters = {
             'select_query': f'select id, Account_Name from Accounts where Account_Name like \'%\' order by Account_Name asc limit {offset}, {limit}'
         }
