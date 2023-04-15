@@ -150,18 +150,16 @@ export class ApiStack extends Stack {
     });
     integrationsSecret.grantRead(salesAgentHandler);
 
-    const deadLetterQueue = new Queue(this, "dlq", {
-      deliveryDelay: Duration.millis(0),
-      contentBasedDeduplication: true,
-      retentionPeriod: Duration.days(14),
-    });
+    // const deadLetterQueue = new Queue(this, "dlq", {
+    //   retentionPeriod: Duration.days(14),
+    // });
 
     const queue = new Queue(this, "slack-sales-agent-queue", {
       visibilityTimeout: Duration.minutes(6),
-      deadLetterQueue: {
-        maxReceiveCount: 1,
-        queue: deadLetterQueue,
-      },
+      // deadLetterQueue: {
+      //   maxReceiveCount: 1,
+      //   queue: deadLetterQueue,
+      // },
     });
     const eventSource = new SqsEventSource(queue);
     salesAgentHandler.addEventSource(eventSource);
