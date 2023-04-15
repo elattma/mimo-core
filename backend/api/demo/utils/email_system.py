@@ -70,7 +70,8 @@ class EmailSystem:
 def _query_mimo_api(message: str, mimo_test_token: str) -> str:
     params = {
         'question': message,
-        'test_token': mimo_test_token
+        'test_token': mimo_test_token,
+        'max_tokens': 100
     }
     response = requests.get(constants.MIMO_ENDPOINT, params=params)
     response = response.json() if response else None

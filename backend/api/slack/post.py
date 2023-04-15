@@ -92,6 +92,7 @@ def handler(event: dict, context):
             'response_action': 'clear',
         })
     
+    print(IS_COLD_START)
     if IS_COLD_START:
         IS_COLD_START = False
         import time

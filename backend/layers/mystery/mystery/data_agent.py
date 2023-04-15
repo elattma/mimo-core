@@ -1,13 +1,13 @@
 import json
 import re
 from dataclasses import dataclass
-from math import sqrt
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
 from external.openai_ import OpenAI
 from graph.blocks import MemberBlock, entity
-from graph.neo4j_ import (Block, BlockFilter, ContentMatch, Document, DocumentFilter,
-                          Limit, NameFilter, Neo4j, QueryFilter)
+from graph.neo4j_ import (Block, BlockFilter, ContentMatch, Document,
+                          DocumentFilter, Limit, NameFilter, Neo4j,
+                          QueryFilter)
 from graph.pinecone_ import Filter as VectorFilter
 from graph.pinecone_ import Pinecone, RowType
 from mystery.context_basket.model import ContextBasket, Request
@@ -15,12 +15,13 @@ from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
-from mystery.query import (AbsoluteTimeFilter, BlocksFilter, BlocksToReturn,
-                           BlocksToSearch, Concepts, Count,
-                           IntegrationsFilter, PageIds, PageParticipantRole,
-                           PageParticipants, Query, QueryComponent,
-                           RelativeTimeFilter, ReturnType, ReturnTypeValue,
-                           SearchMethod, SearchMethodValue)
+from mystery.query import AbsoluteTimeFilter
+from mystery.query import Block as QueryBlock
+from mystery.query import (BlocksFilter, BlocksToReturn, BlocksToSearch,
+                           Concepts, Count, IntegrationsFilter, PageIds,
+                           PageParticipantRole, PageParticipants, Query,
+                           QueryComponent, RelativeTimeFilter, ReturnType,
+                           ReturnTypeValue, SearchMethod, SearchMethodValue)
 from mystery.util import count_tokens
 
 # ----------------------------------------------------------------------------
@@ -192,6 +193,10 @@ class DataAgent:
         else:
             default = True
         if default:
+            query.components = {
+                BlocksToSearch: BlocksToSearch(blocks=[QueryBlock.SUMMARY]),
+                ReturnType: ReturnType(value=ReturnTypeValue.PAGES),
+            }
             documents.extend(self._relevant_context(query))
         filtered_documents = self._apply_return_filters(documents, query)
 
