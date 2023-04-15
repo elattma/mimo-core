@@ -37,7 +37,7 @@ Message: What is the capital of Italy?
 Requests: []
 '''
 
-RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's message. Use the information below as context.
+RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's message. Use the information below as context for your response. Do not use try to follow the formatting of the context.
 --------
 {context}
 --------'''
