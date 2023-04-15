@@ -153,7 +153,7 @@ class OpenAIChat(OpenAIBase):
     ) -> str:
         messages = [
             {
-                'role': message.role,
+                'role': message.role.value,
                 'content': message.content
             } for message in prompt.prompt
         ]

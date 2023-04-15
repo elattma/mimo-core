@@ -448,11 +448,11 @@ class DataAgent:
     def _generate_query(self, request: str) -> Query:
         print('[DataAgent] Generating query...')
         system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM.value,
+            role=ChatPromptMessageRole.SYSTEM,
             content=self._system_prompt
         )
         user_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.USER.value,
+            role=ChatPromptMessageRole.USER,
             content=request
         )
         prompt = ChatPrompt([system_message, user_message])
@@ -467,11 +467,11 @@ class DataAgent:
     ) -> ChatPrompt:
         print('[DataAgent] Generating prompt...')
         system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM.value,
+            role=ChatPromptMessageRole.SYSTEM,
             content=self._system_prompt
         )
         user_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.USER.value,
+            role=ChatPromptMessageRole.USER,
             content=request
         )
         prompt = ChatPrompt([system_message, user_message])

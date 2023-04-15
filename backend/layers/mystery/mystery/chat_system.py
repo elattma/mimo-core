@@ -110,11 +110,11 @@ class ChatSystem:
     def _generate_requests(self, message: str) -> List[str]:
         print('[ChatSystem] Generating requests...')
         system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM.value,
+            role=ChatPromptMessageRole.SYSTEM,
             content=GENERATE_REQUESTS_SYSTEM_MESSAGE_CONTENT
         )
         user_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.USER.value,
+            role=ChatPromptMessageRole.USER,
             content=message
         )
         prompt = ChatPrompt([system_message, user_message])
@@ -153,13 +153,13 @@ class ChatSystem:
                         'response.')
         else:
             system_message = ChatPromptMessage(
-                role=ChatPromptMessageRole.SYSTEM.value,
+                role=ChatPromptMessageRole.SYSTEM,
                 content=RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE_CONTENT.format(
                     context=context
                 )
             )
             user_message = ChatPromptMessage(
-                role=ChatPromptMessageRole.USER.value,
+                role=ChatPromptMessageRole.USER,
                 content=message
             )
             prompt = ChatPrompt([system_message, user_message])
@@ -175,11 +175,11 @@ class ChatSystem:
                         'response.')
         else:
             system_message = ChatPromptMessage(
-                role=ChatPromptMessageRole.SYSTEM.value,
+                role=ChatPromptMessageRole.SYSTEM,
                 content=RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE_CONTENT
             )
             user_message = ChatPromptMessage(
-                role=ChatPromptMessageRole.USER.value,
+                role=ChatPromptMessageRole.USER,
                 content=message
             )
             prompt = ChatPrompt([system_message, user_message])

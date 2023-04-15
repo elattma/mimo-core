@@ -124,7 +124,7 @@ class MRKLAgent(Agent):
             tool_names=tool_names
         )
         system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM.value,
+            role=ChatPromptMessageRole.SYSTEM,
             content='\n\n'.join([
                 prefix,
                 tool_descriptions,
@@ -133,7 +133,7 @@ class MRKLAgent(Agent):
             ])
         )
         assistant_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.ASSISTANT.value,
+            role=ChatPromptMessageRole.ASSISTANT,
             content=scratchpad_start
         )
         return ChatPromptTemplate(
