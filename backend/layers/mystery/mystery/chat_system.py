@@ -12,7 +12,7 @@ from mystery.util import count_tokens
 from .mrkl.open_ai import OpenAIChat
 from .mrkl.prompt import ChatPrompt, ChatPromptMessage, ChatPromptMessageRole
 
-MAX_TOKENS = 4000
+MAX_TOKENS = 2000
 
 GENERATE_REQUESTS_SYSTEM_MESSAGE_CONTENT = '''You are ChatGPT and you only know everything that ChatGPT was trained on.
 You are chatting with a user that assumes you know everything about their company and its data.
@@ -38,8 +38,9 @@ Requests: []
 '''
 
 RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's message. Use the information below as context.
----------
-{context}'''
+--------
+{context}
+--------'''
 
 RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE_CONTENT = '''Respond to the user's message.'''
 
