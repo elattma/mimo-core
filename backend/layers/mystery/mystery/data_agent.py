@@ -1,5 +1,3 @@
-import json
-import re
 from dataclasses import dataclass
 from typing import Dict, List, Set
 
@@ -16,14 +14,13 @@ from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
-from mystery.query import AbsoluteTimeFilter
 from mystery.query import Block as QueryBlock
 from mystery.query import (BlocksFilter, BlocksToReturn, BlocksToSearch,
                            Concepts, Count, IntegrationsFilter, PageIds,
                            PageParticipantRole, PageParticipants, Query,
                            QueryComponent, RelativeTimeFilter, ReturnType,
                            ReturnTypeValue, SearchMethod, SearchMethodValue)
-from mystery.util import count_tokens
+from mystery.venus_fly_trap import VenusFlyTrap
 
 
 @dataclass
@@ -64,6 +61,7 @@ class DataAgent:
         )
         print('[DataAgent] Initialized.')
 
+    @VenusFlyTrap.catch_flies
     def generate_context(
         self,
         request: str,
@@ -72,25 +70,23 @@ class DataAgent:
         max_tokens: int = None
     ) -> ContextBasket:
         print('[DataAgent] Generating context...')
-        request = Request(
-            encoding_name=self._llm.encoding_name,
-            text=request,
-            embedding=self._openai.embed(request)
-        )
-        # Generate query
+        request_embedding = self._openai.embed(request)
+        request = Request(self._llm.encoding_name, request, request_embedding)
         if page_ids:
             query = Query(
-                components={
+                {
                     SearchMethod: SearchMethod(SearchMethodValue.RELEVANT),
                     ReturnType: ReturnType(ReturnTypeValue.BLOCKS),
                     PageIds: PageIds(set(page_ids))
-                }
+                },
+                request=Request
             )
         if not query:
             query = self._generate_query(request)
+        else:
+            query.request = request
         print(f'[DataAgent] Query Components: {query.components}')
 
-        # Use query to fetch documents
         documents = []
         default = False
         if SearchMethod not in query.components:
@@ -104,6 +100,8 @@ class DataAgent:
                 documents.extend(
                     self._relevant_context_by_page_participants(query)
                 )
+            else:
+                documents.extend(self._relevant_context(query))
             if not documents:
                 default = True
         else:
@@ -124,7 +122,6 @@ class DataAgent:
         for vector_id, vector in vectors.items():
             block_id_to_block[vector_id].embedding = vector.values
 
-        # Weave basket from documents
         basket = self._basket_weaver.weave_context_basket(
             query.request,
             filtered_documents
@@ -146,7 +143,7 @@ class DataAgent:
     def _relevant_context(self, query: Query) -> List[Document]:
         print('[DataAgent] Filling basket with relevant context...')
         if Count in query.components:
-            c = query.components[Count]
+            c: Count = query.components[Count]
             k = c.value
             matches = self._query_vector_db(query, k=k)
         else:
@@ -181,7 +178,9 @@ class DataAgent:
         print('[DataAgent] Applying return filters...')
         filtered_documents = documents
         if ReturnType in query.components:
+            print('@@@@@@@')
             rt: ReturnType = query.components[ReturnType]
+            print(rt)
             page_ids = set([document.id for document in documents])
             if rt.value == ReturnTypeValue.PAGES:
                 filtered_documents = self._query_graph_db(page_ids=page_ids)
@@ -229,28 +228,21 @@ class DataAgent:
     def _query_vector_db(
         self,
         query: Query,
-        k: int = 6,
+        k: int = 5,
         threshold: float = None
     ) -> Dict[str, float]:
         print('[DataAgent] Querying vector database...')
         vector_filter = self._make_vector_filter(query)
-        embeddings = []
         if Concepts in query.components:
             c: Concepts = query.components[Concepts]
-            for concept in c.values:
-                embeddings.append(self._openai.embed(concept))
-        if not embeddings:
-            embeddings = [query.request.embedding]
+            embedding = self._openai.embed(' '.join(c.values))
+        else:
+            embedding = query.request.embedding
+        relevant_blocks = self._vector_db.query(embedding, vector_filter, k=k)
         matches = {}
-        for embedding in embeddings:
-            relevant_blocks = self._vector_db.query(
-                embedding,
-                vector_filter,
-                k=k
-            )
-            for block in relevant_blocks:
-                if not threshold or block.score >= threshold:
-                    matches[block.id] = block.score
+        for block in relevant_blocks:
+            if not threshold or block.score >= threshold:
+                matches[block.id] = block.score
         print('[DataAgent] Queried vector database!')
         return matches
 
@@ -265,7 +257,7 @@ class DataAgent:
         time_range = None
         block_labels = None
         order_by = None
-        limit = Limit(0, constants.DATA_AGENT_GRAPH_DB_LIMIT)
+        limit = Limit(0, constants.GRAPH_DB_LIMIT)
         regex_matches = None
         if query and query.components and query.request:
             if PageParticipants in query.components:
@@ -289,9 +281,9 @@ class DataAgent:
                         label=MemberBlock._LABEL
                     )
                     regex_matches.add(content_match)
-            if AbsoluteTimeFilter in query.components:
-                atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
-                time_range = atf.neo4j_time_range
+            # if AbsoluteTimeFilter in query.components:
+            #     atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
+            #     time_range = atf.neo4j_time_range
             if RelativeTimeFilter in query.components:
                 rtf: RelativeTimeFilter = query.components[RelativeTimeFilter]
                 order_by = rtf.neo4j_order_by
@@ -338,10 +330,10 @@ class DataAgent:
         max_date_day = None
         block_labels = None
         document_id = None
-        if AbsoluteTimeFilter in query.components:
-            atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
-            min_date_day = atf.pinecone_min_date_day
-            max_date_day = atf.pinecone_max_date_day
+        # if AbsoluteTimeFilter in query.components:
+        #     atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
+        #     min_date_day = atf.pinecone_min_date_day
+        #     max_date_day = atf.pinecone_max_date_day
         if IntegrationsFilter in query.components:
             if_: IntegrationsFilter = query.components[IntegrationsFilter]
             integrations = if_.pinecone_integrations
@@ -363,10 +355,6 @@ class DataAgent:
         )
         return vector_filter
 
-    def _get_page_ids_from_results(self, results: List[Document]) -> Set[str]:
-        page_ids = [document.id for document in results]
-        return set(page_ids)
-
     def _generate_query(self, request: Request) -> Query:
         print('[DataAgent] Generating query...')
         system_message = ChatPromptMessage(
@@ -382,34 +370,3 @@ class DataAgent:
         query = Query.from_string_and_request(llm_response, request)
         print('[DataAgent] Generated query!')
         return query
-
-    def _context_basket_token_size(
-        self,
-        context_basket: ContextBasket
-    ) -> int:
-        token_count = 0
-        for context in context_basket:
-            token_count += count_tokens(context.content,
-                                        self._llm.encoding_name)
-        return token_count
-
-
-# ----------------------------------------------------------------------------
-# Helpers
-# ----------------------------------------------------------------------------
-
-
-def _query_from_llm_response(llm_response: str) -> Query:
-    match = re.search(r'{[\s\S]*}', llm_response, re.DOTALL)
-    try:
-        stringified_json = match.group(0)
-        query_json = json.loads(stringified_json)
-        query = Query.from_llm_response(query_json)
-        return query
-    except:
-        print((
-            '[DataAgent] Error parsing query from LLM response!\n'
-            f'LLM response:\n{llm_response}'
-        ))
-        return Query()
-    
