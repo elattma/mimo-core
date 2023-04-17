@@ -1,12 +1,14 @@
 from typing import Dict, Generator, List, Optional, Union
 
+from backoff import on_exception, expo, full_jitter
 from openai import ChatCompletion, Completion, Embedding
-
+from openai.error import RateLimitError
 
 class OpenAI:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
         
+    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
     def embed(self, text: str) -> List[float]:
         if not (self._api_key and text):
             return None
@@ -21,6 +23,7 @@ class OpenAI:
         embedding = first.get('embedding', None) if first else None
         return embedding
     
+    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
     def completion(
         self,
         prompt: str,
@@ -49,6 +52,7 @@ class OpenAI:
         text: str = choices[0].get('text', None) if choices and len(choices) > 0 else None
         return text
     
+    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
     def stream_chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -94,6 +98,7 @@ class OpenAI:
         if accumulated_tokens > 0:
             yield output
 
+    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -122,6 +127,7 @@ class OpenAI:
         content = message.get('content', None) if message else None
         return content
     
+    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
     def summarize(self, text: str):
         if not (self._api_key and text):
             return None
@@ -140,6 +146,7 @@ class OpenAI:
         summary = message.get('content', None) if message else None
         return summary
     
+    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
     def names(self, text: str):
         if not (self._api_key and text):
             return []
