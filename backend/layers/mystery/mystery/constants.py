@@ -72,7 +72,7 @@ Query: {{
 }}'''
 '''The system message content for the data agent's prompt.'''
 
-DATA_AGENT_GRAPH_DB_LIMIT = 20
+GRAPH_DB_LIMIT = 20
 '''The default limit on results for graph database queries.'''
 
 # ----------------------------------------------------------------------------
@@ -102,20 +102,20 @@ Requests: []
 '''
 '''The system message content for the chat system's prompt.'''
 
-CHAT_SYSTEM_RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE = '''Respond to the user's message. Use the information below as context for your response. Do not use try to follow the formatting of the context.
+RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE = '''Respond to the user's message. Use the information below as context for your response. Do not use try to follow the formatting of the context.
 --------
 {context}
 --------'''
 '''The system message content for the chat system's prompt when the chat 
 system is responding to a message with context.'''
 
-CHAT_SYSTEM_RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE = '''Respond to the user's message.'''
+RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE = '''Respond to the user's message.'''
 '''The system message content for the chat system's prompt when the chat
 system is responding to a message without context.'''
 
-CHAT_SYSTEM_MAX_CONTEXT_SIZE = 2000
+MAX_CONTEXT_SIZE = 2000
 '''The maximum number of tokens that the chat system's context can be.'''
 
-CHAT_SYSTEM_MAX_PROMPT_SIZE = 3000
+MAX_PROMPT_SIZE = 3000
 '''The maximum number of tokens that the chat system's prompt (including
 context) can be.'''

@@ -48,7 +48,10 @@ class ChatSystem:
         yield '[THOUGHT]Determining if I need more information...'
         requests = self._generate_requests(message)
         if not requests:
-            yield '[THOUGHT]I don\'t need more information. Thinking about my response...'
+            yield (
+                '[THOUGHT]I don\'t need more information. Thinking about my '
+                'response...'
+            )
             response = self._respond_without_context(message)
             yield response
             return
@@ -80,7 +83,7 @@ class ChatSystem:
         print('[ChatSystem] Generating requests...')
         system_message = ChatPromptMessage(
             role=ChatPromptMessageRole.SYSTEM,
-            content=constants.CHAT_SYSTEM_SYSTEM_MESSAGE
+            content=constants.SYSTEM_MESSAGE
         )
         user_message = ChatPromptMessage(
             role=ChatPromptMessageRole.USER,
@@ -98,7 +101,7 @@ class ChatSystem:
         baskets: List[ContextBasket],
         page_ids: List[str] = None,
     ) -> Generator[str, None, None]:
-        max_tokens = constants.CHAT_SYSTEM_MAX_CONTEXT_SIZE // len(requests)
+        max_tokens = constants.MAX_CONTEXT_SIZE // len(requests)
 
         print('[ChatSystem] Retrieving context...')
         for request in requests:
@@ -117,14 +120,14 @@ class ChatSystem:
         print(f'[ChatSystem] Producing response with context... {context}'.replace('\n', '||'))
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
         context_size = count_tokens(context, self._chat_gpt.encoding_name)
-        size = message_size + context_size
-        if size > constants.CHAT_SYSTEM_MAX_PROMPT_SIZE:
+        prompt_size = message_size + context_size
+        if prompt_size > constants.MAX_PROMPT_SIZE:
             response = ('I received too many tokens to produce a proper '
                         'response.')
         else:
             system_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.SYSTEM,
-                content=constants.CHAT_SYSTEM_RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE.format(
+                content=constants.RESPOND_WITH_CONTEXT_SYSTEM_MESSAGE.format(
                     context=context
                 )
             )
@@ -140,13 +143,13 @@ class ChatSystem:
     def _respond_without_context(self, message: str) -> str:
         print('[ChatSystem] Producing response without information...')
         message_size = count_tokens(message, self._chat_gpt.encoding_name)
-        if message_size > constants.CHAT_SYSTEM_MAX_PROMPT_SIZE:
+        if message_size > constants.MAX_PROMPT_SIZE:
             response = ('I received too many tokens to produce a proper '
                         'response.')
         else:
             system_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.SYSTEM,
-                content=constants.CHAT_SYSTEM_RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE
+                content=constants.RESPOND_WITHOUT_CONTEXT_SYSTEM_MESSAGE
             )
             user_message = ChatPromptMessage(
                 role=ChatPromptMessageRole.USER,
