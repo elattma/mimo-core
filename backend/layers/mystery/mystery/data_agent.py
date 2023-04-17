@@ -14,13 +14,12 @@ from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
-from mystery.query import Block as QueryBlock
 from mystery.query import (BlocksFilter, BlocksToReturn, BlocksToSearch,
                            Concepts, Count, IntegrationsFilter, PageIds,
                            PageParticipantRole, PageParticipants, Query,
                            QueryComponent, RelativeTimeFilter, ReturnType,
-                           ReturnTypeValue, SearchMethod, SearchMethodValue)
-from mystery.venus_fly_trap import VenusFlyTrap
+                           ReturnTypeValue, SearchMethod, SearchMethodValue,
+                           Block as QueryBlock)
 
 
 @dataclass
@@ -61,7 +60,6 @@ class DataAgent:
         )
         print('[DataAgent] Initialized.')
 
-    @VenusFlyTrap.catch_flies
     def generate_context(
         self,
         request: str,
@@ -178,9 +176,7 @@ class DataAgent:
         print('[DataAgent] Applying return filters...')
         filtered_documents = documents
         if ReturnType in query.components:
-            print('@@@@@@@')
             rt: ReturnType = query.components[ReturnType]
-            print(rt)
             page_ids = set([document.id for document in documents])
             if rt.value == ReturnTypeValue.PAGES:
                 filtered_documents = self._query_graph_db(page_ids=page_ids)
