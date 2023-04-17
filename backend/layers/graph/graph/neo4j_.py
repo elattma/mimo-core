@@ -27,7 +27,6 @@ class Node(ABC):
             'id': self.id,
         }
 
-
 @dataclass
 class Block(Node):
     embedding: List[float]
@@ -45,7 +44,14 @@ class Block(Node):
         map['content'] = self.content
         map['last_updated_timestamp'] = self.last_updated_timestamp
         return map
+    
+    def __hash__(self):
+        return hash((self.id))
 
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.id == other.id
 
 @dataclass
 class Consists:

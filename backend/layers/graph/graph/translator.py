@@ -1,7 +1,8 @@
 from typing import List
 
 from .blocks import (BlockStream, BodyBlock, CommentBlock, ContactBlock,
-                     DealBlock, MemberBlock, Relations, SummaryBlock, TitleBlock)
+                     DealBlock, MemberBlock, Relations, SummaryBlock,
+                     TitleBlock)
 
 SUPPORTED_BLOCK_LABELS = set([
     SummaryBlock._LABEL,
@@ -39,38 +40,34 @@ class Translator:
     ) -> str:
         if not (integration and block_streams):
             return None
-        translation = Translator._get_translation_start(integration)
+        translations = [Translator._get_translation_start(integration)]
         blocks = Translator._get_sorted_blocks(block_streams)
 
         if 'title' in blocks and blocks['title']:
-            translation += Translator._translate_title_blocks(blocks['title'])
-            translation += '\n'
+            translations.append(Translator._translate_title_blocks(blocks['title']))
         if 'member' in blocks and blocks['member']:
-            translation += Translator._translate_member_blocks(blocks['member'])
-            translation += '\n'
+            translations.append(Translator._translate_member_blocks(blocks['member']))
         if 'summary' in blocks and blocks['summary']:
-            translation += Translator._translate_summary_blocks(
-                blocks['summary']
-            )
-            translation += '\n'
+            translations.append(Translator._translate_summary_blocks(blocks['summary']))
         if 'body' in blocks and blocks['body']:
-            translation += Translator._translate_body_blocks(blocks['body'])
-            translation += '\n'
+            translations.append(Translator._translate_body_blocks(blocks['body']))
         if 'comment' in blocks and blocks['comment']:
-            translation += Translator._translate_comment_blocks(
-                blocks['comment']
-            )
-            translation += '\n'
+            translations.append(Translator._translate_comment_blocks(blocks['comment']))
         if 'deal' in blocks and blocks['deal']:
-            translation += Translator._translate_deal_blocks(blocks['deal'])
-            translation += '\n'
+            translations.append(Translator._translate_deal_blocks(blocks['deal']))
         if 'contact' in blocks and blocks['contact']:
-            translation += Translator._translate_contact_blocks(
-                blocks['contact']
-            )
-            translation += '\n'
-        translation += Translator._get_translation_end(integration)
-        return translation
+            translations.append(Translator._translate_contact_blocks(blocks['contact']))
+        translations.append(Translator._get_translation_end(integration))
+        return Translator._get_translation_separator().join(translations)
+
+    @staticmethod
+    def get_extra_document_tokens(integration: str, length: int) -> int:
+        if not (integration and length):
+            return 0
+
+        return len(Translator._get_translation_start(integration)) + \
+            len(Translator._get_translation_end(integration)) + \
+            len(Translator._get_translation_separator()) * (length - 1)
 
     @staticmethod
     def _get_translation_start(integration: str) -> str:
@@ -79,6 +76,10 @@ class Translator:
     @staticmethod
     def _get_translation_end(integration: str) -> str:
         return TRANSLATION_ENDS[integration]
+    
+    @staticmethod
+    def _get_translation_separator() -> str:
+        return '\n'
 
     @staticmethod
     def translate_block_streams(block_streams: List[BlockStream]) -> str:

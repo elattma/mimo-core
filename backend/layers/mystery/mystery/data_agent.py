@@ -206,7 +206,6 @@ class DataAgent:
                 block_id_to_block[block.target.id] = block.target
         vectors = self._vector_db.fetch(list(block_id_to_block.keys()))
         for vector_id, vector in vectors.items():
-            print(len(vector.values))
             block_id_to_block[vector_id].embedding = vector.values
 
         # Weave basket from documents
@@ -214,10 +213,12 @@ class DataAgent:
             query.request,
             filtered_documents
         )
-        print(f'[DataAgent] Context generated! Raw: {str(basket)}'.replace('\n', '\r'))
+        print('[DataAgent] Context generated! Raw:')
+        print(str(basket).replace('\n', '||'))
         if max_tokens:
             self._basket_weaver.minify_context_basket(basket, max_tokens)
-        print(f'[DataAgent] Context generated! Minified: {str(basket)}'.replace('\n', '\r'))
+        print(f'[DataAgent] Context generated! Minified: ')
+        print(str(basket).replace('\n', '||'))
         return basket
 
     def _exact_context(self, query: Query) -> List[Document]:

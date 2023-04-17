@@ -88,10 +88,8 @@ class Concepts(QueryComponent):
     @ staticmethod
     def from_llm_response(llm_response: List[str]) -> 'Concepts':
         if not Concepts._validate_llm_response(llm_response):
-            print((
-                'Failed to create Concepts from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create Concepts from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         return Concepts(llm_response)
 
@@ -147,10 +145,8 @@ class PageParticipants(QueryComponent):
         # llm_response should be a list of dictionaries with each entry
         # containing keys "name" and "role" that map to strings
         if not PageParticipants._validate_llm_response(llm_response):
-            print((
-                'Failed to create PageParticipants from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create PageParticipants from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         values = []
         for item in llm_response:
@@ -216,10 +212,8 @@ class AbsoluteTimeFilter(QueryComponent):
         start_valid = AbsoluteTimeFilter._validate_date(start)
         end_valid = AbsoluteTimeFilter._validate_date(end)
         if not (start_valid or end_valid):
-            print((
-                'Failed to create AbsoluteTimeFilter from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create AbsoluteTimeFilter from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         start = date_string_to_date_day(
             llm_response['start']
@@ -284,10 +278,8 @@ class RelativeTimeFilter(QueryComponent):
         # 'count'. The value of 'ascending' should be a boolean and the value
         # of 'count' should be an integer.
         if not RelativeTimeFilter._validate_llm_response(llm_response):
-            print((
-                'Failed to create RelativeTimeFilter from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create RelativeTimeFilter from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         ascending = llm_response['ascending']
         return RelativeTimeFilter(ascending)
@@ -326,10 +318,8 @@ class Count(QueryComponent):
     @ staticmethod
     def from_llm_response(llm_response: int) -> 'Count':
         if not isinstance(llm_response, int) or llm_response < 1:
-            print((
-                'Failed to create Count from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create Count from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         return Count(llm_response)
 
@@ -369,10 +359,8 @@ class IntegrationsFilter(QueryComponent):
             integrations = [Integration(integration) for integration in
                             llm_response]
         except ValueError:
-            print((
-                'Failed to create IntegrationsFilter from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create IntegrationsFilter from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         return IntegrationsFilter(integrations)
 
@@ -430,10 +418,8 @@ class SearchMethod(QueryComponent):
         try:
             value = SearchMethodValue(llm_response)
         except ValueError:
-            print((
-                'Failed to create SearchMethod from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create SearchMethod from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         return SearchMethod(value)
 
@@ -461,10 +447,8 @@ class ReturnType(QueryComponent):
         try:
             value = ReturnTypeValue(llm_response)
         except ValueError:
-            print((
-                'Failed to create ReturnType from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create ReturnType from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         return ReturnType(value)
 
@@ -503,10 +487,8 @@ class BlocksFilter(QueryComponent, ABC):
         try:
             blocks = [Block(block) for block in llm_response]
         except ValueError:
-            print((
-                f'Failed to create {cls.__name__} from LLM response:\n'
-                f'{llm_response}'
-            ).replace('\n', '\r'))
+            print('Failed to create BlockFilter from LLM response:\n')
+            print(str(llm_response).replace('\n', '||'))
             return None
         return cls(blocks)
     
@@ -604,7 +586,7 @@ class Query:
                 print(
                     f'LLM produced invalid query component: {key}'.replace(
                         '\n',
-                        '\r'
+                        '||'
                     )
                 )
                 continue
