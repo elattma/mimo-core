@@ -54,6 +54,8 @@ class BasketWeaver:
                 translated=translated,
                 tokens=tokens
             ))
+        print('[DataAgent] Context generated! Raw:')
+        print(str(context_basket).replace('\n', '||'))
         return context_basket
 
     def minify_context_basket(self, context_basket: ContextBasket, limit_tokens: int) -> None:
@@ -105,6 +107,8 @@ class BasketWeaver:
         context_basket.contexts = [context for context in context_basket.contexts if len(context.blocks) > 0]
         context_basket.tokens = sum([context.tokens for context in context_basket.contexts])
         print(f'[Weaver] Minified context basket blocks with {len(context_basket.contexts)} contexts and {context_basket.tokens} tokens. Limit: {limit_tokens} tokens.')
+        print(f'[DataAgent] Context generated! Minified: ')
+        print(str(context_basket).replace('\n', '||'))
 
 def euclidean_distance(row1, row2) -> float:
     distance = 0.0

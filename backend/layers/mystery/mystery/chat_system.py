@@ -6,7 +6,7 @@ import mystery.constants as constants
 from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
-from mystery.context_basket.model import ContextBasket
+from mystery.context_basket.model import ContextBasket, DataRequest
 from mystery.data_agent import DataAgent
 from mystery.util import count_tokens
 
@@ -106,13 +106,21 @@ class ChatSystem:
         print('[ChatSystem] Retrieving context...')
         for request in requests:
             yield f'Researching: "{request}"...'
-            basket = self._data_agent.generate_context(
-                request, 
+            data_request = DataRequest(
+                request=request,
                 page_ids=page_ids,
                 max_tokens=max_tokens
             )
-            if basket:
-                baskets.append(basket)
+            response = self._data_agent.generate_context(data_request)
+            if response and not response.successful:
+                yield f'Failed to retrieve context for: "{request}" because of an error: {response.error}'
+                continue
+            if not (response and response.context_basket):
+                yield f'Failed to retrieve context for: "{request}"'
+                continue
+            yield f'Retrieved context for: "{request}"'
+            baskets.append(response.context_basket)
+            
         print('[ChatSystem] Context retrieved!')
         return
 

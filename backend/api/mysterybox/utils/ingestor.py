@@ -66,7 +66,7 @@ class Ingestor:
                 if not translated:
                     continue
                 summary = self._openai.summarize(translated)
-                summary_block = SummaryBlock(text=summary, last_updated_timestamp=None)
+                summary_block = SummaryBlock(text=summary, last_updated_timestamp=0)
                 temp_block_streams.append(BlockStream(label=SummaryBlock._LABEL, blocks=[summary_block]))
             tree_block_streams = temp_block_streams
         if len(tree_block_streams) != 1:
@@ -126,7 +126,7 @@ class Ingestor:
             name_mentioned = [Mentioned(document)]
             for name in names:
                 name.mentioned = name_mentioned
-                
+                            
             pinecone_response = self._pinecone_write(owner=input.owner, document=document)
             neo4j_response = self._neo4j_write(owner=input.owner, documents=[document], names=names, timestamp=input.timestamp)
 

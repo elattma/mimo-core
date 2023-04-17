@@ -7,11 +7,17 @@ from typing import Any, Dict, List, Set, Tuple, Type, Union
 
 from graph.blocks import Relations
 from graph.neo4j_ import Limit, OrderBy, OrderDirection
-from mystery.context_basket.model import Request
 
 from .util import (date_day_to_timestamp, date_string_to_date_day,
                    get_today_date_day, get_today_date_string,
                    get_today_timestamp)
+
+
+@dataclass
+class Request:
+    encoding_name: str
+    text: str
+    embedding: List[float]
 
 
 class QueryComponent(ABC):

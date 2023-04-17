@@ -6,7 +6,7 @@ from external.auth0_ import Auth0
 from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
-from mystery.context_basket.model import ContextBasket
+from mystery.context_basket.model import ContextBasket, DataRequest
 from mystery.data_agent import DataAgent
 
 secrets: Secrets = None
@@ -54,10 +54,28 @@ def handler(event: dict, context):
             graph_db=neo4j, 
             openai=openai, 
         )
-    context_basket: ContextBasket = data_agent.generate_context(question, max_tokens=max_tokens)
-    answer = str(context_basket)
+    data_request = DataRequest(
+        request=question,
+        max_tokens=max_tokens
+    )
+    data_response = data_agent.generate_context(data_request)
+    answer = None
+    error = None
+    sources = None
+    if not data_response:
+        error = 'No response from data agent.'
+    elif not data_response.successful:
+        error = data_response.error
+    else: 
+        answer = str(data_response.context_basket)
+        sources = [context.source for context in data_response.context_basket.contexts]
     
+    print(f'[Data] Answer: ')
+    print(answer.replace('\n', '||'))
+    print(f'[Data] Error: {error}')
+    print(f'[Data] Sources: {sources}')
     return to_response_success({
         'answer': answer,
-        'sources': [context.source for context in context_basket.contexts]
+        'error': error,
+        'sources': sources
     })

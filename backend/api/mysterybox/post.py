@@ -47,6 +47,8 @@ def handler(event: dict, context):
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
             integration = item.get_raw_child()
+            if integration != 'google_docs':
+                continue
             fetchers.append(Fetcher.create(integration, {
                 'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
                 'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
@@ -113,6 +115,8 @@ def discover_fetch_ingest(user: str, fetcher: Fetcher, ingestor: Ingestor) -> Df
             break
         next_token = discovery_response.next_token
         for item in discovery_response.items:
+            if item.id != '152yltmk55dhK7q8zUq8kOilQVyaBsJjNjtQDvtE1Gnc' and item.id != '1hTHV32mf-Po0W8o00tC50l2ana2I2zO-baR5Wgd9xWY':
+                continue
             max_items -= 1
             ingestion_timestamp = int(time())
             blocks_generator = fetcher.fetch(item.id)

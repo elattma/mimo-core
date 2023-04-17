@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import List
 
 from graph.neo4j_ import Block
+from mystery.query import Query, Request
 
 
 @dataclass
@@ -15,12 +17,6 @@ class Context:
     blocks: List[Block]
     translated: str
     tokens: int
-
-@dataclass
-class Request:
-    encoding_name: str
-    text: str
-    embedding: List[float]
 
 @dataclass
 class ContextBasket:
@@ -51,3 +47,25 @@ class ContextBasket:
         stringified += '\n--------\n'
         stringified += '\n'.join([context.translated for context in self.contexts])
         return stringified
+
+@dataclass
+class DataError(Enum):
+    QUERY_FORMATION_FAILURE = 'Failed to dynamically formulate query!'
+    FETCH_DOCUMENTS_FAILURE = 'Failed to fetch documents!'
+    FILTERED_DOCUMENTS_FAILURE = 'Failed to fetched filtered documents!'
+    DECORATE_EMBEDDINGS_FAILURE = 'Failed to decorate documents with embeddings!'
+    WEAVE_CONTEXT_FAILURE = 'Failed to weave context!'
+    MINIFY_CONTEXT_FAILURE = 'Failed to minify context!'
+
+@dataclass
+class DataRequest:
+    request: str
+    query: Query = None
+    page_ids: List[str] = None
+    max_tokens: int = None
+
+@dataclass
+class DataResponse:
+    successful: bool
+    context_basket: ContextBasket
+    error: DataError = None
