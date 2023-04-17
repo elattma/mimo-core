@@ -83,7 +83,7 @@ class ChatSystem:
         print('[ChatSystem] Generating requests...')
         system_message = ChatPromptMessage(
             role=ChatPromptMessageRole.SYSTEM,
-            content=constants.SYSTEM_MESSAGE
+            content=constants.CHAT_SYSTEM_SYSTEM_MESSAGE
         )
         user_message = ChatPromptMessage(
             role=ChatPromptMessageRole.USER,
