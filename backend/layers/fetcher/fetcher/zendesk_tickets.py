@@ -1,4 +1,4 @@
-from typing import Any, Generator, List
+from typing import Any, Generator, List, Set
 
 import requests
 from graph.blocks import (BlockStream, BodyBlock, CommentBlock, MemberBlock,
@@ -16,7 +16,7 @@ class Zendesk(Fetcher):
     
     def get_auth_attributes(self) -> dict:
         return {
-            'authorize_endpoint': 'https://mimo8561.zendesk.com/oauth/tokens'
+            'authorize_endpoint': 'https://mimo1489.zendesk.com/oauth/tokens'
         }
 
     def discover(self, filter: Filter = None) -> DiscoveryResponse:
@@ -30,7 +30,7 @@ class Zendesk(Fetcher):
                 filters['page[size]'] = filter.limit
 
         response = requests.get(
-            'https://mimo8561.zendesk.com/api/v2/tickets',
+            'https://mimo1489.zendesk.com/api/v2/tickets',
             params={ **filters },
             headers={
                 'Authorization': f'Basic YWRtaW5AbWltby50ZWFtOkBANVoyQVdrUjJZYkEzaw=='
@@ -46,7 +46,7 @@ class Zendesk(Fetcher):
                 id=ticket.get('id', None) if ticket else None,
                 title=ticket.get('subject', None) if ticket else None,
                 icon=self.get_icon(),
-                link=f'https://mimo8561.zendesk.com/agent/tickets/{ticket["id"]}' if ticket else None,
+                link=f'https://mimo1489.zendesk.com/agent/tickets/{ticket["id"]}' if ticket else None,
             ) for ticket in tickets],
             next_token=next_token
         )
@@ -56,7 +56,7 @@ class Zendesk(Fetcher):
         if not (session and id):
             return None
         
-        response = session.get(f'https://mimo8561.zendesk.com/api/v2/tickets/{id}')
+        response = session.get(f'https://mimo1489.zendesk.com/api/v2/tickets/{id}')
         ticket_response = response.json() if response else None
         ticket = ticket_response.get('ticket', None) if ticket_response else None
         return ticket
@@ -66,7 +66,7 @@ class Zendesk(Fetcher):
         if not (session and id):
             return None
 
-        response = session.get(f'https://mimo8561.zendesk.com/api/v2/users/{id}')
+        response = session.get(f'https://mimo1489.zendesk.com/api/v2/users/{id}')
         user_response = response.json() if response else None
         user = user_response.get('user', None) if user_response else None
         user_name = user.get('name', None) if user else None
@@ -78,7 +78,7 @@ class Zendesk(Fetcher):
         if not (session and id):
             return None
 
-        response = session.get(f'https://mimo8561.zendesk.com/api/v2/tickets/{id}/comments')
+        response = session.get(f'https://mimo1489.zendesk.com/api/v2/tickets/{id}/comments')
         comments_response = response.json() if response else None
         comments = comments_response.get('comments', None) if comments_response else None
         comments = comments[1:] if comments else None
@@ -94,41 +94,35 @@ class Zendesk(Fetcher):
         ticket = Zendesk._fetch_ticket(session, id)
         ticket_last_updated_timestamp = self._get_timestamp_from_format(ticket.get('updated_at', None), ZENDESK_TIME_FORMAT) if ticket else None
         subject = ticket.get('subject', None) if ticket else None
-        member_blocks_map: dict[str, MemberBlock] = {}
+        member_blocks: Set[MemberBlock] = set()
         
         requester = Zendesk._fetch_user_entity(session, ticket.get('requester_id', None)) if ticket else None
         assignee = Zendesk._fetch_user_entity(session, ticket.get('assignee_id', None)) if ticket else None
         if requester:
-            member_blocks_map[requester] = MemberBlock(name=requester, last_updated_timestamp=ticket_last_updated_timestamp, relation=Relations.AUTHOR)
+            member_blocks.add(MemberBlock(name=requester, last_updated_timestamp=ticket_last_updated_timestamp, relation=Relations.AUTHOR))
         if assignee:
-            member_blocks_map[assignee] = MemberBlock(name=assignee, last_updated_timestamp=ticket_last_updated_timestamp, relation=Relations.RECIPIENT)
+            member_blocks.add(MemberBlock(name=assignee, last_updated_timestamp=ticket_last_updated_timestamp, relation=Relations.RECIPIENT))
 
         if subject:
             yield BlockStream(TitleBlock._LABEL, [TitleBlock(text=subject, last_updated_timestamp=ticket_last_updated_timestamp)])
         description = ticket.get('description', None) if ticket else None
         if description:
-            for body_stream in self._streamify_blocks(BodyBlock._LABEL, [BodyBlock(text=description, last_updated_timestamp=ticket_last_updated_timestamp)]):
-                yield body_stream
+            yield from self._generate(BodyBlock._LABEL, [BodyBlock(text=description, last_updated_timestamp=ticket_last_updated_timestamp)])
 
         comments = Zendesk._fetch_comments(session, id)
         comment_blocks = []
-        for comment in comments:
-            comment_last_updated_timestamp = self._get_timestamp_from_format(comment.get('created_at', None), ZENDESK_TIME_FORMAT) if comment else None
-            author_id = comment.get('author_id', None) if comment else None
-            author = 'unknown'
-            if author_id:
-                author = Zendesk._fetch_user_entity(session, author_id)
-                if author:
-                    if author not in member_blocks_map:
-                        member_blocks_map[author] = MemberBlock(name=author, last_updated_timestamp=comment_last_updated_timestamp, relation=Relations.PARTICIPANT)
-                    else:
-                        member_blocks_map[author].last_updated_timestamp = max(comment_last_updated_timestamp, member_blocks_map[author].last_updated_timestamp)
-                    
-            comment_blocks.append(CommentBlock(author=author, text=comment.get('plain_body', None), last_updated_timestamp=comment_last_updated_timestamp))
+        if comments:
+            for comment in comments:
+                comment_last_updated_timestamp = self._get_timestamp_from_format(comment.get('created_at', None), ZENDESK_TIME_FORMAT) if comment else None
+                author_id = comment.get('author_id', None) if comment else None
+                author = 'unknown'
+                if author_id:
+                    author = Zendesk._fetch_user_entity(session, author_id)
+                    author_member = MemberBlock(name=author, last_updated_timestamp=comment_last_updated_timestamp, relation=Relations.PARTICIPANT)
+                    if author_member in member_blocks:
+                        member_blocks.add(author_member)
+                        
+                comment_blocks.append(CommentBlock(author=author, text=comment.get('plain_body', None), last_updated_timestamp=comment_last_updated_timestamp))
         
-        for comment_stream in self._streamify_blocks(CommentBlock._LABEL, comment_blocks):
-            yield comment_stream
-
-        if len(member_blocks_map) > 0:
-            for member_stream in self._streamify_blocks(MemberBlock._LABEL, member_blocks_map.values()):
-                yield member_stream
+        yield from self._generate(CommentBlock._LABEL, comment_blocks)
+        yield from self._generate(MemberBlock._LABEL, list(member_blocks))

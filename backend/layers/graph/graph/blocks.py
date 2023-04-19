@@ -130,6 +130,14 @@ class SummaryBlock(Block):
         return {
             'text': self.text
         }
+    
+    def __hash__(self):
+        return hash((self.text))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.text == other.text
 
 
 @dataclass
@@ -141,6 +149,14 @@ class BodyBlock(Block):
         return {
             'text': self.text
         }
+    
+    def __hash__(self):
+        return hash((self.text))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.text == other.text
 
 
 class Relations(Enum):
@@ -156,6 +172,11 @@ class entity:
 
     def __hash__(self) -> int:
         return hash(self.id)
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.id == other.id
 
     def get_as_dict(self) -> dict:
         return {
@@ -175,6 +196,14 @@ class MemberBlock(Block):
             'name': self.name.get_as_dict(),
             'relation': self.relation.value if self.relation else None
         }
+    
+    def __hash__(self):
+        return hash((self.name, self.relation.value))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.name == other.name and self.relation == other.relation
 
 
 @dataclass
@@ -187,6 +216,13 @@ class TitleBlock(Block):
             'text': self.text
         }
 
+    def __hash__(self):
+        return hash((self.text))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.text == other.text
 
 @dataclass
 class CommentBlock(Block):
@@ -196,9 +232,17 @@ class CommentBlock(Block):
 
     def get_as_dict(self) -> dict:
         return {
-            'author': self.author.get_as_dict(),
+            'author': self.author.get_as_dict() if self.author else None,
             'text': self.text
         }
+    
+    def __hash__(self):
+        return hash((self.author, self.text))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.author == other.author and self.text == other.text
 
 
 @dataclass
@@ -224,6 +268,14 @@ class DealBlock(Block):
             'amount': self.amount,
             'probability': self.probability
         }
+    
+    def __hash__(self):
+        return hash((self.name))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.name == other.name
 
 
 @dataclass
@@ -243,3 +295,11 @@ class ContactBlock(Block):
             'title': self.title,
             'lead_source': self.lead_source
         }
+
+    def __hash__(self):
+        return hash((self.name))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.name == other.name

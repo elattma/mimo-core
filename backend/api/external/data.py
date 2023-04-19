@@ -6,7 +6,7 @@ from external.auth0_ import Auth0
 from external.openai_ import OpenAI
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
-from mystery.context_basket.model import ContextBasket, DataRequest
+from mystery.context_basket.model import DataRequest
 from mystery.data_agent import DataAgent
 
 secrets: Secrets = None

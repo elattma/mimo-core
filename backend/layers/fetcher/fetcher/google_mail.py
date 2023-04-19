@@ -1,5 +1,5 @@
 import base64
-from typing import Generator, List
+from typing import Generator, List, Set
 
 import requests
 from graph.blocks import (BlockStream, BodyBlock, MemberBlock, Relations,
@@ -89,8 +89,8 @@ class GoogleMail(Fetcher):
         if not messages:
             return
         
-        member_blocks_map: dict[str, MemberBlock] = {}
-        title_blocks_map: dict[str, TitleBlock] = {}
+        member_blocks: Set[MemberBlock] = set()
+        title_blocks: Set[TitleBlock] = set()
         for message in messages:
             part = message.get('payload', None) if message else None
             headers = part.get('headers', []) if part else []
@@ -101,32 +101,23 @@ class GoogleMail(Fetcher):
                     continue
                 if header_name == 'Subject':
                     subject = header.get('value', None)
-                    if subject and subject not in title_blocks_map:
-                        title_blocks_map[subject] = TitleBlock(text=subject, last_updated_timestamp=last_updated_timestamp)
+                    title_blocks.add(TitleBlock(text=subject, last_updated_timestamp=last_updated_timestamp))
                 elif header_name == 'From':
                     from_: str = header.get('value', None)
                     if not from_:
                         continue
                     email = from_.split('<')[-1].split('>')[0].strip()
                     name = from_.split('<')[0].strip()
-                    if email not in member_blocks_map:
-                        name_entity = entity(id=email, value=name)
-                        member_blocks_map[email] = MemberBlock(last_updated_timestamp=last_updated_timestamp, name=name_entity, relation=Relations.AUTHOR)
+                    member_blocks.add(MemberBlock(last_updated_timestamp=last_updated_timestamp, name=entity(id=email, value=name), relation=Relations.AUTHOR))
                 elif header_name == 'To':
                     to_: str = header.get('value', None)
                     if not to_:
                         continue
                     email = to_.split('<')[-1].split('>')[0].strip()
                     name = to_.split('<')[0].strip()
-                    if email not in member_blocks_map:
-                        name_entity = entity(id=email, value=None)
-                        member_blocks_map[email] = MemberBlock(last_updated_timestamp=last_updated_timestamp, name=name_entity, relation=Relations.RECIPIENT)
-
-        for member_stream in self._streamify_blocks(MemberBlock._LABEL, member_blocks_map.values()):
-            yield member_stream
-
-        for title_stream in self._streamify_blocks(TitleBlock._LABEL, title_blocks_map.values()):
-            yield title_stream
+                    member_blocks.add(MemberBlock(last_updated_timestamp=last_updated_timestamp, name=entity(id=email, value=None), relation=Relations.RECIPIENT))
+        yield from self._generate(MemberBlock._LABEL, list(member_blocks))
+        yield from self._generate(TitleBlock._LABEL, list(title_blocks))
         
         body_blocks: List[BodyBlock] = []
         for message in messages:
@@ -153,5 +144,4 @@ class GoogleMail(Fetcher):
                 if parts:
                     message_parts[0:0] = parts
 
-            for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
-                yield body_stream
+            yield from self._generate(BodyBlock._LABEL, list(body_blocks))

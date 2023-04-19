@@ -112,13 +112,6 @@ class ChatSystem:
                 max_tokens=max_tokens
             )
             response = self._data_agent.generate_context(data_request)
-            if response and not response.successful:
-                yield f'Failed to retrieve context for: "{request}" because of an error: {response.error}'
-                continue
-            if not (response and response.context_basket):
-                yield f'Failed to retrieve context for: "{request}"'
-                continue
-            yield f'Retrieved context for: "{request}"'
             baskets.append(response.context_basket)
             
         print('[ChatSystem] Context retrieved!')

@@ -30,7 +30,7 @@ class Zoho(Fetcher):
     def discover(self, filter: Filter = None) -> DiscoveryResponse:
         print('zoho discovery!')
 
-        offset = filter.next_token if filter and filter.next_token else 1
+        offset = filter.next_token if filter and filter.next_token else 0
         limit = filter.limit if filter and filter.limit else 100
         filters = {
             'select_query': f'select id, Account_Name from Accounts where Account_Name like \'%\' order by Account_Name asc limit {offset}, {limit}'
@@ -104,8 +104,7 @@ class Zoho(Fetcher):
             last_updated_timestamp=account_last_updated_timestamp, 
             text=account_name
         ))
-        for title_stream in self._streamify_blocks(TitleBlock._LABEL, title_blocks):
-            yield title_stream
+        yield from self._generate(TitleBlock._LABEL, title_blocks)
 
         quoted = account_name.replace('(', '\(').replace(')', '\)').replace(',', '\,')
         quoted_starts_with = quote(quoted.split(' ')[0]) if quoted else None
@@ -130,8 +129,7 @@ class Zoho(Fetcher):
                 last_updated_timestamp = self._get_timestamp_from_format(note.get('Modified_Time', None))
                 comment_blocks.append(CommentBlock(author=author_entity, text=text, last_updated_timestamp=last_updated_timestamp))
             
-            for comment_stream in self._streamify_blocks(CommentBlock._LABEL, comment_blocks):
-                yield comment_stream
+            yield from self._generate(CommentBlock._LABEL, comment_blocks)
 
         contact_id_entity_map: dict[str, entity] = {}
         response = session.get(
@@ -165,8 +163,7 @@ class Zoho(Fetcher):
                     last_updated_timestamp=last_updated_timestamp
                 ))
 
-            for contact_stream in self._streamify_blocks(ContactBlock._LABEL, contact_blocks):
-                yield contact_stream
+            yield from self._generate(ContactBlock._LABEL, contact_blocks)
 
         response = session.get(
             f'https://www.zohoapis.com/crm/v3/Deals/search',
@@ -203,5 +200,4 @@ class Zoho(Fetcher):
                     probability=probability,
                     last_updated_timestamp=last_updated_timestamp
                 ))
-            for deal_stream in self._streamify_blocks(DealBlock._LABEL, deal_blocks):
-                yield deal_stream
+            yield from self._generate(DealBlock._LABEL, deal_blocks)

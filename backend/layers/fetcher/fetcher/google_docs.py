@@ -85,15 +85,14 @@ class GoogleDocs(Fetcher):
         file_response = response.json() if response else None
         last_updated_timestamp = self._get_timestamp_from_format(file_response.get('modifiedTime', None), GOOGLE_TIME_FORMAT) if file_response else None
         owners = file_response.get('owners', None) if file_response else None
-        members_blocks: List[MemberBlock] = []
+        member_blocks: List[MemberBlock] = []
         for owner in owners:
             if not owner or 'emailAddress' not in owner:
                 continue
             name_entity = entity(id=owner.get('emailAddress', None),value=owner.get('displayName', None))
-            members_blocks.append(MemberBlock(last_updated_timestamp=last_updated_timestamp, name=name_entity, relation=Relations.AUTHOR))
+            member_blocks.append(MemberBlock(last_updated_timestamp=last_updated_timestamp, name=name_entity, relation=Relations.AUTHOR))
 
-        for member_stream in self._streamify_blocks(MemberBlock._LABEL, members_blocks):
-            yield member_stream
+        yield from self._generate(MemberBlock._LABEL, member_blocks)
 
         response = requests.get(
             f'https://docs.googleapis.com/v1/documents/{id}',
@@ -133,5 +132,4 @@ class GoogleDocs(Fetcher):
             elif 'tableOfContents' in value and 'content' in value['tableOfContents']:
                 content[0:0] = value['tableOfContents']['content']
         
-        for body_stream in self._streamify_blocks(BodyBlock._LABEL, body_blocks):
-            yield body_stream
+        yield from self._generate(BodyBlock._LABEL, body_blocks)

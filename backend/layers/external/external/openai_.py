@@ -1,14 +1,15 @@
 from typing import Dict, Generator, List, Optional, Union
 
-from backoff import on_exception, expo, full_jitter
+from backoff import expo, full_jitter, on_exception
 from openai import ChatCompletion, Completion, Embedding
-from openai.error import RateLimitError
+from openai.error import APIConnectionError, RateLimitError
+
 
 class OpenAI:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
         
-    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
     def embed(self, text: str) -> List[float]:
         if not (self._api_key and text):
             return None
@@ -23,7 +24,7 @@ class OpenAI:
         embedding = first.get('embedding', None) if first else None
         return embedding
     
-    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
     def completion(
         self,
         prompt: str,
@@ -52,7 +53,7 @@ class OpenAI:
         text: str = choices[0].get('text', None) if choices and len(choices) > 0 else None
         return text
     
-    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
     def stream_chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -98,7 +99,7 @@ class OpenAI:
         if accumulated_tokens > 0:
             yield output
 
-    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -127,7 +128,7 @@ class OpenAI:
         content = message.get('content', None) if message else None
         return content
     
-    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
     def summarize(self, text: str):
         if not (self._api_key and text):
             return None
@@ -146,31 +147,3 @@ class OpenAI:
         summary = message.get('content', None) if message else None
         return summary
     
-    @on_exception(expo, RateLimitError, max_tries=5, jitter=full_jitter)
-    def names(self, text: str):
-        if not (self._api_key and text):
-            return []
-        
-        names_response = ChatCompletion.create(
-            api_key=self._api_key,
-            model='gpt-3.5-turbo',
-            messages=[
-                { 'role': 'system', 'content': 'Extract only people\'s names and company specific acronyms from the text. Your output should be in the following format:\nProperNoun1,ProperNoun2,ProperNoun3'},
-                { 'role': 'user', 'content': text },
-            ],
-            temperature=0
-        )
-        names_choices = names_response.get('choices', None) if names_response else None
-        message = names_choices[0].get('message', None) if names_choices and len(names_choices) > 0 else None
-        names_content = message.get('content', None) if message else None
-        if not names_content:
-            return []
-        print(names_content)
-        
-        names: List[str] = []
-        for name_raw in names_content.split(','):
-            name: str = name_raw.strip()
-            if len(name) <= 64:
-                names.append(name)
-        print(names)
-        return names

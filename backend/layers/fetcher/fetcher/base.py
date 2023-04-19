@@ -81,6 +81,12 @@ class Fetcher(ABC):
     @abstractmethod
     def fetch(self, id: str) -> Generator[BlockStream, None, None]:
         raise NotImplementedError("fetch not implemented")
+    
+    def _generate(self, label: str, blocks: List[Block]) -> Generator[BlockStream, None, None]:
+        if not blocks or len(blocks) < 1:
+            return
+        for block in self._streamify_blocks(label, blocks):
+            yield block
 
     def _get_timestamp_from_format(self, timestamp_str: str, format: str = None) -> int:
         if not (timestamp_str and format):

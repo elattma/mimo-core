@@ -640,7 +640,7 @@ export class ApiStack extends Stack {
       },
       timeout: Duration.seconds(20),
       memorySize: 512,
-      layers: this.getLayersSubset(["aws", "fetcher"]),
+      layers: this.getLayersSubset(["aws", "fetcher", "graph"]),
     });
     mimoTable.grantWriteData(authIntegrationHandler);
     this.integrationsSecret.grantRead(authIntegrationHandler);
