@@ -413,6 +413,8 @@ class DataAgent:
             pass
         elif (query.components[SearchMethod].value == SearchMethodValue.EXACT):
             documents.extend(self._exact_context(query))
+            print('hi!!!')
+            print(documents)
             default_if_empty = False
         elif (query.components[SearchMethod].value == SearchMethodValue.RELEVANT):
             if PageParticipants in query.components:

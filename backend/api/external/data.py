@@ -25,7 +25,6 @@ def handler(event: dict, context):
     max_tokens: int = query_string_parameters.get('max_tokens', None) if query_string_parameters else None
     max_tokens = int(max_tokens) if max_tokens else 1600
     test_token: str = query_string_parameters.get('test_token', None) if query_string_parameters else None
-    user = 'google-oauth2|108573573074253667565'
     if not test_token or test_token != mimo_test_token:
         if not auth0:
             auth0 = Auth0(os.environ['STAGE'])
@@ -33,6 +32,7 @@ def handler(event: dict, context):
         if not user:
             return to_response_error(Errors.INVALID_USER.value)
 
+    user = 'google-oauth2|108573573074253667565'
     if not (stage or graph_db_uri or question):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
@@ -66,12 +66,13 @@ def handler(event: dict, context):
         error = 'No response from data agent.'
     elif not data_response.successful:
         error = data_response.error
+        error = error.value if error else None
     else: 
         answer = str(data_response.context_basket)
         sources = [context.source for context in data_response.context_basket.contexts]
     
     print(f'[Data] Answer: ')
-    print(answer.replace('\n', '||'))
+    print(answer.replace('\n', '||') if answer else None)
     print(f'[Data] Error: {error}')
     print(f'[Data] Sources: {sources}')
     return to_response_success({
@@ -79,3 +80,4 @@ def handler(event: dict, context):
         'error': error,
         'sources': sources
     })
+

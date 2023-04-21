@@ -515,6 +515,7 @@ class Neo4j:
         result = tx.run(query, owner=query_filter.owner)
         records = list(result)
         print('[Neo4j]: Query completed!')
+        print(records)
 
         return Neo4j._parse_record_documents(records)
     
