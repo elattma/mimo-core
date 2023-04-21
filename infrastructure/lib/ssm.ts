@@ -58,6 +58,13 @@ const INTEGRATION_CONFIGS: IntegrationConfig[] = [
     oauth2_link:
       "https://accounts.zoho.com/oauth/v2/auth?scope=ZohoCRM.modules.ALL,ZohoCRM.coql.READ&client_id=1000.FOXW2IM5QG3WT0PJTJZDW6WJKQ9LEQ&response_type=code&access_type=offline&prompt=consent",
   },
+  {
+    id: "salesforce_crm",
+    name: "Salesforce CRM",
+    description: "Some description for Salesforce CRM",
+    oauth2_link:
+      "https://mimo2-dev-ed.develop.my.salesforce.com/services/oauth2/authorize?client_id=3MVG9gtDqcOkH4PIHJEX7YrYZriRHTXCsoT7E9lqjUbQWLjASLjfkP6NWKw9TZPQb_G02UyNGsBqXetf4U2mi&response_type=code",
+  },
 ];
 
 export interface SsmStackProps extends StackProps {

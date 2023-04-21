@@ -1,4 +1,5 @@
 import { Stage, StageProps } from "aws-cdk-lib";
+import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { ApiStack } from "./api";
 import { AppsyncStack } from "./appsync";
@@ -48,5 +49,22 @@ export class MimoStage extends Stage {
     api.addDependency(ssm);
     api.addDependency(appsync);
     api.addDependency(s3);
+    for (const handler of api.usagePlanHandlers) {
+      handler.addEnvironment(
+        "DEFAULT_USAGE_PLAN_ID",
+        api.defaultUsagePlan.usagePlanId
+      );
+      handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: [
+            "apigateway:GET",
+            "apigateway:PUT",
+            "apigateway:POST",
+            "apigateway:DELETE",
+          ],
+          resources: ["*"],
+        })
+      );
+    }
   }
 }

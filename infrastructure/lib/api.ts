@@ -14,8 +14,10 @@ import {
   ApiKeySourceType,
   IAuthorizer,
   IModel,
+  IUsagePlan,
   JsonSchemaType,
   LambdaIntegration,
+  Period,
   RestApi,
   TokenAuthorizer,
 } from "aws-cdk-lib/aws-apigateway";
@@ -65,6 +67,8 @@ export class ApiStack extends Stack {
   readonly authorizer: IAuthorizer;
   readonly integrationsSecret: ISecret;
   readonly layersMap: Map<string, PythonLayerVersion> = new Map();
+  readonly defaultUsagePlan: IUsagePlan;
+  readonly usagePlanHandlers: PythonFunction[] = [];
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -78,7 +82,7 @@ export class ApiStack extends Stack {
 
     this.api = this.createRestApi(props.domainName);
     this.authorizer = this.createAuth0Authorizer(props.stageId);
-    this.createDefaultApiKey();
+    this.defaultUsagePlan = this.createUsagePlan(props.stageId);
 
     LAYERS.forEach((layerName) => {
       const layer = this.createLayer(props.stageId, layerName);
@@ -106,6 +110,7 @@ export class ApiStack extends Stack {
       props.mimoTable,
       props.uploadItemBucket
     );
+    this.createLocksmithRoutes(props.stageId);
     this.createDataLambda(props.stageId);
     this.createAgentRoutes(props.stageId, this.integrationsSecret);
 
@@ -135,6 +140,118 @@ export class ApiStack extends Stack {
     });
 
     return layer;
+  };
+
+  createLocksmithRoutes = (stage: string) => {
+    const locksmith = this.api.root.addResource("locksmith");
+    const generateHandler = this.getHandler({
+      route: "locksmith",
+      method: "generate",
+      environment: {
+        STAGE: "prod",
+        REST_API_ID: this.api.restApiId,
+      },
+      memorySize: 1024,
+      timeout: Duration.seconds(30),
+      layers: this.getLayersSubset(["aws"]),
+    });
+    this.usagePlanHandlers.push(generateHandler);
+
+    const generateResponseModel = this.api.addModel("GenerateResponseModel", {
+      contentType: "application/json",
+      modelName: "GenerateResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          apiKey: {
+            type: JsonSchemaType.OBJECT,
+            properties: {
+              value: {
+                type: JsonSchemaType.STRING,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    locksmith.addMethod("POST", new LambdaIntegration(generateHandler), {
+      authorizer: this.authorizer,
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": generateResponseModel,
+          },
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
+
+    const getHandler = this.getHandler({
+      route: "locksmith",
+      method: "get",
+      environment: {
+        STAGE: "prod",
+        REST_API_ID: this.api.restApiId,
+      },
+      timeout: Duration.seconds(30),
+      layers: this.getLayersSubset(["aws"]),
+    });
+    this.usagePlanHandlers.push(getHandler);
+
+    const getResponseModel = this.api.addModel("GetResponseModel", {
+      contentType: "application/json",
+      modelName: "GetResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          apiKey: {
+            type: JsonSchemaType.OBJECT,
+            properties: {
+              value: {
+                type: JsonSchemaType.STRING,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    locksmith.addMethod("GET", new LambdaIntegration(getHandler), {
+      authorizer: this.authorizer,
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseModels: {
+            "application/json": getResponseModel,
+          },
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
+
+    const deleteHandler = this.getHandler({
+      route: "locksmith",
+      method: "delete",
+      environment: {
+        STAGE: "prod",
+        REST_API_ID: this.api.restApiId,
+      },
+      timeout: Duration.seconds(30),
+      layers: this.getLayersSubset(["aws"]),
+    });
+    this.usagePlanHandlers.push(deleteHandler);
+
+    locksmith.addMethod("DELETE", new LambdaIntegration(deleteHandler), {
+      authorizer: this.authorizer,
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseParameters: RESPONSE_PARAMS,
+        },
+      ],
+    });
   };
 
   createAgentRoutes = (stage: string, integrationsSecret: ISecret) => {
@@ -299,22 +416,18 @@ export class ApiStack extends Stack {
     return api;
   };
 
-  createDefaultApiKey = () => {
-    const plan = this.api.addUsagePlan("usage-plan", {
+  createUsagePlan = (stage: string) => {
+    return this.api.addUsagePlan(`${stage}-default-usage-plan`, {
       name: "test",
       throttle: {
         rateLimit: 10,
         burstLimit: 2,
       },
-      apiStages: [
-        {
-          api: this.api,
-          stage: this.api.deploymentStage,
-        },
-      ],
+      quota: {
+        limit: 100,
+        period: Period.DAY,
+      },
     });
-    const key = this.api.addApiKey("test");
-    plan.addApiKey(key);
   };
 
   createAuth0Authorizer = (stage: string): IAuthorizer => {
@@ -472,7 +585,6 @@ export class ApiStack extends Stack {
     });
 
     item.addMethod("GET", new LambdaIntegration(getItemHandler), {
-      apiKeyRequired: true,
       authorizer: this.authorizer,
       methodResponses: [
         {
@@ -533,7 +645,6 @@ export class ApiStack extends Stack {
     // );
 
     // item.addMethod("POST", new LambdaIntegration(uploadItemHandler), {
-    //   apiKeyRequired: true,
     //   authorizer: this.authorizer,
     //   requestModels: {
     //     "application/json": uploadItemRequestModel,
@@ -616,7 +727,6 @@ export class ApiStack extends Stack {
 
     // TODO: figure out response for 1 specific integration
     integration.addMethod("GET", new LambdaIntegration(getIntegrationHandler), {
-      apiKeyRequired: true,
       authorizer: this.authorizer,
       requestParameters: {
         "method.request.querystring.integration": false,
@@ -669,7 +779,6 @@ export class ApiStack extends Stack {
       "POST",
       new LambdaIntegration(authIntegrationHandler),
       {
-        apiKeyRequired: true,
         authorizer: this.authorizer,
         requestModels: {
           "application/json": authIntegrationModel,
@@ -755,7 +864,6 @@ export class ApiStack extends Stack {
     });
 
     chat.addMethod("POST", new LambdaIntegration(chatHandler), {
-      apiKeyRequired: true,
       authorizer: this.authorizer,
       requestModels: {
         "application/json": chatRequestModel,
@@ -797,7 +905,6 @@ export class ApiStack extends Stack {
     });
 
     chat.addMethod("GET", new LambdaIntegration(chatHistoryHandler), {
-      apiKeyRequired: true,
       authorizer: this.authorizer,
       methodResponses: [
         {
@@ -822,7 +929,7 @@ export class ApiStack extends Stack {
       environment: params.environment,
       retryAttempts: 0,
       bundling: {
-        assetExcludes: ["**.venv**", "**poetry.lock"],
+        assetExcludes: ["**.venv**"],
       },
       layers: params.layers,
     });

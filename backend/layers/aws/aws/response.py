@@ -17,6 +17,8 @@ class Errors(Enum):
     OPENAI_ERROR = 'openai error'
     CHAT_ERROR = 'chat error'
     S3_ERROR = 's3 error'
+    FAILED_DELETE_OLD_KEY = 'failed to delete old key'
+    FAILED_CREATE_KEY = 'failed to create key'
 
 def to_response_error(error_message: Errors = 'An error occurred'):
     return {

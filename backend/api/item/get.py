@@ -4,7 +4,7 @@ from typing import List
 
 from aws.response import Errors, to_response_error, to_response_success
 from aws.secrets import Secrets
-from fetcher.base import DiscoveryResponse, Item
+from fetcher.base import Item
 from graph.blocks import BlockStream, TitleBlock
 from graph.neo4j_ import Document, Neo4j
 

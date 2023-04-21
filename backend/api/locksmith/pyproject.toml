@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "assets"
+version = "0.1.0"
+description = ""
+authors = ["Mohamed Elattma <mo@mimo.team>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+boto3 = "^1.26.116"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
