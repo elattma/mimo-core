@@ -48,12 +48,17 @@ class OAuth(Auth):
         headers.update(override_headers)
 
         response = requests.post(self.authorize_endpoint, data = data, headers = headers, auth = (self.client_id, self.client_secret))
-
         auth_response = response.json() if response else None
         access_token = auth_response.get('access_token', None) if auth_response else None
         refresh_token = auth_response.get('refresh_token', None) if auth_response else None
+
         expires_in = auth_response.get('expires_in', None) if auth_response else None
         expiry_timestamp = expires_in + int(time()) if expires_in else None
+        if not expiry_timestamp:
+            #TODO: hack for salesforce, generalize this. 1 day expiration, issued_at in ms
+            issued_at = auth_response.get('issued_at', None) if auth_response else None
+            issued_at = int(issued_at) // 1000 if issued_at else None
+            expiry_timestamp = issued_at + 86400 if issued_at else None
         
         if not access_token:
             return False
@@ -71,8 +76,8 @@ class OAuth(Auth):
         override_data = params.get('override_data', {}) if params else {}
         override_headers = params.get('override_headers', {}) if params else {}
         current_timestamp = int(time())
-        if current_timestamp < self.expiry_timestamp:
-            return True
+        # if not self.expiry_timestamp or current_timestamp < self.expiry_timestamp:
+        #     return True
         
         data = {
             'grant_type': 'refresh_token',
@@ -86,17 +91,25 @@ class OAuth(Auth):
             'Content-Type': 'application/x-www-form-urlencoded'
         }
         headers.update(override_headers)
-
         response = requests.post(self.refresh_endpoint, data=data, headers=headers, auth=(self.client_id, self.client_secret))
 
         auth_response = response.json() if response else None
         access_token: str = auth_response.get('access_token', None) if auth_response else None
         expires_in: str = auth_response.get('expires_in', None) if auth_response else None
         expiry_timestamp: int = int(expires_in) + current_timestamp if expires_in else None
+        if not expiry_timestamp:
+            #TODO: hack for salesforce, generalize this. 1 day expiration, issued_at in ms
+            issued_at = auth_response.get('issued_at', None) if auth_response else None
+            issued_at = int(issued_at) // 1000 if issued_at else None
+            expiry_timestamp = issued_at + 86400 if issued_at else None
         if not (access_token and expiry_timestamp):
-            return False
+            return False #TODO: throw exception since something is wrong
         
         self.access_token = access_token
         self.expiry_timestamp = expiry_timestamp
 
         return True
+    
+    def __str__(self):
+        return f'OAuth: {self.client_id}, {self.client_secret}, {self.access_token}, {self.refresh_token}, {self.expiry_timestamp}, {self.authorize_endpoint}, {self.refresh_endpoint}'
+        

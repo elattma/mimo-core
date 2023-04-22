@@ -13,7 +13,8 @@ from fetcher.base import DiscoveryResponse, Fetcher, Filter
 from graph.blocks import BlockStream
 from graph.neo4j_ import Neo4j
 from graph.pinecone_ import Pinecone
-from utils.ingestor import IngestInput, Ingestor, IngestResponse
+
+from .utils.ingestor import IngestInput, Ingestor, IngestResponse
 
 db: ParentChildDB = None
 secrets: Secrets = None
@@ -47,6 +48,8 @@ def handler(event: dict, context):
     if user_integration_items and len(user_integration_items) > 0:
         for item in user_integration_items:
             integration = item.get_raw_child()
+            if integration != "salesforce_crm":
+                continue
             fetchers.append(Fetcher.create(integration, {
                 'client_id': secrets.get(f'{item.get_raw_child()}/CLIENT_ID'),
                 'client_secret': secrets.get(f'{item.get_raw_child()}/CLIENT_SECRET'),
@@ -130,11 +133,11 @@ def discover_fetch_ingest(user: str, fetcher: Fetcher, ingestor: Ingestor) -> Df
                 timestamp=ingestion_timestamp
             )
 
-            ingest_response: IngestResponse = ingestor.ingest(ingest_input)
-            ingestor.infer_names(ingest_input)
-            if not ingest_response.succeeded:
-                succeeded = False
-                continue
+            # ingest_response: IngestResponse = ingestor.ingest(ingest_input)
+            # ingestor.infer_names(ingest_input)
+            # if not ingest_response.succeeded:
+            #     succeeded = False
+            #     continue
             if max_items <= 0:
                 return DfiResponse(integration=fetcher._INTEGRATION, succeeded=succeeded)
         if not next_token:

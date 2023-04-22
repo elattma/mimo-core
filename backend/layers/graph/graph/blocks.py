@@ -193,7 +193,7 @@ class MemberBlock(Block):
 
     def get_as_dict(self) -> dict:
         return {
-            'name': self.name.get_as_dict(),
+            'name': self.name.get_as_dict() if self.name else None,
             'relation': self.relation.value if self.relation else None
         }
     
@@ -259,9 +259,9 @@ class DealBlock(Block):
 
     def get_as_dict(self) -> dict:
         return {
-            'owner': self.owner.get_as_dict(),
-            'name': self.name.get_as_dict(),
-            'contact': self.contact.get_as_dict(),
+            'owner': self.owner.get_as_dict() if self.owner else None,
+            'name': self.name.get_as_dict() if self.name else None,
+            'contact': self.contact.get_as_dict() if self.contact else None,
             'type': self.type,
             'stage': self.stage,
             'close_date': self.close_date,
@@ -289,8 +289,8 @@ class ContactBlock(Block):
 
     def get_as_dict(self) -> dict:
         return {
-            'name': self.name.get_as_dict(),
-            'created_by': self.created_by.get_as_dict(),
+            'name': self.name.get_as_dict() if self.name else None,
+            'created_by': self.created_by.get_as_dict() if self.created_by else None,
             'department': self.department,
             'title': self.title,
             'lead_source': self.lead_source

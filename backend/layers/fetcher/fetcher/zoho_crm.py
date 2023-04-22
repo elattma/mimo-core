@@ -9,8 +9,8 @@ from graph.blocks import (Block, CommentBlock, ContactBlock, DealBlock,
 from .base import DiscoveryResponse, Fetcher, Filter, Item
 
 
-class Zoho(Fetcher):
-    _INTEGRATION = 'zoho'
+class ZohoCrm(Fetcher):
+    _INTEGRATION = 'zoho_crm'
 
     def get_auth_type(self) -> str:
         return 'oauth'
@@ -75,11 +75,6 @@ class Zoho(Fetcher):
             ) for account in accounts] if accounts else [],
             next_token=(offset + limit) if accounts and len(accounts) > 0 else None
         )
-    
-    def _get_entity(self, id: str = None, name: str = None) -> entity:
-        if not (id and name):
-            return None
-        return entity(id=id, value=name)
 
     # TODO: move to bulk read
     def fetch(self, id: str) -> Generator[Block, None, None]:

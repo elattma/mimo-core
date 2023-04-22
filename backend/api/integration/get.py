@@ -28,8 +28,9 @@ def handler(event: dict, context):
     user_integration_items: List[UserIntegrationItem] = db.query('{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user), child_namespace=KeyNamespaces.INTEGRATION.value, Limit=100)
     response_integrations: Mapping[str, Integration] = ssm.integrations.copy()
     for item in user_integration_items:
-        integration = response_integrations[item.get_raw_child()]
+        integration = response_integrations.get(item.get_raw_child(), None)
         if integration:
             integration.authorized = True
 
+    print("Integrations:", str(response_integrations.values()))
     return to_response_success([integration.__dict__ for integration in response_integrations.values()])

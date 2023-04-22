@@ -14,7 +14,7 @@ neo4j: Neo4j = None
 integration_to_link = {
     'google_docs': 'https://docs.google.com/document/d/{id}',
     'google_mail': 'https://mail.google.com/mail/u//#inbox/{id}',
-    'slack': 'https://slack.com/channels/{id}',
+    'slack_messaging': 'https://slack.com/channels/{id}',
     'notion': 'https://www.notion.so/{id}'
 }
 

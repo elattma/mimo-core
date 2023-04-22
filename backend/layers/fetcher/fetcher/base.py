@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Generator, List
 
-from graph.blocks import Block, BlockStream
+from graph.blocks import Block, BlockStream, entity
 
 from .auth.base import Auth
 
@@ -65,6 +65,11 @@ class Fetcher(ABC):
 
     def get_icon(self) -> str:
         return f'assets.mimo.team/icons/{self._INTEGRATION}.svg'
+
+    def _get_entity(self, id: str = None, name: str = None) -> entity:
+        if not (id and name):
+            return None
+        return entity(id=id, value=name)
 
     @abstractmethod
     def get_auth_type(self) -> str:

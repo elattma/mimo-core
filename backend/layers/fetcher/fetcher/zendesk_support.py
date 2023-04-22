@@ -8,15 +8,15 @@ from .base import DiscoveryResponse, Fetcher, Filter, Item
 
 ZENDESK_TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
-class Zendesk(Fetcher):
-    _INTEGRATION = 'zendesk'
+class ZendeskSupport(Fetcher):
+    _INTEGRATION = 'zendesk_support'
 
     def get_auth_type(self) -> str:
         return 'oauth'
     
     def get_auth_attributes(self) -> dict:
         return {
-            'authorize_endpoint': 'https://mimo1489.zendesk.com/oauth/tokens'
+            'authorize_endpoint': 'https://mimo1489.ZendeskSupport.com/oauth/tokens'
         }
 
     def discover(self, filter: Filter = None) -> DiscoveryResponse:
@@ -30,7 +30,7 @@ class Zendesk(Fetcher):
                 filters['page[size]'] = filter.limit
 
         response = requests.get(
-            'https://mimo1489.zendesk.com/api/v2/tickets',
+            'https://mimo1489.ZendeskSupport.com/api/v2/tickets',
             params={ **filters },
             headers={
                 'Authorization': f'Basic YWRtaW5AbWltby50ZWFtOkBANVoyQVdrUjJZYkEzaw=='
@@ -46,7 +46,7 @@ class Zendesk(Fetcher):
                 id=ticket.get('id', None) if ticket else None,
                 title=ticket.get('subject', None) if ticket else None,
                 icon=self.get_icon(),
-                link=f'https://mimo1489.zendesk.com/agent/tickets/{ticket["id"]}' if ticket else None,
+                link=f'https://mimo1489.ZendeskSupport.com/agent/tickets/{ticket["id"]}' if ticket else None,
             ) for ticket in tickets],
             next_token=next_token
         )
@@ -56,7 +56,7 @@ class Zendesk(Fetcher):
         if not (session and id):
             return None
         
-        response = session.get(f'https://mimo1489.zendesk.com/api/v2/tickets/{id}')
+        response = session.get(f'https://mimo1489.ZendeskSupport.com/api/v2/tickets/{id}')
         ticket_response = response.json() if response else None
         ticket = ticket_response.get('ticket', None) if ticket_response else None
         return ticket
@@ -66,7 +66,7 @@ class Zendesk(Fetcher):
         if not (session and id):
             return None
 
-        response = session.get(f'https://mimo1489.zendesk.com/api/v2/users/{id}')
+        response = session.get(f'https://mimo1489.ZendeskSupport.com/api/v2/users/{id}')
         user_response = response.json() if response else None
         user = user_response.get('user', None) if user_response else None
         user_name = user.get('name', None) if user else None
@@ -78,7 +78,7 @@ class Zendesk(Fetcher):
         if not (session and id):
             return None
 
-        response = session.get(f'https://mimo1489.zendesk.com/api/v2/tickets/{id}/comments')
+        response = session.get(f'https://mimo1489.ZendeskSupport.com/api/v2/tickets/{id}/comments')
         comments_response = response.json() if response else None
         comments = comments_response.get('comments', None) if comments_response else None
         comments = comments[1:] if comments else None
@@ -91,13 +91,13 @@ class Zendesk(Fetcher):
         session.headers.update({
             'Authorization': 'Basic YWRtaW5AbWltby50ZWFtOkBANVoyQVdrUjJZYkEzaw=='
         })
-        ticket = Zendesk._fetch_ticket(session, id)
+        ticket = ZendeskSupport._fetch_ticket(session, id)
         ticket_last_updated_timestamp = self._get_timestamp_from_format(ticket.get('updated_at', None), ZENDESK_TIME_FORMAT) if ticket else None
         subject = ticket.get('subject', None) if ticket else None
         member_blocks: Set[MemberBlock] = set()
         
-        requester = Zendesk._fetch_user_entity(session, ticket.get('requester_id', None)) if ticket else None
-        assignee = Zendesk._fetch_user_entity(session, ticket.get('assignee_id', None)) if ticket else None
+        requester = ZendeskSupport._fetch_user_entity(session, ticket.get('requester_id', None)) if ticket else None
+        assignee = ZendeskSupport._fetch_user_entity(session, ticket.get('assignee_id', None)) if ticket else None
         if requester:
             member_blocks.add(MemberBlock(name=requester, last_updated_timestamp=ticket_last_updated_timestamp, relation=Relations.AUTHOR))
         if assignee:
@@ -109,7 +109,7 @@ class Zendesk(Fetcher):
         if description:
             yield from self._generate(BodyBlock._LABEL, [BodyBlock(text=description, last_updated_timestamp=ticket_last_updated_timestamp)])
 
-        comments = Zendesk._fetch_comments(session, id)
+        comments = ZendeskSupport._fetch_comments(session, id)
         comment_blocks = []
         if comments:
             for comment in comments:
@@ -117,7 +117,7 @@ class Zendesk(Fetcher):
                 author_id = comment.get('author_id', None) if comment else None
                 author = 'unknown'
                 if author_id:
-                    author = Zendesk._fetch_user_entity(session, author_id)
+                    author = ZendeskSupport._fetch_user_entity(session, author_id)
                     author_member = MemberBlock(name=author, last_updated_timestamp=comment_last_updated_timestamp, relation=Relations.PARTICIPANT)
                     if author_member in member_blocks:
                         member_blocks.add(author_member)

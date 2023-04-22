@@ -46,6 +46,7 @@ def handler(event: dict, context):
         parent = f'{KeyNamespaces.USER.value}{user}'
         child = f'{KeyNamespaces.INTEGRATION.value}{id}'
         try:
+            print(fetcher.auth)
             db.write([UserIntegrationItem(parent, child, fetcher.auth.access_token, fetcher.auth.refresh_token, int(time()), fetcher.auth.expiry_timestamp)])
         except Exception as e:
             print(e)

@@ -11,8 +11,8 @@
 #     chunks: List[Chunk] 
 #     cursor: str = None
 
-# class Slack(Fetcher):
-#     _INTEGRATION = 'slack'
+# class SlackMessaging(Fetcher):
+#     _INTEGRATION = 'slack_messaging'
 
 #     def get_auth_type(self) -> str:
 #         return 'oauth'
