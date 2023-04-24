@@ -50,6 +50,9 @@ function SettingsSidebarItem({ item, pathname }: SettingsSidebarItemProps) {
         active: pathname === item.href,
       })}
       href={item.href}
+      onClick={(event) => {
+        event.currentTarget.blur();
+      }}
     >
       {item.title}
     </Link>

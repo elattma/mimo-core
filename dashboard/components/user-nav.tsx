@@ -29,15 +29,17 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Avatar>
-          <AvatarImage
-            src={user.user?.picture ?? undefined}
-            alt="Your profile picture"
-          />
-          <AvatarFallback className="select-none">
-            {fallbackText}
-          </AvatarFallback>
-        </Avatar>
+        <button className="rounded-full">
+          <Avatar className="hover:cursor-pointer">
+            <AvatarImage
+              src={user.user?.picture ?? undefined}
+              alt="Your profile picture"
+            />
+            <AvatarFallback className="select-none">
+              {fallbackText}
+            </AvatarFallback>
+          </Avatar>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-40" align="end">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>

@@ -4,6 +4,10 @@ export type NavItem = {
   disabled?: boolean;
 };
 
+export type DashboardConfig = {
+  mainNav: NavItem[];
+};
+
 export type SettingsConfig = {
   sidebar: NavItem[];
 };
