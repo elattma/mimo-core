@@ -1,3 +1,4 @@
+import { Switch } from "@/components/ui/switch";
 import { TypographyH1 } from "@/components/ui/typography";
 
 export default function DashboardPage() {
