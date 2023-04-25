@@ -35,7 +35,7 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="rounded-full">
+        <button className="focus-visible:default-focus rounded-full">
           <Avatar className="hover:cursor-pointer">
             <AvatarImage
               src={user.user?.picture ?? undefined}
@@ -66,7 +66,7 @@ export function UserNav() {
             </div>
             <DropdownMenuItemPrimitive asChild>
               <Switch
-                className="data-[state=checked]:bg-teal-500"
+                className="data-[state=checked]:bg-accent-9"
                 id="developer-mode"
                 size="sm"
                 checked={developerMode}
@@ -80,10 +80,12 @@ export function UserNav() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <LogOut className="mr-2 h-4 w-4" />
+          <DropdownMenuItem asChild>
             {/* @ts-ignore */}
-            <a href="/api/auth/logout">Log out</a>
+            <a href="/api/auth/logout">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </a>
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

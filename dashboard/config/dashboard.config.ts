@@ -7,8 +7,8 @@ export const dashboardConfig: DashboardConfig = {
       href: "/dashboard/home",
     },
     {
-      title: "Test",
-      href: "/dashboard/test",
+      title: "Connections",
+      href: "/dashboard/connections",
     },
   ],
 };

@@ -6,7 +6,7 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import type { NavItem } from "@/types";
 
 const mainNavItemVariants = cva(
-  "font-medium transition-colors hover:text-foreground/80 text-sm",
+  "font-medium transition-colors hover:text-foreground/80 text-sm focus-visible:default-focus rounded-sm",
   {
     variants: {
       active: {

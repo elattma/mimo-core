@@ -18,13 +18,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     <DeveloperModeProvider>
       <div className="mx-auto flex min-h-screen flex-col space-y-6">
         <header className="container sticky top-0 z-40 bg-background">
-          <div className="flex items-center justify-between border-b border-teal-500 py-4">
+          <div className="flex items-center justify-between border-b border-accent-9 py-4">
             <MainNav items={dashboardConfig.mainNav} />
             <UserNav />
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="mx-auto w-fit rounded-b-sm bg-teal-500 px-1">
+              <div className="mx-auto w-fit rounded-b-sm bg-accent-9 px-1">
                 <p className="select-none text-xs font-medium text-white">
                   Developer Mode
                 </p>
