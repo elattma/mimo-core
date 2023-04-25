@@ -8,7 +8,7 @@ type SettingsLayoutProps = {
 
 export default function SettingsLayout({ children }: SettingsLayoutProps) {
   return (
-    <div className="container space-y-6">
+    <div className="space-y-6">
       <TypographyH1>Settings</TypographyH1>
       <div className="flex flex-col gap-6 sm:flex-row">
         <aside className="w-full sm:w-40">

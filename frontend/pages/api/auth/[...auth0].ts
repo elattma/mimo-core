@@ -2,7 +2,6 @@ import { handleAuth, handleLogin } from "@auth0/nextjs-auth0";
 
 export default handleAuth({
   async login(req, res) {
-    console.log(process.env.AUDIENCE);
     try {
       await handleLogin(req, res, {
         returnTo: process.env.AUTH0_REDIRECT_URL,

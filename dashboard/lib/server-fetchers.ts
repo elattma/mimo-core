@@ -1,5 +1,7 @@
-import { GetEndpoints, PostEndpoints } from "@/types/responses";
+// @ts-nocheck
+
 import { cookies } from "next/headers";
+import type { GetEndpoints, PostEndpoints } from "@/types/responses";
 
 const _fetcher = async <JSON = any>(
   input: RequestInfo,

@@ -1,10 +1,16 @@
-import { Switch } from "@/components/ui/switch";
-import { TypographyH1 } from "@/components/ui/typography";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function DashboardPage() {
-  return (
-    <div className="container">
-      <TypographyH1>Home Page</TypographyH1>
-    </div>
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    if (router) {
+      router.push("/dashboard/home");
+    }
+  }, [router]);
+
+  return null;
 }

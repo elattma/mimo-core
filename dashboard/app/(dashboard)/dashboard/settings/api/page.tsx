@@ -1,7 +1,10 @@
 import { ApiKeyManager } from "@/components/api-key-manager";
 import { TypographyH2 } from "@/components/ui/typography";
 import { serverGet, serverPost } from "@/lib/server-fetchers";
-import { GetLocksmithResponse, PostLocksmithResponse } from "@/types/responses";
+import type {
+  GetLocksmithResponse,
+  PostLocksmithResponse,
+} from "@/types/responses";
 
 export default async function ApiSettingsPage() {
   const getLocksmithResponse: GetLocksmithResponse = await serverGet(

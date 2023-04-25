@@ -77,7 +77,7 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
                   className="h-fit w-fit p-1.5"
                   variant="ghost"
                   onClick={() => {
-                    navigator.clipboard.writeText(currentApiKey);
+                    void navigator.clipboard.writeText(currentApiKey);
                     setDisplayCheck(true);
                     setTimeout(() => {
                       setDisplayCheck(false);
@@ -103,10 +103,12 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
           variant="secondary"
           onClick={() => {
             setLoadingNewKey(true);
-            clientPost("/locksmith").then((response) => {
-              setCurrentApiKey(response.apiKey.value);
-              setLoadingNewKey(false);
-            });
+            clientPost("/locksmith")
+              .then((response) => {
+                setCurrentApiKey(response.apiKey.value);
+                setLoadingNewKey(false);
+              })
+              .catch((error) => console.error(error));
           }}
           disabled={loadingNewKey}
         >

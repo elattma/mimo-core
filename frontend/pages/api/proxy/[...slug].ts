@@ -3,25 +3,9 @@ import {
   updateSession,
   withApiAuthRequired,
 } from "@auth0/nextjs-auth0";
-import chalk from "chalk";
 import type { NextApiRequest, NextApiResponse } from "next";
 
 const handler = async (request: NextApiRequest, response: NextApiResponse) => {
-  if (process.env.NODE_ENV === "development") {
-    const now = new Date();
-    console.log(
-      chalk.blue(
-        `Request received at ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
-      )
-    );
-    console.log("Request URL:", request.url);
-    console.log("Request method:", request.method);
-    console.log("Request headers:", request.headers);
-    console.log("Request body:", request.body);
-    console.log("\n");
-  }
-
-  // Get the session
   const session = await getSession(request, response);
   if (!session || !session.accessToken) {
     return response
@@ -53,9 +37,6 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     updateSession(request, response, refreshSession);
   }
 
-  console.log(session.accessToken);
-
-  // Reform the URL
   const { slug, ...query } = request.query;
   if (slug === undefined || typeof slug === "string")
     return response.status(400).json({ error: "Malformed slug." });
@@ -70,16 +51,7 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
       .json({ error: "Endpoint formatted incorrectly." });
   }
 
-  // Log request
-  if (process.env.NODE_ENV === "development") {
-    console.log(
-      chalk.blue(`Attempting to forward response to ${url.toString()}`)
-    );
-    console.log("\n");
-  }
-
   try {
-    // Forward the request
     const responseToForward = await fetch(url.toString(), {
       method: request.method,
       headers: {
@@ -90,25 +62,8 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     });
     const dataToForward = await responseToForward.json();
 
-    // Log response
-    if (process.env.NODE_ENV === "development") {
-      const now = new Date();
-      console.log(
-        chalk.blue(
-          `Response received at ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
-        )
-      );
-      console.log("Response status:", responseToForward.status);
-      console.log("Response data:", dataToForward);
-      console.log("\n");
-    }
-
-    // Forward the status and json data
     return response.status(responseToForward.status).json(dataToForward);
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error(error);
-    }
     return response.status(500).json({ error: error });
   }
 };

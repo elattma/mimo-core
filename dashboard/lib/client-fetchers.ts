@@ -1,4 +1,6 @@
-import { GetEndpoints, PostEndpoints } from "@/types/responses";
+// @ts-nocheck
+
+import type { GetEndpoints, PostEndpoints } from "@/types/responses";
 
 const _fetcher = async <JSON = any>(
   input: RequestInfo,
@@ -8,7 +10,7 @@ const _fetcher = async <JSON = any>(
 
   if (!response.ok) {
     const json = await response.json();
-    if (json.error) {
+    if (json && json.error) {
       const error = new Error(json.error) as Error & { status: number };
       error.status = response.status;
       throw error;

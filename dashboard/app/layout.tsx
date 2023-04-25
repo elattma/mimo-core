@@ -1,5 +1,5 @@
-import { Metadata } from "next";
 import { UserProvider } from "@auth0/nextjs-auth0/client";
+import type { Metadata } from "next";
 
 import "@/styles/globals.css";
 import { TailwindIndicator } from "@/components/tailwind-indicator";

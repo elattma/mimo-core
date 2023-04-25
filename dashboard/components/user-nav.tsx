@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
+import { useDeveloperModeContext } from "@/context/developer-mode";
 
 function getInitialFromName(name: string): string {
   if (!name) {
@@ -29,7 +29,7 @@ function getInitialFromName(name: string): string {
 
 export function UserNav() {
   const user = useUser();
-  const [developerMode, setDeveloperMode] = useState<boolean>(false);
+  const { developerMode, setDeveloperMode } = useDeveloperModeContext();
   const fallbackText = getInitialFromName(user.user?.name ?? "");
 
   return (
@@ -69,7 +69,10 @@ export function UserNav() {
                 className="data-[state=checked]:bg-teal-500"
                 id="developer-mode"
                 size="sm"
-                defaultChecked
+                checked={developerMode}
+                onCheckedChange={(checked) => {
+                  setDeveloperMode(checked);
+                }}
                 disabled
               />
             </DropdownMenuItemPrimitive>
@@ -79,6 +82,7 @@ export function UserNav() {
         <DropdownMenuGroup>
           <DropdownMenuItem>
             <LogOut className="mr-2 h-4 w-4" />
+            {/* @ts-ignore */}
             <a href="/api/auth/logout">Log out</a>
           </DropdownMenuItem>
         </DropdownMenuGroup>

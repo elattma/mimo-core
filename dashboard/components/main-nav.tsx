@@ -1,9 +1,9 @@
 "use client";
 
-import { NavItem } from "@/types";
 import { cva } from "class-variance-authority";
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
+import type { NavItem } from "@/types";
 
 const mainNavItemVariants = cva(
   "font-medium transition-colors hover:text-foreground/80 text-sm",
@@ -29,7 +29,7 @@ export function MainNav({ items }: MainNavProps) {
       {items.map((item, index) => (
         <Link
           className={mainNavItemVariants({
-            active: item.href.startsWith(`/${segment}`),
+            active: item.href.startsWith(`/dashboard/${segment ?? "home"}`),
           })}
           href={item.href}
           aria-disabled={item.disabled}

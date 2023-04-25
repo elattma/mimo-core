@@ -1,9 +1,12 @@
+// @ts-nocheck
+
 import {
   getSession,
   updateSession,
   withApiAuthRequired,
 } from "@auth0/nextjs-auth0";
 import type { NextApiRequest, NextApiResponse } from "next";
+import type { Session } from "@auth0/nextjs-auth0";
 
 const handler = async (request: NextApiRequest, response: NextApiResponse) => {
   const session = await getSession(request, response);
@@ -17,6 +20,14 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
     session.accessTokenExpiresAt &&
     session.accessTokenExpiresAt < Date.now() / 1000
   ) {
+    if (!process.env.AUTH0_ISSUER_BASE_URL) {
+      return response.status(500).json({
+        error:
+          process.env.NODE_ENV === "development"
+            ? "Mising environment variable: AUTH0_ISSUER_BASE_URL"
+            : "Missing environment variable",
+      });
+    }
     const refreshResponse = await fetch(
       `${process.env.AUTH0_ISSUER_BASE_URL}/oauth/token`,
       {
@@ -33,8 +44,8 @@ const handler = async (request: NextApiRequest, response: NextApiResponse) => {
       }
     );
 
-    const refreshSession = await refreshResponse.json();
-    updateSession(request, response, refreshSession);
+    const refreshSession = (await refreshResponse.json()) as Session;
+    await updateSession(request, response, refreshSession);
   }
 
   const { slug, ...query } = request.query;

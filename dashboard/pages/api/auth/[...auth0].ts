@@ -10,8 +10,8 @@ export default handleAuth({
           scope: process.env.AUTH0_SCOPE,
         },
       });
-    } catch (error: any) {
-      res.status(error.status || 400).end(error.message);
+    } catch {
+      res.status(500).json({ message: "Failed to log in." });
     }
   },
 });
