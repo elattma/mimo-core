@@ -21,10 +21,14 @@ export class CdnStack extends Stack {
   constructor(scope: Construct, id: string, props: CdnStackProps) {
     super(scope, id, props);
 
-    const certificate = new Certificate(this, "cdn-certificate", {
-      domainName: props.domainName,
-      validation: CertificateValidation.fromDns(),
-    });
+    const certificate = new Certificate(
+      this,
+      `${props.stageId}-cdn-certificate`,
+      {
+        domainName: props.domainName,
+        validation: CertificateValidation.fromDns(),
+      }
+    );
 
     new Distribution(this, "cdn", {
       defaultBehavior: { origin: new S3Origin(props.assetsBucket) },

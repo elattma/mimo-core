@@ -1,6 +1,8 @@
 import { Stack, StackProps } from "aws-cdk-lib";
+import { RestApi } from "aws-cdk-lib/aws-apigateway";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
+import { MimoUsagePlan } from "./model";
 
 type IntegrationId = string;
 
@@ -81,54 +83,70 @@ const INTEGRATION_CONFIGS: IntegrationConfig[] = [
 
 export interface SsmStackProps extends StackProps {
   readonly stageId: string;
-  readonly integrationsPath: string;
-  readonly prefixIconPath: string;
 }
 
 export class SsmStack extends Stack {
   constructor(scope: Construct, id: string, props: SsmStackProps) {
     super(scope, id, props);
-
-    INTEGRATION_CONFIGS.forEach((integrationConfig: IntegrationConfig) => {
-      this.defineIntegrationParams(
-        integrationConfig,
-        props.integrationsPath,
-        props.prefixIconPath
-      );
-    });
   }
 
   defineIntegrationParams = (
-    integrationConfig: IntegrationConfig,
     integrationsPath: string,
     prefixIconPath: string
   ) => {
-    new StringParameter(this, `${integrationConfig.id}-id-parameter`, {
-      // allowedPattern: // TODO: Add allowed patterns
-      parameterName: `${integrationsPath}/${integrationConfig.id}/id`,
-      stringValue: integrationConfig.id,
-    });
+    INTEGRATION_CONFIGS.forEach((integrationConfig: IntegrationConfig) => {
+      new StringParameter(this, `${integrationConfig.id}-id-parameter`, {
+        // allowedPattern: // TODO: Add allowed patterns
+        parameterName: `${integrationsPath}/${integrationConfig.id}/id`,
+        stringValue: integrationConfig.id,
+      });
 
-    new StringParameter(this, `${integrationConfig.id}-name-parameter`, {
-      parameterName: `${integrationsPath}/${integrationConfig.id}/name`,
-      stringValue: integrationConfig.name,
-    });
+      new StringParameter(this, `${integrationConfig.id}-name-parameter`, {
+        parameterName: `${integrationsPath}/${integrationConfig.id}/name`,
+        stringValue: integrationConfig.name,
+      });
 
-    new StringParameter(this, `${integrationConfig.id}-description-parameter`, {
-      parameterName: `${integrationsPath}/${integrationConfig.id}/description`,
-      stringValue: integrationConfig.description,
-    });
+      new StringParameter(
+        this,
+        `${integrationConfig.id}-description-parameter`,
+        {
+          parameterName: `${integrationsPath}/${integrationConfig.id}/description`,
+          stringValue: integrationConfig.description,
+        }
+      );
 
-    new StringParameter(this, `${integrationConfig.id}-icon-parameter`, {
-      parameterName: `${integrationsPath}/${integrationConfig.id}/icon`,
-      stringValue: `${prefixIconPath}/${integrationConfig.id}.svg`, // TODO: enforce somehow that the icon exists
-    });
+      new StringParameter(this, `${integrationConfig.id}-icon-parameter`, {
+        parameterName: `${integrationsPath}/${integrationConfig.id}/icon`,
+        stringValue: `${prefixIconPath}/${integrationConfig.id}.svg`, // TODO: enforce somehow that the icon exists
+      });
 
-    new StringParameter(this, `${integrationConfig.id}-oauth2_link-parameter`, {
-      parameterName: `${integrationsPath}/${integrationConfig.id}/oauth2_link`,
-      stringValue: integrationConfig.oauth2_link,
+      new StringParameter(
+        this,
+        `${integrationConfig.id}-oauth2_link-parameter`,
+        {
+          parameterName: `${integrationsPath}/${integrationConfig.id}/oauth2_link`,
+          stringValue: integrationConfig.oauth2_link,
+        }
+      );
     });
+  };
 
-    // TODO: add type
+  defineUsagePlanParams = (
+    usagePlanPath: string,
+    usagePlans: MimoUsagePlan[]
+  ) => {
+    for (const usagePlan of usagePlans) {
+      new StringParameter(this, `usageplan-${usagePlan.name}-id-parameter`, {
+        parameterName: `${usagePlanPath}/${usagePlan.name}/id`,
+        stringValue: usagePlan.plan.usagePlanId,
+      });
+    }
+  };
+
+  defineApiParams = (apiPath: string, api: RestApi) => {
+    new StringParameter(this, `api-id-parameter`, {
+      parameterName: `${apiPath}/id`,
+      stringValue: api.restApiId,
+    });
   };
 }
