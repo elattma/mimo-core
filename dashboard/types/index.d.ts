@@ -11,3 +11,11 @@ export type DashboardConfig = {
 export type SettingsConfig = {
   sidebar: NavItem[];
 };
+
+export type Integration = {
+  name: string;
+  id: string;
+  category: string;
+  categoryName: string;
+  icon: string;
+};

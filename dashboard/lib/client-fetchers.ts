@@ -32,7 +32,7 @@ export const clientGet = async <Endpoint extends keyof GetEndpoints>(
   input: Endpoint,
   init?: RequestInit
 ): Promise<GetEndpoints[Endpoint]> => {
-  const url = `/api/proxy${input}`;
+  const url = `/api/${process.env.NEXT_PUBLIC_API_MODE ?? "proxy"}${input}`;
   return _fetcher(url, {
     method: "GET",
     ...init,
@@ -49,7 +49,7 @@ export const clientPost = async <Endpoint extends keyof PostEndpoints>(
   input: Endpoint,
   init?: RequestInit
 ): Promise<PostEndpoints[Endpoint]> => {
-  const url = `/api/proxy${input}`;
+  const url = `/api/${process.env.NEXT_PUBLIC_API_MODE ?? "proxy"}${input}`;
   return _fetcher(url, {
     method: "POST",
     ...init,

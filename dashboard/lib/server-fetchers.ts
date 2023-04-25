@@ -50,7 +50,9 @@ export const serverGet = async <Endpoint extends keyof GetEndpoints>(
   input: Endpoint,
   init?: RequestInit
 ): Promise<GetEndpoints[Endpoint]> => {
-  const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/proxy${String(input)}`;
+  const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/${
+    process.env.NEXT_PUBLIC_API_MODE ?? "proxy"
+  }${String(input)}`;
   return _fetcher(url, {
     method: "GET",
     ...init,
@@ -67,7 +69,9 @@ export const serverPost = async <Endpoint extends keyof PostEndpoints>(
   input: Endpoint,
   init?: RequestInit
 ): Promise<PostEndpoints[Endpoint]> => {
-  const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/proxy${String(input)}`;
+  const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/${
+    process.env.NEXT_PUBLIC_API_MODE ?? "proxy"
+  }${String(input)}`;
   return _fetcher(url, {
     method: "POST",
     ...init,
