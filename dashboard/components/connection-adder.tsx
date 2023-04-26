@@ -38,7 +38,7 @@ export function ConnectionAdder({ integrations }: ConnectionAdderProps) {
   };
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="inline-flex">Add Connection</Button>
       </DialogTrigger>
