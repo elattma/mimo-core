@@ -19,8 +19,8 @@ export default async function ApiSettingsPage() {
   }
 
   return (
-    <div className="flex flex-col space-y-12">
-      <div className="flex flex-col space-y-4">
+    <div className="flex flex-col gap-12">
+      <div className="flex flex-col gap-4">
         <TypographyH2 className="w-full border-b pb-2">API Key</TypographyH2>
         <ApiKeyManager startingApiKey={apiKey} />
       </div>
