@@ -37,16 +37,12 @@ export default function ConnectionPage({ params }: ConnectionPageProps) {
   const router = useRouter();
   const { connections } = useConnectionsContext();
   const connection = connections.find((connection) => connection.id === id);
-  if (connection === undefined) {
-    router.push("/dashboard/connections");
-    return null;
-  }
   const windowSize = useWindowSize();
   const [sheetPosition, setSheetPosition] = useState<"right" | "top" | null>(
     null
   );
   const isOpen = useBoolean(false);
-  const [name, setName] = useState<string>(connection.name);
+  const [name, setName] = useState<string>(connection?.name ?? "");
 
   useEffect(() => {
     isOpen.setTrue();
@@ -56,6 +52,11 @@ export default function ConnectionPage({ params }: ConnectionPageProps) {
     if (windowSize.width < 640) setSheetPosition("top");
     else setSheetPosition("right");
   }, [windowSize]);
+
+  if (connection === undefined) {
+    router.push("/dashboard/connections");
+    return null;
+  }
 
   return (
     <Sheet
