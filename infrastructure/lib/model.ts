@@ -4,16 +4,19 @@ import { ModelOptions, Period, UsagePlan } from "aws-cdk-lib/aws-apigateway";
 export interface MethodConfig {
   name: string;
   handler: PythonFunction;
+  responseModelOptions: ModelOptions;
+  use_authorizer?: boolean;
+  api_key_required?: boolean;
   requestModelOptions?: ModelOptions;
   requestParameters?: {
     [param: string]: boolean;
   };
-  responseModelOptions: ModelOptions;
 }
 
 export interface RouteConfig {
   path: string;
   methods: MethodConfig[];
+  subRoutes?: RouteConfig[];
 }
 
 export interface UsageConfig {

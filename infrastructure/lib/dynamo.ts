@@ -2,13 +2,17 @@ import { RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import { AttributeType, BillingMode, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
 
+export interface DynamoStackProps extends StackProps {
+  readonly stageId: string;
+}
+
 export class DynamoStack extends Stack {
   public readonly mimoTable: Table;
 
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props: DynamoStackProps) {
     super(scope, id, props);
 
-    this.mimoTable = new Table(this, "mimo-pc-ddb", {
+    this.mimoTable = new Table(this, `mimo-${props.stageId}-pc-ddb`, {
       partitionKey: {
         name: "parent",
         type: AttributeType.STRING,
@@ -18,7 +22,7 @@ export class DynamoStack extends Stack {
         type: AttributeType.STRING,
       },
       pointInTimeRecovery: true,
-      tableName: "mimo-beta-pc",
+      tableName: `mimo-${props.stageId}-pc`,
       removalPolicy: RemovalPolicy.RETAIN,
       billingMode: BillingMode.PAY_PER_REQUEST,
     });
@@ -30,13 +34,13 @@ export class DynamoStack extends Stack {
       },
     });
 
-    new Table(this, "mimo-waitlist", {
+    new Table(this, `mimo-${props.stageId}-waitlist`, {
       partitionKey: {
         name: "email",
         type: AttributeType.STRING,
       },
       pointInTimeRecovery: true,
-      tableName: "mimo-beta-waitlist",
+      tableName: `mimo-${props.stageId}-waitlist`,
       removalPolicy: RemovalPolicy.RETAIN,
       billingMode: BillingMode.PAY_PER_REQUEST,
     });

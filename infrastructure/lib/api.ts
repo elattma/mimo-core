@@ -2,6 +2,7 @@ import { Stack, StackProps } from "aws-cdk-lib";
 import {
   ApiKeySourceType,
   IAuthorizer,
+  IResource,
   LambdaIntegration,
   Period,
   RestApi,
@@ -57,8 +58,7 @@ export class ApiStack extends Stack {
     };
 
     for (const routeConfig of props.routeConfigs) {
-      this.getRoute(this.api, routeConfig, authorizer);
-      this.getPostProcessRoute(routeConfig);
+      this.getRoute(this.api, this.api.root, routeConfig, authorizer);
     }
   }
 
@@ -140,15 +140,27 @@ export class ApiStack extends Stack {
         limit: usageConfig.quotaLimit,
         period: usageConfig.quotaPeriod,
       },
+      apiStages: [
+        {
+          api: api,
+          stage: api.deploymentStage,
+        },
+      ],
     });
   };
 
   getRoute = (
     api: RestApi,
+    resource: IResource,
     routeConfig: RouteConfig,
     authorizer: IAuthorizer
   ) => {
-    const route = api.root.addResource(routeConfig.path);
+    const route = resource.addResource(routeConfig.path);
+    if (routeConfig.subRoutes) {
+      for (const subRoute of routeConfig.subRoutes) {
+        this.getRoute(api, route, subRoute, authorizer);
+      }
+    }
     const requestValidator = api.addRequestValidator(
       `${routeConfig.path}-request-validator`,
       {
@@ -159,7 +171,7 @@ export class ApiStack extends Stack {
     for (const method of routeConfig.methods) {
       const requestModel = method.requestModelOptions
         ? api.addModel(
-            `${method.name}-request-model`,
+            `${routeConfig.path}-${method.name}-request-model`,
             method.requestModelOptions
           )
         : undefined;
@@ -169,13 +181,14 @@ export class ApiStack extends Stack {
         : undefined;
 
       const responseModel = api.addModel(
-        `${method.name}-response-model`,
+        `${routeConfig.path}-${method.name}-response-model`,
         method.responseModelOptions
       );
 
       route.addMethod(method.name, new LambdaIntegration(method.handler), {
-        authorizer: authorizer,
-        // requestValidator: requestValidator,
+        authorizer: method.use_authorizer ? authorizer : undefined,
+        apiKeyRequired: method.api_key_required,
+        requestValidator: requestValidator,
         requestModels: requestModel
           ? {
               "application/json": requestModel,
@@ -196,6 +209,7 @@ export class ApiStack extends Stack {
           },
         ],
       });
+      this.getPostProcessRoute(routeConfig);
     }
   };
 

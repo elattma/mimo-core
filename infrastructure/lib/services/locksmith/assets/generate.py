@@ -31,6 +31,10 @@ def handler(event: dict, context):
     body: dict = json.loads(body) if body else None
     user_defined_name: str = body.get('user_defined_name', None) if body else None
 
+    print(user)
+    print(stage)
+    print(api_id)
+    print(default_usage_plan.id)
     if not (user and stage and api_id and default_usage_plan.id):
         return to_response_error(Errors.MISSING_PARAMS)
     

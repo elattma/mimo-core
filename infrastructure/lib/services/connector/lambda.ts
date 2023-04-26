@@ -9,36 +9,41 @@ import { Construct } from "constructs";
 import { MethodConfig } from "../../model";
 import path = require("path");
 
-export interface LocksmithStackProps extends StackProps {
+export interface ConnectorStackProps extends StackProps {
   readonly stageId: string;
   readonly layers?: Map<string, PythonLayerVersion>;
 }
 
-export class LocksmithStack extends Stack {
+export class ConnectorStack extends Stack {
   readonly methods: MethodConfig[] = [];
+  readonly integrationMethods: MethodConfig[] = [];
 
-  constructor(scope: Construct, id: string, props: LocksmithStackProps) {
+  constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
 
     const layers: PythonLayerVersion[] = [];
-    const generateMethod = this.getGenerateMethod(props.stageId, layers);
-    this.methods.push(generateMethod);
-    const getMethod = this.getGetMethod(props.stageId, layers);
-    this.methods.push(getMethod);
-    const deleteMethod = this.getDeleteMethod(props.stageId, layers);
-    this.methods.push(deleteMethod);
+    const getGetMethod = this.getGetMethod(props.stageId, layers);
+    this.methods.push(getGetMethod);
+    const getDeleteMethod = this.getDeleteMethod(props.stageId, layers);
+    this.methods.push(getDeleteMethod);
+
+    const integrationsMethod = this.getIntegrationsMethod(
+      props.stageId,
+      layers
+    );
+    this.integrationMethods.push(integrationsMethod);
   }
 
-  getGenerateMethod = (
+  getCreateMethod = (
     stage: string,
     layers: PythonLayerVersion[]
   ): MethodConfig => {
     const handler = new PythonFunction(
       this,
-      `${stage}-locksmith-generate-lambda`,
+      `${stage}-connector-create-lambda`,
       {
         entry: path.join(__dirname, "assets"),
-        index: "generate.py",
+        index: "create.py",
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
         timeout: Duration.seconds(30),
@@ -56,7 +61,7 @@ export class LocksmithStack extends Stack {
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "LocksmithGenerateResponse",
+      modelName: "GenerateResponse",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
@@ -84,7 +89,7 @@ export class LocksmithStack extends Stack {
     stage: string,
     layers: PythonLayerVersion[]
   ): MethodConfig => {
-    const handler = new PythonFunction(this, `${stage}-locksmith-get-lambda`, {
+    const handler = new PythonFunction(this, `${stage}-connector-get-lambda`, {
       entry: path.join(__dirname, "assets"),
       index: "get.py",
       runtime: Runtime.PYTHON_3_9,
@@ -103,19 +108,27 @@ export class LocksmithStack extends Stack {
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "LocksmithGetResponse",
+      modelName: "ConnectorGetResponse",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          apiKey: {
-            type: JsonSchemaType.OBJECT,
-            properties: {
-              value: {
-                type: JsonSchemaType.STRING,
-              },
-            },
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          integration: {
+            type: JsonSchemaType.STRING,
+          },
+          created_at: {
+            type: JsonSchemaType.STRING,
+          },
+          ingested_at: {
+            type: JsonSchemaType.STRING,
           },
         },
+        required: ["id", "name", "integration", "created_at"],
       },
     };
 
@@ -133,7 +146,7 @@ export class LocksmithStack extends Stack {
   ): MethodConfig => {
     const handler = new PythonFunction(
       this,
-      `${stage}-locksmith-delete-lambda`,
+      `${stage}-connector-delete-lambda`,
       {
         entry: path.join(__dirname, "assets"),
         index: "delete.py",
@@ -154,7 +167,7 @@ export class LocksmithStack extends Stack {
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "LocksmithDeleteResponse",
+      modelName: "ConnectorDeleteResponse",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
@@ -168,6 +181,73 @@ export class LocksmithStack extends Stack {
 
     return {
       name: "DELETE",
+      handler: handler,
+      responseModelOptions: methodResponseOptions,
+      use_authorizer: true,
+    };
+  };
+
+  getIntegrationsMethod = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(
+      this,
+      `${stage}-connector-integrations-lambda`,
+      {
+        entry: path.join(__dirname, "assets"),
+        index: "integrations.py",
+        runtime: Runtime.PYTHON_3_9,
+        handler: "handler",
+        timeout: Duration.seconds(30),
+        memorySize: 1024,
+        environment: {
+          STAGE: "prod",
+        },
+        retryAttempts: 0,
+        bundling: {
+          assetExcludes: ["**.venv**"],
+        },
+        layers: layers,
+      }
+    );
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "ConnectorIntegrationsResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          integrations: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.OBJECT,
+              properties: {
+                id: {
+                  type: JsonSchemaType.STRING,
+                },
+                name: {
+                  type: JsonSchemaType.STRING,
+                },
+                description: {
+                  type: JsonSchemaType.STRING,
+                },
+                icon: {
+                  type: JsonSchemaType.STRING,
+                },
+                oauth2_link: {
+                  type: JsonSchemaType.STRING,
+                },
+              },
+              required: ["id", "name", "description", "icon", "oauth2_link"],
+            },
+          },
+        },
+      },
+    };
+
+    return {
+      name: "GET",
       handler: handler,
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
