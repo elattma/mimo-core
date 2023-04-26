@@ -19,3 +19,11 @@ export type Integration = {
   categoryName: string;
   icon: string;
 };
+
+export type Connection = {
+  id: string;
+  name: string;
+  integration: string;
+  created_at: number;
+  ingested_at: number;
+};

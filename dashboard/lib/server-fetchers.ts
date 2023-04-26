@@ -1,8 +1,7 @@
-// @ts-nocheck
-
 import { cookies } from "next/headers";
 import type { GetEndpoints, PostEndpoints } from "@/types/responses";
 
+// @ts-ignore
 const _fetcher = async <JSON = any>(
   input: RequestInfo,
   init?: RequestInit

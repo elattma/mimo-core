@@ -11,6 +11,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useToggle } from "@/lib/hooks/use-toggle";
+import useBoolean from "@/lib/hooks/use-boolean";
 
 function makeIncognito(apiKey: string): string {
   return "•".repeat(apiKey.length);
@@ -21,13 +23,13 @@ type ApiKeyManagerProps = {
 };
 
 export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
-  const [displayCheck, setDisplayCheck] = useState<boolean>(false);
-  const [displayApiKey, setDisplayApiKey] = useState<boolean>(false);
+  const isDisplayingCheck = useBoolean();
+  const [isDisplayingApiKey, toggleIsDisplayingApiKey] = useToggle();
   const [incognitoApiKey, setIncognitoApiKey] = useState<string>(
     makeIncognito(startingApiKey)
   );
   const [currentApiKey, setCurrentApiKey] = useState<string>(startingApiKey);
-  const [loadingNewKey, setLoadingNewKey] = useState<boolean>(false);
+  const isLoadingNewKey = useBoolean();
 
   useEffect(() => {
     setIncognitoApiKey(makeIncognito(currentApiKey));
@@ -37,7 +39,7 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
     <div className="flex w-full flex-col items-start space-x-0 space-y-4 md:flex-row md:items-center md:space-x-4 md:space-y-0">
       <div className="flex w-full items-center justify-between overflow-hidden rounded-sm border px-2 py-1 sm:w-96">
         <TypographyMuted className="truncate whitespace-pre-wrap font-mono">
-          {displayApiKey ? currentApiKey : incognitoApiKey}
+          {isDisplayingApiKey ? currentApiKey : incognitoApiKey}
         </TypographyMuted>
         <div className="flex shrink-0 items-center">
           <Tooltip delayDuration={300}>
@@ -45,11 +47,9 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
               <Button
                 className="h-fit w-fit p-1.5"
                 variant="ghost"
-                onClick={() => {
-                  setDisplayApiKey(!displayApiKey);
-                }}
+                onClick={toggleIsDisplayingApiKey}
               >
-                {displayApiKey ? (
+                {isDisplayingApiKey ? (
                   <>
                     <EyeOff className="h-4 w-4" />
                     <span className="sr-only">Hide API key</span>
@@ -64,13 +64,13 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom">
               <TypographyMuted>
-                {displayApiKey ? "Hide" : "Reveal"}
+                {isDisplayingApiKey ? "Hide" : "Reveal"}
               </TypographyMuted>
             </TooltipContent>
           </Tooltip>
           <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
-              {displayCheck ? (
+              {isDisplayingCheck.value ? (
                 <Check className="mx-1.5 h-4 w-4 stroke-green-500" />
               ) : (
                 <Button
@@ -78,9 +78,9 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
                   variant="ghost"
                   onClick={() => {
                     void navigator.clipboard.writeText(currentApiKey);
-                    setDisplayCheck(true);
+                    isDisplayingCheck.setTrue();
                     setTimeout(() => {
-                      setDisplayCheck(false);
+                      isDisplayingCheck.setFalse();
                     }, 2000);
                   }}
                 >
@@ -91,7 +91,7 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom">
               <TypographyMuted>
-                {displayCheck ? "Copied!" : "Copy"}
+                {isDisplayingCheck.value ? "Copied!" : "Copy"}
               </TypographyMuted>
             </TooltipContent>
           </Tooltip>
@@ -102,19 +102,21 @@ export function ApiKeyManager({ startingApiKey }: ApiKeyManagerProps) {
           className="w-fit"
           variant="secondary"
           onClick={() => {
-            setLoadingNewKey(true);
+            isLoadingNewKey.setTrue();
             clientPost("/locksmith")
               .then((response) => {
                 setCurrentApiKey(response.apiKey.value);
-                setLoadingNewKey(false);
+                isLoadingNewKey.setFalse();
               })
               .catch((error) => console.error(error));
           }}
-          disabled={loadingNewKey}
+          disabled={isLoadingNewKey.value}
         >
           Generate New Key
         </Button>
-        {loadingNewKey ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        {isLoadingNewKey.value ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : null}
       </div>
     </div>
   );

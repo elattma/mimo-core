@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TypographyMuted } from "@/components/ui/typography";
+import useBoolean from "@/lib/hooks/use-boolean";
+import { useToggle } from "@/lib/hooks/use-toggle";
 import type { Integration } from "@/types";
 import { Check } from "lucide-react";
 import { useState } from "react";
@@ -27,10 +29,10 @@ type ConnectionAdderProps = {
 };
 
 export function ConnectionAdder({ integrations }: ConnectionAdderProps) {
-  const [open, setOpen] = useState<boolean>(false);
+  const [isOpen, toggleIsOpen] = useToggle();
   const [selectedIntegration, setSelectedIntegration] =
     useState<Integration | null>(null);
-  const [authenticated, setAuthenticated] = useState<boolean>(false);
+  const isAuthenticated = useBoolean();
   const [name, setName] = useState<string>("");
 
   const handleSubmit: React.FormEventHandler = (event) => {
@@ -38,7 +40,7 @@ export function ConnectionAdder({ integrations }: ConnectionAdderProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={toggleIsOpen}>
       <DialogTrigger asChild>
         <Button className="inline-flex">Add Connection</Button>
       </DialogTrigger>
@@ -76,7 +78,7 @@ export function ConnectionAdder({ integrations }: ConnectionAdderProps) {
               </SelectContent>
             </Select>
           </div>
-          {selectedIntegration === null ? null : authenticated ? (
+          {selectedIntegration === null ? null : isAuthenticated.value ? (
             <div className="flex items-center space-x-2">
               <Check className="h-4 w-4 stroke-success-11" />
               <TypographyMuted className="text-success-11">
@@ -86,15 +88,13 @@ export function ConnectionAdder({ integrations }: ConnectionAdderProps) {
           ) : (
             <Button
               type="button"
-              onClick={() => {
-                setAuthenticated(true);
-              }}
+              onClick={() => isAuthenticated.setTrue()}
               fullWidth
             >
               Authenticate to {selectedIntegration.name}
             </Button>
           )}
-          {authenticated ? (
+          {isAuthenticated.value ? (
             <>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="new-connection-name">Name</Label>
