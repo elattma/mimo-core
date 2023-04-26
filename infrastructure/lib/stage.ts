@@ -10,6 +10,7 @@ import { SecretsStack } from "./secrets";
 import { ConnectorStack } from "./services/connector/lambda";
 import { DetectiveStack } from "./services/detective/lambda";
 import { LocksmithStack } from "./services/locksmith/lambda";
+import { UsageMonitorStack } from "./services/usage_monitor/lambda";
 import { SsmStack } from "./ssm";
 
 export interface MimoStageProps extends StageProps {
@@ -54,6 +55,9 @@ export class MimoStage extends Stage {
     const detectiveService = new DetectiveStack(this, "detective", {
       stageId: props.stageId,
     });
+    const usageMonitorService = new UsageMonitorStack(this, "usage-monitor", {
+      stageId: props.stageId
+    })
     routeConfigs.push({
       path: "locksmith",
       methods: locksmithService.methods,
@@ -72,6 +76,10 @@ export class MimoStage extends Stage {
       path: "context",
       methods: detectiveService.methods,
     });
+    routeConfigs.push({
+      path: "usage",
+      methods: usageMonitorService.methods
+    })
     const api = new ApiStack(this, "api", {
       stageId: props.stageId,
       domainName: props.domainName,
@@ -106,6 +114,17 @@ export class MimoStage extends Stage {
     }
 
     for (const method of locksmithService.methods) {
+      method.handler.addEnvironment("API_PATH", apiPath);
+      method.handler.addEnvironment("USAGE_PLANS_PATH", usagePlansPath);
+      method.handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+          resources: [`*`],
+        })
+      );
+    }
+
+    for (const method of usageMonitorService.methods) {
       method.handler.addEnvironment("API_PATH", apiPath);
       method.handler.addEnvironment("USAGE_PLANS_PATH", usagePlansPath);
       method.handler.addToRolePolicy(

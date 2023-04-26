@@ -53,7 +53,15 @@ export class UsageMonitorStack extends Stack {
         type: JsonSchemaType.OBJECT,
         properties: {
           usage: {
-            type: JsonSchemaType.NUMBER,
+            type: JsonSchemaType.OBJECT,
+            properties: {
+              used: {
+                type: JsonSchemaType.INTEGER,
+              },
+              remaining: {
+                type: JsonSchemaType.INTEGER,
+              },
+            }
           },
         },
         required: ["usage"],
@@ -63,7 +71,6 @@ export class UsageMonitorStack extends Stack {
     return {
       name: "GET",
       handler: handler,
-      requestParameters: {},
       use_authorizer: true,
       api_key_required: false,
       responseModelOptions: methodResponseOptions,

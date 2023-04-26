@@ -9,20 +9,11 @@ HEADERS = {
 }
 
 class Errors(Enum):
-    INVALID_USER = 'invalid user'
-    MISSING_PARAMS = 'missing params'
-    MISSING_SECRETS = 'missing secrets'
-    AUTH_FAILED = 'auth failed'
-    DB_WRITE_FAILED = 'db write failed'
-    OPENAI_ERROR = 'openai error'
-    CHAT_ERROR = 'chat error'
-    S3_ERROR = 's3 error'
-    FAILED_DELETE_OLD_KEY = 'failed to delete old key'
-    FAILED_CREATE_KEY = 'failed to create key'
+    FAILED_GET_USAGE = 'failed to get usage data'
 
-def to_response_error(error_message: Errors):
+def to_response_error(error_message: Errors, status_code: int=400):
     return {
-        'statusCode': 400,
+        'statusCode': status_code,
         'headers': HEADERS,
         'body': json.dumps({
             'error': error_message.value

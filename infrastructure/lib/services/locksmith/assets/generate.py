@@ -38,13 +38,13 @@ def handler(event: dict, context):
     if not (user and stage and api_id and default_usage_plan.id):
         return to_response_error(Errors.MISSING_PARAMS)
     
-    api_locksmith = ApiGateway(rest_api_id=api_id)
-    old_api_key = api_locksmith.get(user, stage)
+    api_gateway = ApiGateway(rest_api_id=api_id)
+    old_api_key = api_gateway.get(user, stage)
     if old_api_key:
-        succeded = api_locksmith.delete(old_api_key)
+        succeded = api_gateway.delete(old_api_key)
         if not succeded:
             return to_response_error(Errors.FAILED_DELETE_OLD_KEY)
-    api_key = api_locksmith.generate(
+    api_key = api_gateway.generate(
         usage_plan_id=default_usage_plan.id,
         user=user,
         stage=stage,
