@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet";
 import { useConnectionsContext } from "@/context/connections";
 import useBoolean from "@/lib/hooks/use-boolean";
+import useWindowSize from "@/lib/hooks/use-window-size";
 import { RefreshCcw, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -40,10 +41,21 @@ export default function ConnectionPage({ params }: ConnectionPageProps) {
     router.push("/dashboard/connections");
     return null;
   }
+  const windowSize = useWindowSize();
+  const [sheetPosition, setSheetPosition] = useState<"right" | "top" | null>(
+    null
+  );
   const isOpen = useBoolean(false);
   const [name, setName] = useState<string>(connection.name);
 
-  useEffect(() => isOpen.setTrue(), []);
+  useEffect(() => {
+    isOpen.setTrue();
+  }, []);
+
+  useEffect(() => {
+    if (windowSize.width < 640) setSheetPosition("top");
+    else setSheetPosition("right");
+  }, [windowSize]);
 
   return (
     <Sheet
@@ -52,10 +64,15 @@ export default function ConnectionPage({ params }: ConnectionPageProps) {
       }}
       open={isOpen.value}
     >
-      <SheetContent className="flex flex-col gap-4" size="default">
+      <SheetContent
+        position={sheetPosition}
+        className="flex flex-col gap-4"
+        size="content"
+      >
         <SheetHeader className="mt-2">
           <SheetTitle asChild>
             <Input
+              className="w-80"
               value={name}
               onChange={(event) => setName(event.target.value)}
               onBlur={() => {
