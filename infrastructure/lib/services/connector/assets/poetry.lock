@@ -98,6 +98,17 @@ files = [
 ]
 
 [[package]]
+name = "ulid"
+version = "1.1"
+description = "Pyhton version of this: https://github.com/alizain/ulid"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ulid-1.1.tar.gz", hash = "sha256:0943e8a751ec10dfcdb4df2758f96dffbbfbc055d0b49288caf2f92125900d49"},
+]
+
+[[package]]
 name = "urllib3"
 version = "1.26.15"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -117,4 +128,4 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "6182a0ba0489ff9f051c54b34b17eecac33c857e9f33616c2e4238f4e27bb691"
+content-hash = "f531b73cc01dfd238664d8eafd493e6a031b0024662b403e2544cb02124b869e"

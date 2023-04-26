@@ -10,10 +10,9 @@ _integrations: List[Integration] = None
 def handler(event: dict, context):
     global _integrations
 
-    stage: str = os.getenv('STAGE')
     integrations_path: str = os.getenv('INTEGRATIONS_PATH')
 
-    if not (stage and integrations_path):
+    if not integrations_path:
         return to_response_error(Errors.MISSING_PARAMS)
 
     if not _integrations:

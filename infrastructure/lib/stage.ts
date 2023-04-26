@@ -122,6 +122,17 @@ export class MimoStage extends Stage {
           resources: [`*`],
         })
       );
+      method.handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: [
+            "apigateway:GET",
+            "apigateway:PUT",
+            "apigateway:POST",
+            "apigateway:DELETE",
+          ],
+          resources: ["*"],
+        })
+      );
     }
 
     for (const method of usageMonitorService.methods) {

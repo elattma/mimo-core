@@ -8,6 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 boto3 = "^1.26.116"
+ulid = "^1.1"
 
 
 [build-system]

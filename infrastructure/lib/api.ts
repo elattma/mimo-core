@@ -13,7 +13,6 @@ import {
   Certificate,
   CertificateValidation,
 } from "aws-cdk-lib/aws-certificatemanager";
-import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
@@ -209,23 +208,6 @@ export class ApiStack extends Stack {
           },
         ],
       });
-      this.getPostProcessRoute(routeConfig);
-    }
-  };
-
-  getPostProcessRoute = (route: RouteConfig) => {
-    for (const method of route.methods) {
-      method.handler.addToRolePolicy(
-        new PolicyStatement({
-          actions: [
-            "apigateway:GET",
-            "apigateway:PUT",
-            "apigateway:POST",
-            "apigateway:DELETE",
-          ],
-          resources: ["*"],
-        })
-      );
     }
   };
 }

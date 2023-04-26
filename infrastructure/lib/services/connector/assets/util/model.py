@@ -10,6 +10,7 @@ class Integration:
     description: str = ''
     icon: str = ''
     oauth2_link: str = ''
+    authorize_endpoint: str = ''
 
 class AuthType(Enum):
     TOKEN_OAUTH2 = 'TOKEN_OAUTH2'

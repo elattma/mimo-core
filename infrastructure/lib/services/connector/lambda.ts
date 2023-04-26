@@ -17,15 +17,70 @@ export interface ConnectorStackProps extends StackProps {
 export class ConnectorStack extends Stack {
   readonly methods: MethodConfig[] = [];
   readonly integrationMethods: MethodConfig[] = [];
+  readonly integrationModel: ModelOptions;
+  readonly connectionModel: ModelOptions;
 
   constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
 
+    this.integrationModel = {
+      contentType: "application/json",
+      modelName: "Integration",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          description: {
+            type: JsonSchemaType.STRING,
+          },
+          icon: {
+            type: JsonSchemaType.STRING,
+          },
+          oauth2_link: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["id", "name", "description", "icon", "oauth2_link"],
+      }
+    };
+
+    this.connectionModel = {
+      contentType: "application/json",
+      modelName: "Connection",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          integration: {
+            type: JsonSchemaType.STRING,
+          },
+          created_at: {
+            type: JsonSchemaType.STRING,
+          },
+          ingested_at: {
+            type: JsonSchemaType.STRING,
+          },
+        }
+      }
+    };
+
     const layers: PythonLayerVersion[] = [];
-    const getGetMethod = this.getGetMethod(props.stageId, layers);
-    this.methods.push(getGetMethod);
-    const getDeleteMethod = this.getDeleteMethod(props.stageId, layers);
-    this.methods.push(getDeleteMethod);
+    const createMethod = this.getCreateMethod(props.stageId, layers);
+    this.methods.push(createMethod);
+    const getMethod = this.getGetMethod(props.stageId, layers);
+    this.methods.push(getMethod);
+    const deleteMethod = this.getDeleteMethod(props.stageId, layers);
+    this.methods.push(deleteMethod);
 
     const integrationsMethod = this.getIntegrationsMethod(
       props.stageId,
@@ -49,7 +104,7 @@ export class ConnectorStack extends Stack {
         timeout: Duration.seconds(30),
         memorySize: 1024,
         environment: {
-          STAGE: "prod",
+          STAGE: stage,
         },
         retryAttempts: 0,
         bundling: {
@@ -59,20 +114,29 @@ export class ConnectorStack extends Stack {
       }
     );
 
-    const methodResponseOptions: ModelOptions = {
+    const methodRequestOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "GenerateResponse",
+      modelName: "ConnectorGenerateRequest",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          apiKey: {
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          integration: {
+            type: JsonSchemaType.STRING,
+          },
+          token_oauth2: {
             type: JsonSchemaType.OBJECT,
             properties: {
-              value: {
+              code: {
+                type: JsonSchemaType.STRING,
+              },
+              redirect_uri: {
                 type: JsonSchemaType.STRING,
               },
             },
-          },
+          }
         },
       },
     };
@@ -80,7 +144,8 @@ export class ConnectorStack extends Stack {
     return {
       name: "POST",
       handler: handler,
-      responseModelOptions: methodResponseOptions,
+      requestModelOptions: methodRequestOptions,
+      responseModelOptions: {schema: {type: JsonSchemaType.OBJECT}},
       use_authorizer: true,
     };
   };
@@ -97,7 +162,7 @@ export class ConnectorStack extends Stack {
       timeout: Duration.seconds(30),
       memorySize: 1024,
       environment: {
-        STAGE: "prod",
+        STAGE: stage,
       },
       retryAttempts: 0,
       bundling: {
@@ -112,6 +177,7 @@ export class ConnectorStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
+
           id: {
             type: JsonSchemaType.STRING,
           },
@@ -155,7 +221,7 @@ export class ConnectorStack extends Stack {
         timeout: Duration.seconds(30),
         memorySize: 1024,
         environment: {
-          STAGE: "prod",
+          STAGE: stage,
         },
         retryAttempts: 0,
         bundling: {
@@ -202,7 +268,7 @@ export class ConnectorStack extends Stack {
         timeout: Duration.seconds(30),
         memorySize: 1024,
         environment: {
-          STAGE: "prod",
+          STAGE: stage,
         },
         retryAttempts: 0,
         bundling: {

@@ -19,6 +19,7 @@ class Errors(Enum):
     S3_ERROR = 's3 error'
     FAILED_DELETE_OLD_KEY = 'failed to delete old key'
     FAILED_CREATE_KEY = 'failed to create key'
+    INVALID_INTEGRATION = 'invalid integration'
 
 def to_response_error(error_message: Errors):
     return {

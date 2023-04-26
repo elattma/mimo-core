@@ -27,4 +27,4 @@ jobs:
         run: npx cdk synth
       - name: Deploy stack
         working-directory: ./infrastructure
-        run: npx cdk deploy "mimo-dev/*" --require-approval never
+        run: npx cdk deploy "mimo-dev/*" --require-approval never --asset-parallelism true --concurrency 10

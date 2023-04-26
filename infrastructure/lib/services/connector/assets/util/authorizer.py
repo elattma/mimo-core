@@ -12,25 +12,24 @@ class TokenOAuth2Params:
     client_secret: str
     code: str
     redirect_uri: str
-    override_data: dict = None
+    grant_type: str = 'authorization_code'
+    access_type: str = 'offline'
     override_headers: dict = None
 
 class Authorizer:
     @staticmethod
     def token_oauth2(params: TokenOAuth2Params) -> TokenOAuth2:
         if not params:
-            return False
+            return None
         
         data = {
-            'grant_type': 'authorization_code',
+            'grant_type': params.grant_type,
             'client_id': params.client_id,
             'client_secret': params.client_secret,
             'code': params.code,
             'redirect_uri': params.redirect_uri,
-            'access_type': 'offline',
+            'access_type': params.access_type,
         }
-        if params.override_data:
-            data.update(params.override_data)
 
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -51,11 +50,13 @@ class Authorizer:
             issued_at = int(issued_at) // 1000 if issued_at else None
             expiry_timestamp = issued_at + 86400 if issued_at else None
         
-        auth = TokenOAuth2(
+        if not access_token:
+            return None
+
+        return TokenOAuth2(
             type=AuthType.TOKEN_OAUTH2.value,
             access_token=access_token,
             refresh_token=refresh_token,
             timestamp=timestamp,
             expiry_timestamp=expiry_timestamp,
         )
-        return auth
