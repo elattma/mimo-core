@@ -1,8 +1,3 @@
 # Infrastructure
 infrastructure/node_modules
 infrastructure/lib/lambda
-
-# Frontend
-frontend/.next
-frontend/dist
-frontend/node_modules
