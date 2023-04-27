@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from time import time
 
 import requests
-from model import AuthType, TokenOAuth2
+
+from .model import AuthType, TokenOAuth2
 
 
 @dataclass

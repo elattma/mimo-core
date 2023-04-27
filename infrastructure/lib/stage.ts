@@ -56,8 +56,8 @@ export class MimoStage extends Stage {
       stageId: props.stageId,
     });
     const usageMonitorService = new UsageMonitorStack(this, "usage-monitor", {
-      stageId: props.stageId
-    })
+      stageId: props.stageId,
+    });
     routeConfigs.push({
       path: "locksmith",
       methods: locksmithService.methods,
@@ -78,8 +78,8 @@ export class MimoStage extends Stage {
     });
     routeConfigs.push({
       path: "usage",
-      methods: usageMonitorService.methods
-    })
+      methods: usageMonitorService.methods,
+    });
     const api = new ApiStack(this, "api", {
       stageId: props.stageId,
       domainName: props.domainName,
@@ -87,6 +87,14 @@ export class MimoStage extends Stage {
     });
 
     for (const method of connectorService.methods) {
+      secrets.grantRead(method.handler);
+      method.handler.addEnvironment("INTEGRATIONS_PATH", integrationsPath);
+      method.handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+          resources: [`*`],
+        })
+      );
       if (method.name === "GET") {
         dynamo.mimoTable.grantReadData(method.handler);
       } else if (method.name === "POST") {
@@ -142,6 +150,12 @@ export class MimoStage extends Stage {
         new PolicyStatement({
           actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
           resources: [`*`],
+        })
+      );
+      method.handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: ["apigateway:GET"],
+          resources: ["*"],
         })
       );
     }

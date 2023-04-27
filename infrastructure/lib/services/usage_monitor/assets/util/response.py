@@ -9,6 +9,7 @@ HEADERS = {
 }
 
 class Errors(Enum):
+    MISSING_PARAMS = 'missing required parameters'
     FAILED_GET_USAGE = 'failed to get usage data'
 
 def to_response_error(error_message: Errors, status_code: int=400):

@@ -44,7 +44,7 @@ export class LocksmithStack extends Stack {
         timeout: Duration.seconds(30),
         memorySize: 1024,
         environment: {
-          STAGE: "prod",
+          STAGE: stage,
         },
         retryAttempts: 0,
         bundling: {
@@ -92,7 +92,7 @@ export class LocksmithStack extends Stack {
       timeout: Duration.seconds(30),
       memorySize: 1024,
       environment: {
-        STAGE: "prod",
+        STAGE: stage,
       },
       retryAttempts: 0,
       bundling: {
@@ -142,7 +142,7 @@ export class LocksmithStack extends Stack {
         timeout: Duration.seconds(30),
         memorySize: 1024,
         environment: {
-          STAGE: "prod",
+          STAGE: stage,
         },
         retryAttempts: 0,
         bundling: {

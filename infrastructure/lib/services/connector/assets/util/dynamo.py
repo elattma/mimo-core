@@ -6,7 +6,8 @@ from typing import List
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from model import AuthType, Connection, TokenOAuth2
+
+from .model import AuthType, Connection, TokenOAuth2
 
 
 class KeyNamespaces(Enum):

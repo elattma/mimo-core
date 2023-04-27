@@ -46,7 +46,7 @@ export class ConnectorStack extends Stack {
           },
         },
         required: ["id", "name", "description", "icon", "oauth2_link"],
-      }
+      },
     };
 
     this.connectionModel = {
@@ -70,8 +70,8 @@ export class ConnectorStack extends Stack {
           ingested_at: {
             type: JsonSchemaType.STRING,
           },
-        }
-      }
+        },
+      },
     };
 
     const layers: PythonLayerVersion[] = [];
@@ -136,7 +136,32 @@ export class ConnectorStack extends Stack {
                 type: JsonSchemaType.STRING,
               },
             },
-          }
+          },
+        },
+      },
+    };
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "ConnectorGenerateResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          integration: {
+            type: JsonSchemaType.STRING,
+          },
+          created_at: {
+            type: JsonSchemaType.STRING,
+          },
+          ingested_at: {
+            type: JsonSchemaType.STRING,
+          },
         },
       },
     };
@@ -145,7 +170,7 @@ export class ConnectorStack extends Stack {
       name: "POST",
       handler: handler,
       requestModelOptions: methodRequestOptions,
-      responseModelOptions: {schema: {type: JsonSchemaType.OBJECT}},
+      responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };
   };
@@ -177,7 +202,6 @@ export class ConnectorStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-
           id: {
             type: JsonSchemaType.STRING,
           },

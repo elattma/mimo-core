@@ -19,10 +19,6 @@ export interface RouteConfig {
   subRoutes?: RouteConfig[];
 }
 
-export interface CommonModel {
-  options: ModelOptions;
-}
-
 export interface UsageConfig {
   quotaLimit: number;
   quotaPeriod: Period;

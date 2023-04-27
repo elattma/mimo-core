@@ -34,7 +34,7 @@ class ApiGateway:
             value=uuid,
             stageKeys=[{
                 'restApiId': self._rest_api_id,
-                'stageName': stage
+                'stageName': 'prod'
             }],
             tags={
                 'usage_plan_id': usage_plan_id,

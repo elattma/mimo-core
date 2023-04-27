@@ -1,7 +1,7 @@
 import os
-from util.params import SSM
 
 from util.apigateway import ApiGateway
+from util.params import SSM
 from util.response import Errors, to_response_error, to_response_success
 
 _api_params = None
@@ -35,8 +35,5 @@ def handler(event: dict, context):
         return to_response_error(Errors.FAILED_GET_USAGE, 500)
 
     return to_response_success({
-        'usage': {
-            'used': single_day_usage.used,
-            'remaining': single_day_usage.remaining
-        }
+        'usage': single_day_usage.__dict__
     })

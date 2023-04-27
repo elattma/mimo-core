@@ -28,6 +28,7 @@ def handler(event: dict, context):
     name: str = body.get('name', None) if body else None
     integration_id: str = body.get('integration', None) if body else None
     token_oauth2: str = body.get('token_oauth2', None) if body else None
+    token_oauth2: dict = json.loads(token_oauth2) if token_oauth2 else None
 
     if not (user and stage and name and integration_id and token_oauth2):
         return to_response_error(Errors.MISSING_PARAMS.value)
@@ -41,14 +42,21 @@ def handler(event: dict, context):
             nested_params = _ssm.load_nested_params(integrations_path)
             _integrations_dict = {}
             for id, integration_params in nested_params.items():
-                _integrations_dict['id'] = Integration(**integration_params)
+                _integrations_dict[id] = Integration(**integration_params)
         integration: Integration = _integrations_dict.get(integration_id) if _integrations_dict else None
-        if not integration:
-            return to_response_error(Errors.INVALID_INTEGRATION)
         client_id = _secrets.get(f'{id}/CLIENT_ID')
         client_secret = _secrets.get(f'{id}/CLIENT_SECRET')
         code = token_oauth2.get('code', None) if token_oauth2 else None
         redirect_uri = token_oauth2.get('redirect_uri', None) if token_oauth2 else None
+        print(id)
+        print(_integrations_dict)
+        print(integration)
+        print(client_id)
+        print(client_secret)
+        print(code)
+        print(redirect_uri)
+        if not (integration and client_id and client_secret and code and redirect_uri):
+            return to_response_error(Errors.INVALID_AUTH)
         params: TokenOAuth2Params = TokenOAuth2Params(
             authorize_endpoint=integration.authorize_endpoint,
             client_id=client_id,
@@ -59,7 +67,7 @@ def handler(event: dict, context):
         auth = Authorizer.token_oauth2(params)
 
     if not auth:
-        return to_response_error(Errors.AUTH_FAILED.value)
+        return to_response_error(Errors.AUTH_FAILED)
 
     connection = Connection(
         id=ulid(),
@@ -78,6 +86,4 @@ def handler(event: dict, context):
         print(e)
         return to_response_error(Errors.DB_WRITE_FAILED.value)
 
-    return to_response_success({
-        'connection': connection
-    })
+    return to_response_success(connection.to_response())
