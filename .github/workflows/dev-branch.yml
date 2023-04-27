@@ -1,0 +1,21 @@
+name: dev-branch
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build and Push
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Push to Dev
+        run: git config user.email "admin@mimo.team" && git config user.name "Mimo Admin" && git push origin main:dev
