@@ -86,4 +86,6 @@ def handler(event: dict, context):
         print(e)
         return to_response_error(Errors.DB_WRITE_FAILED.value)
 
-    return to_response_success(connection.to_response())
+    return to_response_success({
+        'connection': connection.to_response()
+    })

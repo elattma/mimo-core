@@ -20,4 +20,7 @@ def handler(event: dict, context):
         integrations: Dict[str, dict] = _ssm.load_nested_params(integrations_path)
         _integrations = [Integration(**integration_params) for integration_params in integrations.values()]
     
-    return to_response_success([integration.__dict__ for integration in _integrations])
+    return to_response_success({
+        'integrations': [integration.__dict__ for integration in _integrations],
+        'next_token': None
+    })

@@ -147,20 +147,25 @@ export class ConnectorStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          id: {
-            type: JsonSchemaType.STRING,
-          },
-          name: {
-            type: JsonSchemaType.STRING,
-          },
-          integration: {
-            type: JsonSchemaType.STRING,
-          },
-          created_at: {
-            type: JsonSchemaType.STRING,
-          },
-          ingested_at: {
-            type: JsonSchemaType.STRING,
+          connection: {
+            type: JsonSchemaType.OBJECT,
+            properties: {
+              id: {
+                type: JsonSchemaType.STRING,
+              },
+              name: {
+                type: JsonSchemaType.STRING,
+              },
+              integration: {
+                type: JsonSchemaType.STRING,
+              },
+              created_at: {
+                type: JsonSchemaType.STRING,
+              },
+              ingested_at: {
+                type: JsonSchemaType.STRING,
+              },
+            },
           },
         },
       },
@@ -202,23 +207,31 @@ export class ConnectorStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          id: {
-            type: JsonSchemaType.STRING,
-          },
-          name: {
-            type: JsonSchemaType.STRING,
-          },
-          integration: {
-            type: JsonSchemaType.STRING,
-          },
-          created_at: {
-            type: JsonSchemaType.STRING,
-          },
-          ingested_at: {
-            type: JsonSchemaType.STRING,
+          connections: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.OBJECT,
+              properties: {
+                id: {
+                  type: JsonSchemaType.STRING,
+                },
+                name: {
+                  type: JsonSchemaType.STRING,
+                },
+                integration: {
+                  type: JsonSchemaType.STRING,
+                },
+                created_at: {
+                  type: JsonSchemaType.STRING,
+                },
+                ingested_at: {
+                  type: JsonSchemaType.STRING,
+                },
+              },
+            },
+            required: ["id", "name", "integration", "created_at"],
           },
         },
-        required: ["id", "name", "integration", "created_at"],
       },
     };
 

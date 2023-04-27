@@ -37,4 +37,7 @@ def handler(event: dict, context):
             response_connections = [user_connection_item.connection]
         except Exception as e:
             return to_response_error(Errors.DB_WRITE_FAILED)
-    return to_response_success([connection.to_response() for connection in response_connections])
+    return to_response_success({
+        'connections': [connection.to_response() for connection in response_connections],
+        'next_token': None
+    })
