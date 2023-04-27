@@ -1,12 +1,12 @@
-name: aws-deploy
+name: dev-branch
 on:
   push:
     branches:
-      - dev
-      - beta
+      - main
 jobs:
-  aws_cdk:
+  build:
     runs-on: ubuntu-latest
+    name: Build and Push
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -25,9 +25,5 @@ jobs:
       - name: Build
         working-directory: ./infrastructure
         run: npm run build
-      - name: Synth stack
-        working-directory: ./infrastructure
-        run: npx cdk synth
-      - name: Deploy stack
-        working-directory: ./infrastructure
-        run: npx cdk deploy "mimo-${GITHUB_REF##*/}/*" --require-approval never --asset-parallelism true --concurrency 10
+      - name: Push to Dev
+        run: git config user.email "admin@mimo.team" && git config user.name "Mimo Admin" && git push origin main:dev
