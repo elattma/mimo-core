@@ -4,7 +4,7 @@ node_modules
 .DS_Store
 /backend/dist*
 **pycache**
-**scratch_paper.py
+**scratch_paper.**
 **.env**
 
 /infrastructure/*.js

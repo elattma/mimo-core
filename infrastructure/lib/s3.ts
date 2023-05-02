@@ -31,7 +31,7 @@ export class S3Stack extends Stack {
     });
 
     new BucketDeployment(this, "icons-deployment", {
-      sources: [Source.asset(path.join(__dirname, "./icons"))],
+      sources: [Source.asset(path.join(__dirname, "./integrations/icons"))],
       destinationBucket: this.assetsBucket,
       destinationKeyPrefix: "icons",
     });

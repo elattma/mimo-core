@@ -41,11 +41,14 @@ export class ConnectorStack extends Stack {
           icon: {
             type: JsonSchemaType.STRING,
           },
-          oauth2_link: {
-            type: JsonSchemaType.STRING,
+          auth_strategies: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.OBJECT,
+            },
           },
         },
-        required: ["id", "name", "description", "icon", "oauth2_link"],
+        required: ["id", "name", "description", "icon", "auth_strategies"],
       },
     };
 
@@ -75,21 +78,26 @@ export class ConnectorStack extends Stack {
     };
 
     const layers: PythonLayerVersion[] = [];
-    const createMethod = this.getCreateMethod(props.stageId, layers);
+    const util = new PythonLayerVersion(this, `${props.stageId}-util-layer`, {
+      entry: path.join(__dirname, `layers/util`),
+      bundling: {
+        assetExcludes: ["**.venv**", "**pycache**"],
+      },
+      compatibleRuntimes: [Runtime.PYTHON_3_9],
+    });
+    layers.push(util);
+    const createMethod = this.connectionPost(props.stageId, layers);
     this.methods.push(createMethod);
-    const getMethod = this.getGetMethod(props.stageId, layers);
+    const getMethod = this.connectionGet(props.stageId, layers);
     this.methods.push(getMethod);
-    const deleteMethod = this.getDeleteMethod(props.stageId, layers);
+    const deleteMethod = this.connectionDelete(props.stageId, layers);
     this.methods.push(deleteMethod);
 
-    const integrationsMethod = this.getIntegrationsMethod(
-      props.stageId,
-      layers
-    );
+    const integrationsMethod = this.integrationGet(props.stageId, layers);
     this.integrationMethods.push(integrationsMethod);
   }
 
-  getCreateMethod = (
+  connectionPost = (
     stage: string,
     layers: PythonLayerVersion[]
   ): MethodConfig => {
@@ -97,8 +105,8 @@ export class ConnectorStack extends Stack {
       this,
       `${stage}-connector-create-lambda`,
       {
-        entry: path.join(__dirname, "assets"),
-        index: "create.py",
+        entry: path.join(__dirname, "connection"),
+        index: "post.py",
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
         timeout: Duration.seconds(30),
@@ -180,12 +188,12 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  getGetMethod = (
+  connectionGet = (
     stage: string,
     layers: PythonLayerVersion[]
   ): MethodConfig => {
     const handler = new PythonFunction(this, `${stage}-connector-get-lambda`, {
-      entry: path.join(__dirname, "assets"),
+      entry: path.join(__dirname, "connection"),
       index: "get.py",
       runtime: Runtime.PYTHON_3_9,
       handler: "handler",
@@ -243,7 +251,7 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  getDeleteMethod = (
+  connectionDelete = (
     stage: string,
     layers: PythonLayerVersion[]
   ): MethodConfig => {
@@ -251,7 +259,7 @@ export class ConnectorStack extends Stack {
       this,
       `${stage}-connector-delete-lambda`,
       {
-        entry: path.join(__dirname, "assets"),
+        entry: path.join(__dirname, "connection"),
         index: "delete.py",
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
@@ -290,7 +298,7 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  getIntegrationsMethod = (
+  integrationGet = (
     stage: string,
     layers: PythonLayerVersion[]
   ): MethodConfig => {
@@ -298,8 +306,8 @@ export class ConnectorStack extends Stack {
       this,
       `${stage}-connector-integrations-lambda`,
       {
-        entry: path.join(__dirname, "assets"),
-        index: "integrations.py",
+        entry: path.join(__dirname, "integration"),
+        index: "get.py",
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
         timeout: Duration.seconds(30),
@@ -352,6 +360,64 @@ export class ConnectorStack extends Stack {
     return {
       name: "GET",
       handler: handler,
+      responseModelOptions: methodResponseOptions,
+      use_authorizer: true,
+    };
+  };
+
+  getSyncMethod = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `${stage}-sync-lambda`, {
+      entry: path.join(__dirname, "assets"),
+      index: "sync.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodRequestOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "SyncRequest",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          connection: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["connection"],
+      },
+    };
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "SyncResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          succees: {
+            type: JsonSchemaType.BOOLEAN,
+            default: true,
+          },
+        },
+      },
+    };
+
+    return {
+      name: "POST",
+      handler: handler,
+      requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };
