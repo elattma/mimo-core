@@ -26,7 +26,6 @@ class Filter:
 
 @dataclass
 class Section(ABC):
-    id: str
     created_at: int
     updated_at: int
     
@@ -37,8 +36,8 @@ class Section(ABC):
     
 @dataclass
 class PersonSection(Section):
+    id: str
     name: str
-    id_person: str
     email: str = None
 
     @classmethod
@@ -51,6 +50,7 @@ class AccessSection(Section):
 
 @dataclass
 class UnstructuredTextSection(Section):
+
     text: str
     id_author: str
 
@@ -90,6 +90,10 @@ class ContactInfoSection(Section):
     department: str
     title: str
     lead_source: str
+
+    @classmethod
+    def get_type(cls) -> SectionType:
+        return SectionType.DEAL
 
 @dataclass
 class Page:

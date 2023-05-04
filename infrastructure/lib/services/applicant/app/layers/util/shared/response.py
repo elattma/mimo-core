@@ -21,7 +21,6 @@ class Errors(Enum):
     FAILED_CREATE_KEY = 'failed to create key'
     INVALID_AUTH = 'invalid auth'
     INVALID_CONNECTION = 'invalid connection'
-    DB_READ_FAILED = 'db read failed'
 
 def to_response_error(error_message: Errors):
     return {

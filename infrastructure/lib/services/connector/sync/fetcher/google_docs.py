@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Dict, Generator, List
+from uuid import uuid5
 
 from base import Fetcher
-from model import DiscoveredPage, DocumentPage, IntegrationType
+from model import Page, PageType, Section, UnstructuredTextSection
 from util import generate, get_timestamp_from_format
 
 GOOGLE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
@@ -13,7 +14,7 @@ GET_DOCUMENT_ENDPOINT = 'https://docs.googleapis.com/v1/documents/{id}'
 class GoogleDocs(Fetcher):
     _INTEGRATION = 'google_docs'
 
-    def discover(self) -> Generator[DiscoveredPage, None, None]:
+    def discover(self) -> Generator[PageType, None, None]:
         max_pages = self._filter.limit if self._filter and self._filter.limit else None
         discover_filters = ['mimeType="application/vnd.google-apps.document"', 'trashed=false']
         if self._filter:
@@ -39,9 +40,9 @@ class GoogleDocs(Fetcher):
             files: List[Dict] = discovery_response.get('files', None) if discovery_response else None
             for file in files:
                 file_id = file.get('id', None) if file else None
-                yield DiscoveredPage(
-                    integration_type=IntegrationType.DOCS,
-                    id=file_id
+                yield Page(
+                    id=file_id,
+                    type=PageType.DOCS
                 )
                 max_pages -= 1
                 if max_pages < 1:
@@ -60,8 +61,11 @@ class GoogleDocs(Fetcher):
 
     def _generate_title(self, response: Dict, lut: int) -> Generator[BlockStream, None, None]:
         title = response.get('title', None)
+        uuid5()
         if title:
-            yield BlockStream(TitleBlock._LABEL, [TitleBlock(text=title, last_updated_timestamp=lut)])
+            yield UnstructuredTextSection(
+                id=
+                TitleBlock._LABEL, [TitleBlock(text=title, last_updated_timestamp=lut)])
 
     def _generate_body(self, response: Dict, lut: int) -> Generator[BlockStream, None, None]:
         body = response.get('body', None)
@@ -97,13 +101,13 @@ class GoogleDocs(Fetcher):
     def _get_lut(self, response: dict) -> int:
         return get_timestamp_from_format(response.get('modifiedTime', None), GOOGLE_TIME_FORMAT) if response else None
 
-    def fetch(self, page: DiscoveredPage) -> Generator[DocumentPage, None, None]:
+    def fetch(self, page: Page) -> Generator[Section, None, None]:
         print('google_docs load!')
         response = self._request_session.get(
             GET_METADATA_ENDPOINT.format(id=page.id),
             params={
                 'fields': 'modifiedTime, owners'
-            },
+            }
         )
         metadata_response: dict = response.json() if response else None
         lut = None

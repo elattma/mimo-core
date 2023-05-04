@@ -142,11 +142,3 @@ class Connection:
         return self.id and self.name and self.integration \
             and self.auth and self.auth.is_valid() and self.created_at
     
-@dataclass
-class Library:
-    id: str = None
-    name: str = None
-    created_at: int = None
-
-    def is_valid(self):
-        return self.id and self.name and self.created_at

@@ -1,18 +1,18 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List
+from typing import List
 
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from shared.model import AuthType, Connection, Library, TokenAuth
+from shared.model import AuthType, Connection, TokenAuth
 
 
 class KeyNamespaces(Enum):
     USER = "USER#"
+    APP = "APP#"
     LIBRARY = "LIBRARY#"
-    CONNECTION = "CONNECTION#"
 
 @dataclass
 class ParentChildItem(ABC):
@@ -38,57 +38,11 @@ class ParentChildItem(ABC):
     @abstractmethod
     def as_dict(self):
         pass
-
-@dataclass
-class UserLibraryItem(ParentChildItem):
-    library: Library = None
-
-    def get_raw_child(self):
-        return self.library.id if self.library else None
-
-    def get_child(self):
-        return KeyNamespaces.LIBRARY.value + self.library.id if self.library else None
-
-    def is_valid(self):
-        return self.parent and self.library and self.library.is_valid()
-
-    def as_dict(self):
-        if not self.is_valid():
-            return None
-        
-        return {
-            'parent': self.parent,
-            'child': self.get_child(),
-            'name': self.library.name,
-            'created_at': self.library.created_at
-        }
     
-    @staticmethod
-    def from_dict(item: dict):
-        if not item:
-            return None
-
-        parent: str = item.get('parent', None)
-        child: str = item.get('child', None)
-        if not (parent and child):
-            return None
-        
-        name = item.get('name', None)
-        created_at = item.get('created_at', None)
-        library = Library(
-            id=child.split('#')[-1],
-            name=name,
-            created_at=int(created_at) if created_at else None,
-        )
-
-        return UserLibraryItem(
-            parent=parent,
-            library=library,
-        )
 
 @dataclass
-class LibraryConnectionItem(ParentChildItem):
-    connection: Connection = None
+class UserAppItem(ParentChildItem):
+    app: App = None
 
     def get_raw_child(self):
         return self.connection.id if self.connection else None
@@ -143,7 +97,7 @@ class LibraryConnectionItem(ParentChildItem):
             ingested_at=int(ingested_at) if ingested_at else None,
         )
 
-        return LibraryConnectionItem(
+        return UserConnectionItem(
             parent=parent,
             connection=connection,
         )
@@ -205,18 +159,13 @@ class ParentChildDB:
             items = []
             for response_item in response_items:
                 item: ParentChildItem = None
-                parent = response_item.get('parent', None) if response_item else None
                 child = response_item.get('child', None) if response_item else None
-                if not (parent and child):
-                    continue
+                if child and child.startswith(KeyNamespaces.CONNECTION.value):
+                    item = UserConnectionItem.from_dict(response_item)
+                    if item:
+                        items.append(item)
                 
-                if parent.startswith(KeyNamespaces.LIBRARY.value) and child.startswith(KeyNamespaces.CONNECTION.value):
-                    item = LibraryConnectionItem.from_dict(response_item)
-                elif parent.startswith(KeyNamespaces.USER.value) and child.startswith(KeyNamespaces.LIBRARY.value):
-                    item = UserLibraryItem.from_dict(response_item)
-                if item:
-                    items.append(item)
-                else:
+                if not item:
                     print("invalid item!")
                     print(response_item)
             return items
@@ -234,14 +183,14 @@ class ParentChildDB:
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
         else:
-            response_item: Dict = response.get('Item', None) if response else []
+            response_items = response.get('Items', None) if response else []
+            if not len(response_items) == 1:
+                return None
+            
             item: ParentChildItem = None
-            parent = response_item.get('parent', None)
-            child = response_item.get('child', None)
-            if parent.startswith(KeyNamespaces.LIBRARY.value) and child.startswith(KeyNamespaces.CONNECTION.value):
-                item = LibraryConnectionItem.from_dict(response_item)
-            elif parent.startswith(KeyNamespaces.USER.value) and child.startswith(KeyNamespaces.LIBRARY.value):
-                item = UserLibraryItem.from_dict(response_item)
+            child = response_items[0].get('child', None)
+            if child and child.startswith(KeyNamespaces.CONNECTION.value):
+                item = UserConnectionItem.from_dict(response_items[0])
             
             if not item:
                 print("invalid item!")

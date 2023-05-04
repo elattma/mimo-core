@@ -12,6 +12,7 @@ def handler(event: dict, context):
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
     path_parameters: dict = event.get('pathParameters', None) if event else None
+    library: str = path_parameters.get('library', None) if path_parameters else None
     connection: str = path_parameters.get('connection', None) if path_parameters else None
     stage: str = os.getenv('STAGE')
 
@@ -21,7 +22,7 @@ def handler(event: dict, context):
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
     
-    parent_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user)
+    parent_key = '{namespace}{library}'.format(namespace=KeyNamespaces.LIBRARY.value, library=library)
     child_key = '{namespace}{connection}'.format(namespace=KeyNamespaces.CONNECTION.value, connection=connection)
     try:
         _db.delete(parent_key, child_key)

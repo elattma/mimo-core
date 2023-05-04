@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Generator
 
 import requests
-from model import DiscoveredPage, Filter, Page
+from model import Filter, Page, Section
 from shared.model import Connection, TokenAuth
 
 
@@ -40,9 +40,9 @@ class Fetcher(ABC):
         })
     
     @abstractmethod
-    def discover(self, filter: Filter = None) -> Generator[DiscoveredPage, None, None]:
+    def discover(self, filter: Filter = None) -> Generator[Page, None, None]:
         raise NotImplementedError('discover not implemented')
 
     @abstractmethod
-    def fetch(self, page: DiscoveredPage) -> Generator[Page, None, None]:
+    def fetch(self, page: Page) -> Generator[Section, None, None]:
         raise NotImplementedError("fetch not implemented")

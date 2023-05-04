@@ -1,0 +1,1 @@
+# validate and authorize auth link

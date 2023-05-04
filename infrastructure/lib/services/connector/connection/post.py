@@ -6,7 +6,8 @@ from typing import Dict
 from auth.authorizer import Authorizer
 from shared.model import Auth, AuthType, Connection, Integration, TokenAuth
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import KeyNamespaces, ParentChildDB, UserConnectionItem
+from state.dynamo import (KeyNamespaces, LibraryConnectionItem, ParentChildDB,
+                          UserConnectionItem)
 from state.params import SSM
 from ulid import ulid
 
@@ -23,12 +24,13 @@ def handler(event: dict, context):
     integrations_path: str = os.getenv('INTEGRATIONS_PATH')
     body: str = event.get('body', None) if event else None
     body: dict = json.loads(body) if body else None
+    library: str = body.get('library', None) if body else None
     integration_id: str = body.get('integration', None) if body else None
     name: str = body.get('name', None) if body else None
     auth_strategy: Dict = body.get('auth_strategy', None) if body else None
     type: str = auth_strategy.get('type', None) if auth_strategy else None
 
-    if not (user and stage and name and integration_id and type):
+    if not (user and stage and library and name and integration_id and type):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     now_timestamp: int = int(time())
@@ -73,9 +75,9 @@ def handler(event: dict, context):
 
     if not _db: 
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
-    parent = f'{KeyNamespaces.USER.value}{user}'
+    parent = f'{KeyNamespaces.LIBRARY.value}{library}'
     try:
-        _db.write([UserConnectionItem(parent, connection)])
+        _db.write([LibraryConnectionItem(parent, connection)])
     except Exception as e:
         print(e)
         return to_response_error(Errors.DB_WRITE_FAILED)
