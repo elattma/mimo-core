@@ -1,18 +1,18 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
+from typing import Dict, List
 
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from shared.model import AuthType, Connection, TokenAuth
+from shared.model import App
 
 
 class KeyNamespaces(Enum):
     USER = "USER#"
-    APP = "APP#"
     LIBRARY = "LIBRARY#"
+    APP = "APP#"
 
 @dataclass
 class ParentChildItem(ABC):
@@ -38,20 +38,19 @@ class ParentChildItem(ABC):
     @abstractmethod
     def as_dict(self):
         pass
-    
 
 @dataclass
-class UserAppItem(ParentChildItem):
+class ParentAppItem(ParentChildItem):
     app: App = None
 
     def get_raw_child(self):
-        return self.connection.id if self.connection else None
-    
+        return self.app.id if self.app else None
+
     def get_child(self):
-        return KeyNamespaces.CONNECTION.value + self.connection.id if self.connection else None
-    
+        return KeyNamespaces.APP.value + self.app.id if self.app else None
+
     def is_valid(self):
-        return self.parent and self.connection and self.connection.is_valid()
+        return self.parent and self.app and self.app.is_valid()
 
     def as_dict(self):
         if not self.is_valid():
@@ -60,13 +59,10 @@ class UserAppItem(ParentChildItem):
         return {
             'parent': self.parent,
             'child': self.get_child(),
-            'name': self.connection.name,
-            'integration': self.connection.integration,
-            'auth': self.connection.auth.__dict__,
-            'created_at': self.connection.created_at,
-            'ingested_at': self.connection.ingested_at,
+            'name': self.app.name,
+            'created_at': self.app.created_at
         }
-
+    
     @staticmethod
     def from_dict(item: dict):
         if not item:
@@ -77,29 +73,17 @@ class UserAppItem(ParentChildItem):
         if not (parent and child):
             return None
         
-        auth: dict = item.get('auth', None)
-        auth_type: dict = auth.get('type', None) if auth else None
-        if auth_type == AuthType.TOKEN_OAUTH2.value:
-            auth = TokenAuth(**auth)
-        else:
-            return None
-        
         name = item.get('name', None)
-        integration = item.get('integration', None)
         created_at = item.get('created_at', None)
-        ingested_at = item.get('ingested_at', None)
-        connection = Connection(
+        app = App(
             id=child.split('#')[-1],
             name=name,
-            integration=integration,
-            auth=auth,
             created_at=int(created_at) if created_at else None,
-            ingested_at=int(ingested_at) if ingested_at else None,
         )
 
-        return UserConnectionItem(
+        return ParentAppItem(
             parent=parent,
-            connection=connection,
+            app=app,
         )
     
 class ParentChildDB:
@@ -119,28 +103,6 @@ class ParentChildDB:
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
 
-    def update(self, items: List[ParentChildItem], **kwargs) -> None:
-        if not kwargs or len(kwargs) < 1:
-            return
-        update_expression = ', '.join([f'#{key} = :{key}' for key in kwargs.keys()])
-        expression_attribute_names = {f'#{key}': key for key in kwargs.keys()}
-        expression_attribute_values = {f':{key}': value for key, value in kwargs.items()}
-        for item in items:
-            try:
-                self.table.update_item(
-                    Key={
-                        'parent': item.parent,
-                        'child': item.get_child(),
-                    },
-                    UpdateExpression=f'set {update_expression}',
-                    ExpressionAttributeNames=expression_attribute_names,
-                    ExpressionAttributeValues=expression_attribute_values,
-                )
-            except ClientError as err:
-                print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
-                    err.response['Error']['Code'], err.response['Error']['Message'])
-                raise
-
     def query(self, parent: str, child_namespace: str, **kwargs) -> List[ParentChildItem]:
         try:
             response = self.table.query(
@@ -159,13 +121,16 @@ class ParentChildDB:
             items = []
             for response_item in response_items:
                 item: ParentChildItem = None
+                parent = response_item.get('parent', None) if response_item else None
                 child = response_item.get('child', None) if response_item else None
-                if child and child.startswith(KeyNamespaces.CONNECTION.value):
-                    item = UserConnectionItem.from_dict(response_item)
-                    if item:
-                        items.append(item)
+                if not (parent and child):
+                    continue
                 
-                if not item:
+                if child.startswith(KeyNamespaces.APP.value):
+                    item = ParentAppItem.from_dict(response_item)
+                if item:
+                    items.append(item)
+                else:
                     print("invalid item!")
                     print(response_item)
             return items
@@ -183,14 +148,12 @@ class ParentChildDB:
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
         else:
-            response_items = response.get('Items', None) if response else []
-            if not len(response_items) == 1:
-                return None
-            
+            response_item: Dict = response.get('Item', None) if response else []
             item: ParentChildItem = None
-            child = response_items[0].get('child', None)
-            if child and child.startswith(KeyNamespaces.CONNECTION.value):
-                item = UserConnectionItem.from_dict(response_items[0])
+            parent = response_item.get('parent', None)
+            child = response_item.get('child', None)
+            if child.startswith(KeyNamespaces.APP.value):
+                item = ParentAppItem.from_dict(response_item)
             
             if not item:
                 print("invalid item!")

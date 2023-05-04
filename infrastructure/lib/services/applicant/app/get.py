@@ -1,9 +1,9 @@
 import os
 from typing import List
 
-from shared.model import Connection
+from shared.model import App
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import KeyNamespaces, ParentChildDB, UserConnectionItem
+from state.dynamo import KeyNamespaces, ParentAppItem, ParentChildDB
 
 _db: ParentChildDB = None
 
@@ -23,30 +23,25 @@ def handler(event: dict, context):
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
 
-    response_connections: List[Connection] = []
+    response_apps: List[App] = []
     if not app:
         parent_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user)
-        child_namespace = KeyNamespaces.CONNECTION.value
-        user_connection_items: List[UserConnectionItem] = _db.query(parent_key, child_namespace=child_namespace, Limit=100)
-        response_connections = [user_connection_item.connection for user_connection_item in user_connection_items]
+        child_namespace = KeyNamespaces.APP.value
+        user_app_items: List[ParentAppItem] = _db.query(parent_key, child_namespace=child_namespace, Limit=100)
+        response_apps = [user_app_item.app for user_app_item in user_app_items]
     else:
         parent_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user)
-        child_key = '{namespace}{connection}'.format(namespace=KeyNamespaces.CONNECTION.value, connection=connection)
+        child_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app)
         try:
-            user_connection_item: UserConnectionItem = _db.get(parent_key, child_key)
-            response_connections = [user_connection_item.connection]
+            user_app_item: ParentAppItem = _db.get(parent_key, child_key)
+            response_apps = [user_app_item.app]
         except Exception as e:
             return to_response_error(Errors.DB_WRITE_FAILED)
     return to_response_success({
-        'connections': [{
-            'id': connection.id,
-            'name': connection.name,
-            'integration': connection.integration,
-            'auth': {
-                'type': connection.auth.type.value,
-            },
-            'created_at': connection.created_at,
-            'ingested_at': connection.ingested_at
-        } for connection in response_connections],
+        'apps': [{
+            'id': app.id,
+            'name': app.name,
+            'created_at': app.created_at,
+        } for app in response_apps],
         'next_token': None
     })

@@ -1,13 +1,11 @@
 import json
 import os
 from time import time
-from typing import Dict
+from typing import List
 
-from auth.authorizer import Authorizer
-from shared.model import Auth, AuthType, Connection, Integration, TokenAuth
+from shared.model import App
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import KeyNamespaces, ParentChildDB, UserConnectionItem
-from state.params import SSM
+from state.dynamo import KeyNamespaces, ParentAppItem, ParentChildDB
 from ulid import ulid
 
 _db: ParentChildDB = None
@@ -22,43 +20,39 @@ def handler(event: dict, context):
     body: str = event.get('body', None) if event else None
     body: dict = json.loads(body) if body else None
     name: str = body.get('name', None) if body else None
-    auth_strategy: Dict = body.get('auth_strategy', None) if body else None
-    type: str = auth_strategy.get('type', None) if auth_strategy else None
 
-    if not (user and stage and name and integration_id and type):
+    if not (user and stage and name):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
-    now_timestamp: int = int(time())
-    auth: Auth = None    
-    if not auth:
-        return to_response_error(Errors.AUTH_FAILED)
-    
-    connection = Connection(
-        id=ulid(),
-        name=name,
-        integration=integration.id,
-        auth=auth,
-        created_at=now_timestamp
-    )
-
-    if not _db: 
+    if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
+    apps: List[ParentAppItem] = []
     parent = f'{KeyNamespaces.USER.value}{user}'
+    child_namespace = KeyNamespaces.APP.value
     try:
-        _db.write([UserConnectionItem(parent, connection)])
+        apps = _db.query(parent, child_namespace=child_namespace, Limit=100)
+    except Exception as e:
+        print(e)
+        return to_response_error(Errors.DB_READ_FAILED)
+    if len(apps) >= 10:
+        return to_response_error(Errors.APP_LIMIT_REACHED)
+    elif len(apps) < 1:
+        return to_response_error(Errors.APP_LIMIT_REACHED)
+
+    now_timestamp: int = int(time())
+    app_id = ulid()
+    app = App(id=app_id, name=name, created_at=now_timestamp)
+    user_app_item = ParentAppItem(parent, app)
+    try:
+        _db.write([user_app_item])
     except Exception as e:
         print(e)
         return to_response_error(Errors.DB_WRITE_FAILED)
 
     return to_response_success({
-        'connection': {
-            'id': connection.id,
-            'name': connection.name,
-            'integration': connection.integration,
-            'auth': {
-                'type': connection.auth.type.value,
-            },
-            'created_at': connection.created_at,
-            'ingested_at': connection.ingested_at
+        'app': {
+            'id': app.id,
+            'name': app.name,
+            'created_at': app.created_at
         }
     })

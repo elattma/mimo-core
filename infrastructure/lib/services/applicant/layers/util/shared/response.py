@@ -11,16 +11,10 @@ HEADERS = {
 class Errors(Enum):
     INVALID_USER = 'invalid user'
     MISSING_PARAMS = 'missing params'
-    MISSING_SECRETS = 'missing secrets'
-    AUTH_FAILED = 'auth failed'
     DB_WRITE_FAILED = 'db write failed'
-    OPENAI_ERROR = 'openai error'
-    CHAT_ERROR = 'chat error'
-    S3_ERROR = 's3 error'
-    FAILED_DELETE_OLD_KEY = 'failed to delete old key'
-    FAILED_CREATE_KEY = 'failed to create key'
-    INVALID_AUTH = 'invalid auth'
-    INVALID_CONNECTION = 'invalid connection'
+    DB_READ_FAILED = 'db read failed'
+    APP_LIMIT_REACHED = 'app limit reached'
+    USER_NOT_PERMITTED = 'user not permitted'
 
 def to_response_error(error_message: Errors):
     return {
