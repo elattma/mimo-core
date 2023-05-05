@@ -1,4 +1,4 @@
-from typing import Dict, Generator, List
+from typing import Any, Dict, Generator, List
 
 import boto3
 from shared.model import Integration
@@ -26,8 +26,8 @@ class SSM:
             if next_token is None:
                 break
     
-    def load_params(self, path: str) -> Dict[str, Dict | str]:
-        params: Dict[str, Dict | str] = {}
+    def load_params(self, path: str) -> Dict[str, Any]:
+        params: Dict[str, Any] = {}
         base_len = len(path.split('/'))
         param_generator = self._get_by_path(path)
         for parameter in param_generator:

@@ -155,6 +155,10 @@ export class ApiStack extends Stack {
     authorizer: IAuthorizer
   ) => {
     const route = resource.addResource(routeConfig.path);
+    let idRoute = undefined;
+    if (routeConfig.idResource) {
+      idRoute = route.addResource(`{${routeConfig.idResource}}`);
+    }
     if (routeConfig.subRoutes) {
       for (const subRoute of routeConfig.subRoutes) {
         this.getRoute(api, route, subRoute, authorizer);
@@ -177,7 +181,10 @@ export class ApiStack extends Stack {
 
       const requestParameters = method.requestParameters
         ? method.requestParameters
-        : undefined;
+        : {};
+      if (method.idResource) {
+        requestParameters[`method.request.path.${method.idResource}`] = false;
+      }
 
       const responseModel = api.addModel(
         `${routeConfig.path}-${method.name}-response-model`,
@@ -208,6 +215,33 @@ export class ApiStack extends Stack {
           },
         ],
       });
+
+      if (method.idResource && idRoute) {
+        idRoute.addMethod(method.name, new LambdaIntegration(method.handler), {
+          authorizer: method.use_authorizer ? authorizer : undefined,
+          apiKeyRequired: method.api_key_required,
+          requestValidator: requestValidator,
+          requestModels: requestModel
+            ? {
+                "application/json": requestModel,
+              }
+            : undefined,
+          requestParameters: requestParameters,
+          methodResponses: [
+            {
+              statusCode: "200",
+              responseModels: {
+                "application/json": responseModel,
+              },
+              responseParameters: {
+                "method.response.header.Content-Type": true,
+                "method.response.header.Access-Control-Allow-Origin": true,
+                "method.response.header.Access-Control-Allow-Credentials": true,
+              },
+            },
+          ],
+        });
+      }
     }
   };
 }

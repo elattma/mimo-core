@@ -8,6 +8,7 @@ export interface MethodConfig {
   use_authorizer?: boolean;
   api_key_required?: boolean;
   requestModelOptions?: ModelOptions;
+  idResource?: string;
   requestParameters?: {
     [param: string]: boolean;
   };
@@ -17,6 +18,7 @@ export interface RouteConfig {
   path: string;
   methods: MethodConfig[];
   subRoutes?: RouteConfig[];
+  idResource?: string;
 }
 
 export interface UsageConfig {

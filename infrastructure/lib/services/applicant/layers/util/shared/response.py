@@ -15,6 +15,7 @@ class Errors(Enum):
     DB_READ_FAILED = 'db read failed'
     APP_LIMIT_REACHED = 'app limit reached'
     USER_NOT_PERMITTED = 'user not permitted'
+    APP_NOT_FOUND = 'app not found'
 
 def to_response_error(error_message: Errors):
     return {

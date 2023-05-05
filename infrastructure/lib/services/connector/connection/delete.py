@@ -12,8 +12,9 @@ def handler(event: dict, context):
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
     path_parameters: dict = event.get('pathParameters', None) if event else None
-    library: str = path_parameters.get('library', None) if path_parameters else None
     connection: str = path_parameters.get('connection', None) if path_parameters else None
+    query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
+    library: str = query_string_parameters.get('library', None) if query_string_parameters else None
     stage: str = os.getenv('STAGE')
 
     if not (user and stage and connection):

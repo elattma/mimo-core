@@ -17,65 +17,10 @@ export interface ConnectorStackProps extends StackProps {
 export class ConnectorStack extends Stack {
   readonly methods: MethodConfig[] = [];
   readonly integrationMethods: MethodConfig[] = [];
-  readonly integrationModel: ModelOptions;
-  readonly connectionModel: ModelOptions;
+  readonly libraryMethods: MethodConfig[] = [];
 
   constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
-
-    this.integrationModel = {
-      contentType: "application/json",
-      modelName: "Integration",
-      schema: {
-        type: JsonSchemaType.OBJECT,
-        properties: {
-          id: {
-            type: JsonSchemaType.STRING,
-          },
-          name: {
-            type: JsonSchemaType.STRING,
-          },
-          description: {
-            type: JsonSchemaType.STRING,
-          },
-          icon: {
-            type: JsonSchemaType.STRING,
-          },
-          auth_strategies: {
-            type: JsonSchemaType.ARRAY,
-            items: {
-              type: JsonSchemaType.OBJECT,
-            },
-          },
-        },
-        required: ["id", "name", "description", "icon", "auth_strategies"],
-      },
-    };
-
-    this.connectionModel = {
-      contentType: "application/json",
-      modelName: "Connection",
-      schema: {
-        type: JsonSchemaType.OBJECT,
-        properties: {
-          id: {
-            type: JsonSchemaType.STRING,
-          },
-          name: {
-            type: JsonSchemaType.STRING,
-          },
-          integration: {
-            type: JsonSchemaType.STRING,
-          },
-          created_at: {
-            type: JsonSchemaType.STRING,
-          },
-          ingested_at: {
-            type: JsonSchemaType.STRING,
-          },
-        },
-      },
-    };
 
     const layers: PythonLayerVersion[] = [];
     const util = new PythonLayerVersion(this, `${props.stageId}-util-layer`, {
@@ -95,6 +40,9 @@ export class ConnectorStack extends Stack {
 
     const integrationsMethod = this.integrationGet(props.stageId, layers);
     this.integrationMethods.push(integrationsMethod);
+
+    const libraryMethod = this.libraryGet(props.stageId, layers);
+    this.libraryMethods.push(libraryMethod);
   }
 
   connectionPost = (
@@ -365,59 +313,63 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  getSyncMethod = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
-    const handler = new PythonFunction(this, `${stage}-sync-lambda`, {
-      entry: path.join(__dirname, "assets"),
-      index: "sync.py",
-      runtime: Runtime.PYTHON_3_9,
-      handler: "handler",
-      timeout: Duration.seconds(30),
-      memorySize: 1024,
-      environment: {
-        STAGE: stage,
-      },
-      retryAttempts: 0,
-      bundling: {
-        assetExcludes: ["**.venv**", "**__pycache__**"],
-      },
-      layers: layers,
-    });
-
-    const methodRequestOptions: ModelOptions = {
-      contentType: "application/json",
-      modelName: "SyncRequest",
-      schema: {
-        type: JsonSchemaType.OBJECT,
-        properties: {
-          connection: {
-            type: JsonSchemaType.STRING,
-          },
+  libraryGet = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
+    const handler = new PythonFunction(
+      this,
+      `${stage}-connector-library-lambda`,
+      {
+        entry: path.join(__dirname, "library"),
+        index: "get.py",
+        runtime: Runtime.PYTHON_3_9,
+        handler: "handler",
+        timeout: Duration.seconds(30),
+        memorySize: 1024,
+        environment: {
+          STAGE: stage,
         },
-        required: ["connection"],
-      },
-    };
+        retryAttempts: 0,
+        bundling: {
+          assetExcludes: ["**.venv**"],
+        },
+        layers: layers,
+      }
+    );
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "SyncResponse",
+      modelName: "Library",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          succees: {
-            type: JsonSchemaType.BOOLEAN,
-            default: true,
+          libraries: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.OBJECT,
+              properties: {
+                id: {
+                  type: JsonSchemaType.STRING,
+                },
+                name: {
+                  type: JsonSchemaType.STRING,
+                },
+                created_at: {
+                  type: JsonSchemaType.INTEGER,
+                },
+              },
+              required: ["id", "name", "created_at"],
+            },
+          },
+          next_token: {
+            type: JsonSchemaType.STRING,
           },
         },
       },
     };
 
     return {
-      name: "POST",
+      name: "GET",
       handler: handler,
-      requestModelOptions: methodRequestOptions,
+      idResource: "library",
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };

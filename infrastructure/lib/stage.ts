@@ -7,6 +7,7 @@ import { DynamoStack } from "./dynamo";
 import { RouteConfig } from "./model";
 import { S3Stack } from "./s3";
 import { SecretsStack } from "./secrets";
+import { ApplicantStack } from "./services/applicant/lambda";
 import { ConnectorStack } from "./services/connector/lambda";
 import { DetectiveStack } from "./services/detective/lambda";
 import { LocksmithStack } from "./services/locksmith/lambda";
@@ -58,6 +59,9 @@ export class MimoStage extends Stage {
     const usageMonitorService = new UsageMonitorStack(this, "usage-monitor", {
       stageId: props.stageId,
     });
+    const applicantService = new ApplicantStack(this, "applicant", {
+      stageId: props.stageId,
+    });
     routeConfigs.push({
       path: "locksmith",
       methods: locksmithService.methods,
@@ -65,10 +69,16 @@ export class MimoStage extends Stage {
     routeConfigs.push({
       path: "connector",
       methods: connectorService.methods,
+      idResource: "connection",
       subRoutes: [
         {
           path: "integration",
           methods: connectorService.integrationMethods,
+        },
+        {
+          path: "library",
+          methods: connectorService.libraryMethods,
+          idResource: "library",
         },
       ],
     });
@@ -79,6 +89,17 @@ export class MimoStage extends Stage {
     routeConfigs.push({
       path: "usage",
       methods: usageMonitorService.methods,
+    });
+    routeConfigs.push({
+      path: "app",
+      methods: applicantService.appMethods,
+      idResource: "app",
+      subRoutes: [
+        {
+          path: "auth",
+          methods: applicantService.authMethods,
+        },
+      ],
     });
     const api = new ApiStack(this, "api", {
       stageId: props.stageId,
@@ -106,6 +127,9 @@ export class MimoStage extends Stage {
       }
     }
 
+    for (const method of connectorService.libraryMethods) {
+      dynamo.mimoTable.grantReadWriteData(method.handler);
+    }
     for (const method of detectiveService.methods) {
       secrets.grantRead(method.handler);
     }
@@ -158,6 +182,19 @@ export class MimoStage extends Stage {
           resources: ["*"],
         })
       );
+    }
+
+    for (const method of [
+      ...applicantService.appMethods,
+      ...applicantService.authMethods,
+    ]) {
+      if (method.name === "GET") {
+        dynamo.mimoTable.grantReadData(method.handler);
+      } else if (method.name === "POST") {
+        dynamo.mimoTable.grantReadWriteData(method.handler);
+      } else if (method.name === "DELETE") {
+        dynamo.mimoTable.grantWriteData(method.handler);
+      }
     }
 
     const ssm = new SsmStack(this, "ssm", {

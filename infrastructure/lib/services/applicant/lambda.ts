@@ -4,88 +4,113 @@ import {
 } from "@aws-cdk/aws-lambda-python-alpha";
 import { Duration, Stack, StackProps } from "aws-cdk-lib";
 import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
+import { Key, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
 import { MethodConfig } from "../../model";
 import path = require("path");
 
-export interface LocksmithStackProps extends StackProps {
+export interface ApplicantStackProps extends StackProps {
   readonly stageId: string;
   readonly layers?: Map<string, PythonLayerVersion>;
 }
 
-export class LocksmithStack extends Stack {
-  readonly methods: MethodConfig[] = [];
+export class ApplicantStack extends Stack {
+  readonly appMethods: MethodConfig[] = [];
+  readonly authMethods: MethodConfig[] = [];
 
-  constructor(scope: Construct, id: string, props: LocksmithStackProps) {
+  constructor(scope: Construct, id: string, props: ApplicantStackProps) {
     super(scope, id, props);
 
     const layers: PythonLayerVersion[] = [];
-    const generateMethod = this.getGenerateMethod(props.stageId, layers);
-    this.methods.push(generateMethod);
-    const getMethod = this.getGetMethod(props.stageId, layers);
-    this.methods.push(getMethod);
-    const deleteMethod = this.getDeleteMethod(props.stageId, layers);
-    this.methods.push(deleteMethod);
+    const util = new PythonLayerVersion(this, `${props.stageId}-util-layer`, {
+      entry: path.join(__dirname, `layers/util`),
+      bundling: {
+        assetExcludes: ["**.venv**", "**pycache**"],
+      },
+      compatibleRuntimes: [Runtime.PYTHON_3_9],
+    });
+    layers.push(util);
+    const appPostMethod = this.appPost(props.stageId, layers);
+    this.appMethods.push(appPostMethod);
+    const appGetMethod = this.appGet(props.stageId, layers);
+    this.appMethods.push(appGetMethod);
+    const appDeleteMethod = this.appDelete(props.stageId, layers);
+    this.appMethods.push(appDeleteMethod);
+
+    const authKey = new Key(this, `auth-key`, {
+      enableKeyRotation: true,
+      description: `Auth key for ${props.stageId}`,
+      keyUsage: KeyUsage.ENCRYPT_DECRYPT,
+    });
+    const authGetMethod = this.authGet(props.stageId, layers, authKey);
+    this.authMethods.push(authGetMethod);
   }
 
-  getGenerateMethod = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
-    const handler = new PythonFunction(
-      this,
-      `${stage}-locksmith-generate-lambda`,
-      {
-        entry: path.join(__dirname, "assets"),
-        index: "generate.py",
-        runtime: Runtime.PYTHON_3_9,
-        handler: "handler",
-        timeout: Duration.seconds(30),
-        memorySize: 1024,
-        environment: {
-          STAGE: stage,
-        },
-        retryAttempts: 0,
-        bundling: {
-          assetExcludes: ["**.venv**", "**__pycache__**"],
-        },
-        layers: layers,
-      }
-    );
+  appPost = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
+    const handler = new PythonFunction(this, `app-post-lambda`, {
+      entry: path.join(__dirname, "app"),
+      index: "post.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
 
-    const methodResponseOptions: ModelOptions = {
+    const methodRequestOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "LocksmithGenerateResponse",
+      modelName: "AppPostRequest",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          apiKey: {
-            type: JsonSchemaType.OBJECT,
-            properties: {
-              value: {
-                type: JsonSchemaType.STRING,
-              },
-            },
+          name: {
+            type: JsonSchemaType.STRING,
           },
         },
+        required: ["name"],
+      },
+    };
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "AppPostResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          id: {
+            type: JsonSchemaType.STRING,
+          },
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          created_at: {
+            type: JsonSchemaType.INTEGER,
+          },
+        },
+        required: ["id", "name", "created_at"],
       },
     };
 
     return {
       name: "POST",
       handler: handler,
+      requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };
   };
 
-  getGetMethod = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
-    const handler = new PythonFunction(this, `${stage}-locksmith-get-lambda`, {
-      entry: path.join(__dirname, "assets"),
+  appGet = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
+    const handler = new PythonFunction(this, `app-get-lambda`, {
+      entry: path.join(__dirname, "app"),
       index: "get.py",
       runtime: Runtime.PYTHON_3_9,
       handler: "handler",
@@ -103,17 +128,30 @@ export class LocksmithStack extends Stack {
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "LocksmithGetResponse",
+      modelName: "AppGetResponse",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          apiKey: {
-            type: JsonSchemaType.OBJECT,
-            properties: {
-              value: {
-                type: JsonSchemaType.STRING,
+          apps: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.OBJECT,
+              properties: {
+                id: {
+                  type: JsonSchemaType.STRING,
+                },
+                name: {
+                  type: JsonSchemaType.STRING,
+                },
+                created_at: {
+                  type: JsonSchemaType.INTEGER,
+                },
               },
+              required: ["id", "name", "created_at"],
             },
+          },
+          next_token: {
+            type: JsonSchemaType.STRING,
           },
         },
       },
@@ -122,39 +160,33 @@ export class LocksmithStack extends Stack {
     return {
       name: "GET",
       handler: handler,
+      idResource: "app",
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };
   };
 
-  getDeleteMethod = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
-    const handler = new PythonFunction(
-      this,
-      `${stage}-locksmith-delete-lambda`,
-      {
-        entry: path.join(__dirname, "assets"),
-        index: "delete.py",
-        runtime: Runtime.PYTHON_3_9,
-        handler: "handler",
-        timeout: Duration.seconds(30),
-        memorySize: 1024,
-        environment: {
-          STAGE: stage,
-        },
-        retryAttempts: 0,
-        bundling: {
-          assetExcludes: ["**.venv**", "**__pycache__**"],
-        },
-        layers: layers,
-      }
-    );
+  appDelete = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
+    const handler = new PythonFunction(this, `app-delete-lambda`, {
+      entry: path.join(__dirname, "app"),
+      index: "delete.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "LocksmithDeleteResponse",
+      modelName: "AppDeleteResponse",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
@@ -169,6 +201,57 @@ export class LocksmithStack extends Stack {
     return {
       name: "DELETE",
       handler: handler,
+      idResource: "app",
+      responseModelOptions: methodResponseOptions,
+      use_authorizer: true,
+    };
+  };
+
+  authGet = (
+    stage: string,
+    layers: PythonLayerVersion[],
+    kmsKey: Key
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `auth-get-lambda`, {
+      entry: path.join(__dirname, "auth"),
+      index: "get.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+        KMS_KEY_ID: kmsKey.keyId,
+        AUTH_ENDPOINT: "https://auth.mimo.team",
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+    kmsKey.grantEncryptDecrypt(handler);
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "AuthGetResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          authLink: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["authLink"],
+      },
+    };
+
+    return {
+      name: "GET",
+      handler: handler,
+      requestParameters: {
+        "method.request.querystring.app": true,
+      },
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };

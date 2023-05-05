@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from shared.model import Integration
 from shared.response import Errors, to_response_error, to_response_success
@@ -17,7 +17,7 @@ def handler(_, __):
 
     if not _integrations:
         _ssm = SSM()
-        integrations: Dict[str, Dict | str] = _ssm.load_params(integrations_path)
+        integrations: Dict[str, Any] = _ssm.load_params(integrations_path)
         _integrations = [Integration.from_dict(integration_params) for integration_params in integrations.values()]
     
     return to_response_success({

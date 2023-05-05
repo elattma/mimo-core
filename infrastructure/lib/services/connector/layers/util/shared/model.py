@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 class AuthType(Enum):
@@ -60,7 +60,7 @@ class Integration:
     auth_strategies: Dict[AuthType, AuthStrategy]
 
     @staticmethod
-    def from_dict(params: Dict[str, Dict | str]) -> 'Integration':
+    def from_dict(params: Dict[str, Any]) -> 'Integration':
         id: str = params.get('id', None)
         name: str = params.get('name', None)
         description: str = params.get('description', None)
