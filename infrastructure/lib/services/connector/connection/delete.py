@@ -17,7 +17,7 @@ def handler(event: dict, context):
     library: str = query_string_parameters.get('library', None) if query_string_parameters else None
     stage: str = os.getenv('STAGE')
 
-    if not (user and stage and connection):
+    if not (user and stage and connection and library):
         return to_response_error(Errors.MISSING_PARAMS)
 
     if not _db:

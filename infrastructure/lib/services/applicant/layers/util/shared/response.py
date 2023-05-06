@@ -16,6 +16,8 @@ class Errors(Enum):
     APP_LIMIT_REACHED = 'app limit reached'
     USER_NOT_PERMITTED = 'user not permitted'
     APP_NOT_FOUND = 'app not found'
+    LIBRARY_NOT_FOUND = 'library not found'
+    INVALID_TOKEN = 'invalid token'
 
 def to_response_error(error_message: Errors):
     return {

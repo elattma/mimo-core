@@ -52,6 +52,17 @@ class TokenOAuth2Strategy(AuthStrategy):
         }
 
 @dataclass
+class TokenDirectStrategy(AuthStrategy):
+    id: str
+    
+    @classmethod
+    def get_type(cls) -> AuthType:
+        return AuthType.TOKEN_DIRECT
+    
+    def get_params(self):
+        return {}
+
+@dataclass
 class Integration:
     id: str
     name: str

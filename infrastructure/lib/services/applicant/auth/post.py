@@ -1,10 +1,12 @@
 import json
 import os
+from time import time
+from typing import List
 
 from helper.kms import KMS
-from shared.model import App
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import KeyNamespaces, ParentAppItem, ParentChildDB
+from state.dynamo import (KeyNamespaces, LibraryAppItem, ParentChildDB,
+                          ParentChildItem)
 
 _db: ParentChildDB = None
 _kms: KMS = None
@@ -19,36 +21,55 @@ def handler(event: dict, context):
     body: dict = json.loads(body) if body else None
     token: str = body.get('token', None) if body else None
     kms_key_id: str = os.getenv('KMS_KEY_ID')
-    auth_endpoint: str = os.getenv('AUTH_ENDPOINT')
     stage: str = os.getenv('STAGE')
 
-    if not (user and stage and kms_key_id and auth_endpoint and token):
+    if not (user and stage and kms_key_id and token):
         return to_response_error(Errors.MISSING_PARAMS)
 
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
 
-    child_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app)
-    response_app: App = None
-    try:
-        user_app_item: ParentAppItem = _db.get(parent_key, child_key)
-        response_app: App = user_app_item.app
+    parent_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user)
+    child_namespace = KeyNamespaces.LIBRARY.value
+    library: str = None
+    try: 
+        items: List[ParentChildItem] = _db.query(parent_key, child_namespace)
+        if not items:
+            return to_response_error(Errors.LIBRARY_NOT_FOUND)
+        library = items[0].get_raw_child()
     except Exception as e:
-        return to_response_error(Errors.DB_READ_FAILED)
-    
-    if not response_app:
-        return to_response_error(Errors.APP_NOT_FOUND)
+        print(e)
+        return to_response_error(Errors.DB_READ_FAILED)    
+    if not library:
+        return to_response_error(Errors.LIBRARY_NOT_FOUND)
 
     if not _kms:
         _kms = KMS()
+    payload = _kms.verify(token=token, key_id=kms_key_id)
+    if not payload:
+        return to_response_error(Errors.INVALID_TOKEN)
     
-    token = _kms.sign({
-        'app': {
-            'id': response_app.id,
-            'name': response_app.name
-        },
-        'user': user
-    }, key_id=kms_key_id)
+    try:
+        parent_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=payload.user)
+        child_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=payload.app.id)
+        is_valid_user_app = _db.exists(parent_key, child_key)
+    except Exception as e:
+        print(e)
+        return to_response_error(Errors.DB_READ_FAILED)
+    if not is_valid_user_app:
+        return to_response_error(Errors.APP_NOT_FOUND)
+    
+    now_timestamp = int(time())
+    try:
+        library_app_item: LibraryAppItem = LibraryAppItem(
+            parent='{namespace}{library}'.format(namespace=KeyNamespaces.LIBRARY.value, library=library),
+            app_id=payload.app.id,
+            timestamp=now_timestamp
+        )
+        _db.write([library_app_item])
+    except Exception as e:
+        print(e)
+        return to_response_error(Errors.DB_WRITE_FAILED)
     return to_response_success({
-        'authLink': '{auth_endpoint}?token={token}'.format(auth_endpoint=auth_endpoint, token=token)
+        'success': True
     })

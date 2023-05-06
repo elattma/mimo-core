@@ -86,6 +86,48 @@ class ParentAppItem(ParentChildItem):
             app=app,
         )
     
+@dataclass
+class LibraryAppItem(ParentChildItem):
+    app_id: str = None
+    created_at: int = None
+
+    def get_raw_child(self):
+        return self.app_id
+    
+    def get_child(self):
+        return KeyNamespaces.APP.value + self.app_id
+    
+    def is_valid(self):
+        return self.parent and self.app_id and self.created_at
+    
+    def as_dict(self):
+        if not self.is_valid():
+            return None
+        
+        return {
+            'parent': self.parent,
+            'child': self.get_child(),
+            'created_at': self.created_at
+        }
+    
+    @staticmethod
+    def from_dict(item: dict):
+        if not item:
+            return None
+        
+        parent: str = item.get('parent', None)
+        child: str = item.get('child', None)
+        if not (parent and child):
+            return None
+        
+        created_at = item.get('created_at', None)
+        app_id = child.split('#')[-1]
+        return LibraryAppItem(
+            parent=parent,
+            app_id=app_id,
+            created_at=created_at,
+        )
+    
 class ParentChildDB:
     table = None
     def __init__(self, table_name: str):
@@ -126,7 +168,9 @@ class ParentChildDB:
                 if not (parent and child):
                     continue
                 
-                if child.startswith(KeyNamespaces.APP.value):
+                if child.startswith(KeyNamespaces.LIBRARY.value):
+                    item = LibraryAppItem.from_dict(response_item)
+                elif child.startswith(KeyNamespaces.APP.value):
                     item = ParentAppItem.from_dict(response_item)
                 if item:
                     items.append(item)
@@ -152,7 +196,11 @@ class ParentChildDB:
             item: ParentChildItem = None
             parent = response_item.get('parent', None)
             child = response_item.get('child', None)
-            if child.startswith(KeyNamespaces.APP.value):
+            if not (parent and child):
+                return None
+            if parent.startswith(KeyNamespaces.LIBRARY.value):
+                item = LibraryAppItem.from_dict(response_item)
+            elif child.startswith(KeyNamespaces.APP.value):
                 item = ParentAppItem.from_dict(response_item)
             
             if not item:
@@ -171,3 +219,19 @@ class ParentChildDB:
             print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
+
+    def exists(self, parent: str, child: str) -> bool:
+        try:
+            response = self.table.get_item(
+                Key={
+                    'parent': parent,
+                    'child': child,
+                }
+            )
+        except ClientError as err:
+            print("Couldn't query %s. Here's why: %s: %s", parent,
+                err.response['Error']['Code'], err.response['Error']['Message'])
+            raise
+        else:
+            response_item: Dict = response.get('Item', None) if response else []
+            return response_item is not None

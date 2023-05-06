@@ -4,7 +4,7 @@ import {
 } from "@aws-cdk/aws-lambda-python-alpha";
 import { Duration, Stack, StackProps } from "aws-cdk-lib";
 import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
-import { Key, KeyUsage } from "aws-cdk-lib/aws-kms";
+import { Key, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
 import { MethodConfig } from "../../model";
@@ -38,13 +38,15 @@ export class ApplicantStack extends Stack {
     const appDeleteMethod = this.appDelete(props.stageId, layers);
     this.appMethods.push(appDeleteMethod);
 
-    const authKey = new Key(this, `auth-key`, {
-      enableKeyRotation: true,
+    const authKey = new Key(this, `signing-auth-key`, {
       description: `Auth key for ${props.stageId}`,
-      keyUsage: KeyUsage.ENCRYPT_DECRYPT,
+      keySpec: KeySpec.RSA_2048,
+      keyUsage: KeyUsage.SIGN_VERIFY,
     });
     const authGetMethod = this.authGet(props.stageId, layers, authKey);
     this.authMethods.push(authGetMethod);
+    const authPostMethod = this.authPost(props.stageId, layers, authKey);
+    this.authMethods.push(authPostMethod);
   }
 
   appPost = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
@@ -222,7 +224,7 @@ export class ApplicantStack extends Stack {
       environment: {
         STAGE: stage,
         KMS_KEY_ID: kmsKey.keyId,
-        AUTH_ENDPOINT: "https://auth.mimo.team",
+        AUTH_ENDPOINT: "https://www.mimo.team/auth",
       },
       retryAttempts: 0,
       bundling: {
@@ -230,7 +232,7 @@ export class ApplicantStack extends Stack {
       },
       layers: layers,
     });
-    kmsKey.grantEncryptDecrypt(handler);
+    kmsKey.grant(handler, "kms:Sign");
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
@@ -252,6 +254,70 @@ export class ApplicantStack extends Stack {
       requestParameters: {
         "method.request.querystring.app": true,
       },
+      responseModelOptions: methodResponseOptions,
+      use_authorizer: true,
+    };
+  };
+
+  authPost = (
+    stage: string,
+    layers: PythonLayerVersion[],
+    kmsKey: Key
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `auth-post-lambda`, {
+      entry: path.join(__dirname, "auth"),
+      index: "post.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+        KMS_KEY_ID: kmsKey.keyId,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+    kmsKey.grant(handler, "kms:Verify");
+
+    const methodRequestOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "AuthPostRequest",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          token: {
+            type: JsonSchemaType.STRING,
+          },
+          library: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["token", "library"],
+      },
+    };
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "AuthPostResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          success: {
+            type: JsonSchemaType.BOOLEAN,
+            default: true,
+          },
+        },
+      },
+    };
+
+    return {
+      name: "POST",
+      handler: handler,
+      requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };

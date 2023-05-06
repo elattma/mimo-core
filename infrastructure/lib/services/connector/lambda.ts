@@ -194,6 +194,7 @@ export class ConnectorStack extends Stack {
     return {
       name: "GET",
       handler: handler,
+      idResource: "connection",
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };
@@ -241,6 +242,7 @@ export class ConnectorStack extends Stack {
     return {
       name: "DELETE",
       handler: handler,
+      idResource: "connection",
       responseModelOptions: methodResponseOptions,
       use_authorizer: true,
     };

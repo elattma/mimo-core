@@ -10,6 +10,7 @@ python = "^3.9"
 boto3 = "^1.26.116"
 ulid = "^1.1"
 requests = "^2.29.0"
+pyjwt = {extras = ["crypto"], version = "^2.6.0"}
 
 [build-system]
 requires = ["poetry-core"]

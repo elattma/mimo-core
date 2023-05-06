@@ -57,6 +57,11 @@ export class SsmStack extends Stack {
             authPrefix,
             authStrategy as TokenOAuth2AuthStrategy
           );
+        } else if (authStrategy.type === AuthType.TOKEN_DIRECT) {
+          new StringParameter(this, `${authPrefix}-token_endpoint-parameter`, {
+            parameterName: `${authPrefix}/id`,
+            stringValue: authStrategy.type.toString(),
+          });
         }
       }
     });

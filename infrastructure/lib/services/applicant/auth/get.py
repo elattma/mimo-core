@@ -22,7 +22,6 @@ def handler(event: dict, context):
     auth_endpoint: str = os.getenv('AUTH_ENDPOINT')
     stage: str = os.getenv('STAGE')
 
-
     if not (user and stage and app and kms_key_id and auth_endpoint):
         return to_response_error(Errors.MISSING_PARAMS)
 
@@ -55,7 +54,8 @@ def handler(event: dict, context):
         timestamp=now_timestamp,
         expiration=expiry_timestamp
     )
-    token = _kms.encrypt(payload=payload, key_id=kms_key_id)
+    token = _kms.sign(payload=payload, key_id=kms_key_id)
+    print(token)
     return to_response_success({
         'authLink': '{auth_endpoint}?token={token}'.format(auth_endpoint=auth_endpoint, token=token)
     })
