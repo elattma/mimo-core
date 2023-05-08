@@ -1,7 +1,6 @@
 from typing import Any, Dict, Generator, List
 
 import boto3
-from shared.model import Integration
 
 
 class SSM:

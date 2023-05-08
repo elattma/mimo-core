@@ -9,16 +9,8 @@ HEADERS = {
 }
 
 class Errors(Enum):
-    INVALID_USER = 'invalid user'
     MISSING_PARAMS = 'missing params'
-    DB_WRITE_FAILED = 'db write failed'
-    DB_READ_FAILED = 'db read failed'
-    APP_LIMIT_REACHED = 'app limit reached'
-    USER_NOT_PERMITTED = 'user not permitted'
-    APP_NOT_FOUND = 'app not found'
-    LIBRARY_NOT_FOUND = 'library not found'
-    INVALID_TOKEN = 'invalid token'
-    TOKEN_EXPIRED = 'token expired'
+    INVALID_DEVELOPER = 'invalid developer'
 
 def to_response_error(error_message: Errors):
     return {

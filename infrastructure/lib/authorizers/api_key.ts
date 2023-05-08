@@ -53,7 +53,7 @@ export const handler = async (
       callback("API Key not found!");
     } else {
       const response = await ssmClient.getParameter({
-        Name: `${process.env.DEVELOPER_SECRET_PATH_PREFIX}/${owner}/secret`,
+        Name: `${process.env.DEVELOPER_SECRET_PATH_PREFIX}/${owner}/secret_key`,
         WithDecryption: true,
       });
 

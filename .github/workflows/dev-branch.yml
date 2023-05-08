@@ -26,4 +26,4 @@ jobs:
         working-directory: ./infrastructure
         run: npm run build
       - name: Push to Dev
-        run: git config user.email "admin@mimo.team" && git config user.name "Mimo Admin" && git push origin main:dev
+        run: git config user.email "admin@mimo.team" && git config user.name "Mimo Admin" && git push origin main:dev --force
