@@ -1,7 +1,7 @@
 import { Stack, StackProps } from "aws-cdk-lib";
 import {
   ApiKeySourceType,
-  IAuthorizer,
+  Authorizer,
   IResource,
   LambdaIntegration,
   Period,
@@ -35,7 +35,8 @@ export interface ApiStackProps extends StackProps {
 export class ApiStack extends Stack {
   readonly defaultUsagePlan: MimoUsagePlan;
   readonly api: RestApi;
-  readonly authorizerMap: Map<AuthorizerType, IAuthorizer>;
+  readonly authorizerMap: Map<AuthorizerType, Authorizer>;
+  apiKeyLambda: NodejsFunction;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -46,7 +47,7 @@ export class ApiStack extends Stack {
       props.stageId
     );
     const apiKeyAuthorizer = this.getApiKeyAuthorizer(this.api, props.stageId);
-    this.authorizerMap = new Map<AuthorizerType, IAuthorizer>([
+    this.authorizerMap = new Map<AuthorizerType, Authorizer>([
       [AuthorizerType.APP_OAUTH, appOAuthAuthorizer],
       [AuthorizerType.API_KEY, apiKeyAuthorizer],
     ]);
@@ -113,7 +114,7 @@ export class ApiStack extends Stack {
     return api;
   };
 
-  getAppOAuthAuthorizer = (api: RestApi, stage: string): IAuthorizer => {
+  getAppOAuthAuthorizer = (api: RestApi, stage: string): Authorizer => {
     const auth0SecretName = "beta/Mimo/Integrations/Auth0";
     const auth0Secret = Secret.fromSecretNameV2(
       this,
@@ -141,7 +142,7 @@ export class ApiStack extends Stack {
     return authorizer;
   };
 
-  getApiKeyAuthorizer = (api: RestApi, stage: string): IAuthorizer => {
+  getApiKeyAuthorizer = (api: RestApi, stage: string): Authorizer => {
     const authorizerLambda = new NodejsFunction(
       this,
       "api-key-authorizer-lambda",
@@ -150,10 +151,12 @@ export class ApiStack extends Stack {
         handler: "handler",
         entry: path.join(__dirname, "authorizers/api_key.ts"),
         environment: {
-          STAGE: stage,
+          TABLE_NAME: `mimo-${stage}-pc`,
+          DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer/`,
         },
       }
     );
+    this.apiKeyLambda = authorizerLambda;
     const authorizer = new TokenAuthorizer(this, "api-key-token-authorizer", {
       handler: authorizerLambda,
       authorizerName: "api_key",
@@ -225,7 +228,7 @@ export class ApiStack extends Stack {
         method.responseModelOptions
       );
 
-      let authorizer: IAuthorizer | undefined = this.authorizerMap.get(
+      let authorizer: Authorizer | undefined = this.authorizerMap.get(
         method.authorizerType
       );
 

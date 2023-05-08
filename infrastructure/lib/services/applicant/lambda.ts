@@ -18,6 +18,8 @@ export interface ApplicantStackProps extends StackProps {
 export class ApplicantStack extends Stack {
   readonly appMethods: MethodConfig[] = [];
   readonly authMethods: MethodConfig[] = [];
+  readonly apiKeyMethods: MethodConfig[] = [];
+  readonly developerMethods: MethodConfig[] = [];
 
   constructor(scope: Construct, id: string, props: ApplicantStackProps) {
     super(scope, id, props);
@@ -47,6 +49,14 @@ export class ApplicantStack extends Stack {
     this.authMethods.push(authGetMethod);
     const authPostMethod = this.authPost(props.stageId, layers, authKey);
     this.authMethods.push(authPostMethod);
+
+    const apiKeyPostMethod = this.apiKeyPost(props.stageId, layers);
+    this.apiKeyMethods.push(apiKeyPostMethod);
+    const apiKeyDeleteMethod = this.apiKeyDelete(props.stageId, layers);
+    this.apiKeyMethods.push(apiKeyDeleteMethod);
+
+    const developerGetMethod = this.developerGet(props.stageId, layers);
+    this.developerMethods.push(developerGetMethod);
   }
 
   appPost = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
@@ -318,6 +328,169 @@ export class ApplicantStack extends Stack {
       name: "POST",
       handler: handler,
       requestModelOptions: methodRequestOptions,
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.APP_OAUTH,
+    };
+  };
+
+  apiKeyPost = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
+    const handler = new PythonFunction(this, `api-key-post-lambda`, {
+      entry: path.join(__dirname, "api_key"),
+      index: "post.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodRequestOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "ApiKeyPostRequest",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          app: {
+            type: JsonSchemaType.STRING,
+          },
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["app", "name"],
+      },
+    };
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "ApiKeyPostResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          apiKey: {
+            type: JsonSchemaType.OBJECT,
+            properties: {
+              id: {
+                type: JsonSchemaType.STRING,
+              },
+              name: {
+                type: JsonSchemaType.STRING,
+              },
+              app: {
+                type: JsonSchemaType.STRING,
+              },
+              owner: {
+                type: JsonSchemaType.STRING,
+              },
+              created_at: {
+                type: JsonSchemaType.INTEGER,
+              },
+            },
+          },
+        },
+      },
+    };
+
+    return {
+      name: "POST",
+      handler: handler,
+      requestModelOptions: methodRequestOptions,
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.APP_OAUTH,
+    };
+  };
+
+  apiKeyDelete = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `api-key-delete-lambda`, {
+      entry: path.join(__dirname, "api_key"),
+      index: "delete.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "ApiKeyDeleteResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          success: {
+            type: JsonSchemaType.BOOLEAN,
+            default: true,
+          },
+        },
+      },
+    };
+
+    return {
+      name: "DELETE",
+      handler: handler,
+      requestParameters: {
+        "method.request.querystring.apiKey": true,
+        "method.request.querystring.app": true,
+      },
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.APP_OAUTH,
+    };
+  };
+
+  developerGet = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `developer-get-lambda`, {
+      entry: path.join(__dirname, "developer"),
+      index: "get.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer/`,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "DeveloperGetResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          secret_key: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+      },
+    };
+
+    return {
+      name: "GET",
+      handler: handler,
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
     };

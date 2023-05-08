@@ -99,6 +99,14 @@ export class MimoStage extends Stage {
           path: "auth",
           methods: applicantService.authMethods,
         },
+        {
+          path: "api_key",
+          methods: applicantService.apiKeyMethods,
+        },
+        {
+          path: "developer",
+          methods: applicantService.developerMethods,
+        },
       ],
     });
     const api = new ApiStack(this, "api", {
@@ -106,6 +114,13 @@ export class MimoStage extends Stage {
       domainName: props.domainName,
       routeConfigs: routeConfigs,
     });
+    dynamo.mimoTable.grantReadData(api.apiKeyLambda);
+    api.apiKeyLambda.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+        resources: ["*"],
+      })
+    );
 
     for (const method of connectorService.methods) {
       secrets.grantRead(method.handler);
@@ -113,7 +128,7 @@ export class MimoStage extends Stage {
       method.handler.addToRolePolicy(
         new PolicyStatement({
           actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
-          resources: [`*`],
+          resources: ["*"],
         })
       );
       if (method.name === "GET") {
@@ -140,7 +155,7 @@ export class MimoStage extends Stage {
       method.handler.addToRolePolicy(
         new PolicyStatement({
           actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
-          resources: [`*`],
+          resources: ["*"],
         })
       );
     }
@@ -151,7 +166,7 @@ export class MimoStage extends Stage {
       method.handler.addToRolePolicy(
         new PolicyStatement({
           actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
-          resources: [`*`],
+          resources: ["*"],
         })
       );
       method.handler.addToRolePolicy(
@@ -173,7 +188,7 @@ export class MimoStage extends Stage {
       method.handler.addToRolePolicy(
         new PolicyStatement({
           actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
-          resources: [`*`],
+          resources: ["*"],
         })
       );
       method.handler.addToRolePolicy(
@@ -195,6 +210,25 @@ export class MimoStage extends Stage {
       } else if (method.name === "DELETE") {
         dynamo.mimoTable.grantWriteData(method.handler);
       }
+    }
+
+    for (const method of applicantService.apiKeyMethods) {
+      if (method.name === "GET") {
+        dynamo.mimoTable.grantReadData(method.handler);
+      } else if (method.name === "POST") {
+        dynamo.mimoTable.grantReadWriteData(method.handler);
+      } else if (method.name === "DELETE") {
+        dynamo.mimoTable.grantWriteData(method.handler);
+      }
+    }
+
+    for (const method of applicantService.developerMethods) {
+      method.handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+          resources: ["*"],
+        })
+      );
     }
 
     const ssm = new SsmStack(this, "ssm", {

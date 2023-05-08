@@ -36,8 +36,6 @@ def handler(event: dict, context):
         return to_response_error(Errors.DB_READ_FAILED)
     if len(apps) >= 10:
         return to_response_error(Errors.APP_LIMIT_REACHED)
-    elif len(apps) < 1:
-        return to_response_error(Errors.APP_LIMIT_REACHED)
 
     now_timestamp: int = int(time())
     app_id = ulid()
