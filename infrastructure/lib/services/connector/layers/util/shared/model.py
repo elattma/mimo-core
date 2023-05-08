@@ -112,7 +112,7 @@ class Auth(ABC):
             print(f'auth not found for {type}')
             return None
 
-        return cls.subclasses[type](**kwargs)
+        return cls.subclasses[type](type, **kwargs)
 
     @classmethod
     @abstractmethod
@@ -123,9 +123,10 @@ class Auth(ABC):
     def is_valid(self):
         pass
 
-    def __str__(self):
-        return f'Auth(type={self.type})'
-
+    @abstractmethod
+    def as_dict(self):
+        pass
+    
 @dataclass
 class TokenAuth(Auth):
     access_token: str
@@ -139,7 +140,16 @@ class TokenAuth(Auth):
 
     def is_valid(self):
         return self.access_token or self.refresh_token
-
+    
+    def as_dict(self):
+        return {
+            'type': self.type.value,
+            'access_token': self.access_token,
+            'refresh_token': self.refresh_token,
+            'timestamp': self.timestamp,
+            'expiry_timestamp': self.expiry_timestamp,
+        }
+    
 @dataclass
 class Connection:
     id: str = None

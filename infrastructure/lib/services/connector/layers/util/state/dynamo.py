@@ -6,7 +6,7 @@ from typing import Dict, List
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from shared.model import AuthType, Connection, Library, TokenAuth
+from shared.model import Auth, AuthType, Connection, Library
 
 
 class KeyNamespaces(Enum):
@@ -108,7 +108,7 @@ class LibraryConnectionItem(ParentChildItem):
             'child': self.get_child(),
             'name': self.connection.name,
             'integration': self.connection.integration,
-            'auth': self.connection.auth.__dict__,
+            'auth': self.connection.auth.as_dict() if self.connection.auth else None,
             'created_at': self.connection.created_at,
             'ingested_at': self.connection.ingested_at,
         }
@@ -124,11 +124,10 @@ class LibraryConnectionItem(ParentChildItem):
             return None
         
         auth: dict = item.get('auth', None)
-        auth_type: dict = auth.get('type', None) if auth else None
-        if auth_type == AuthType.TOKEN_OAUTH2.value:
-            auth = TokenAuth(**auth)
-        else:
-            return None
+        auth_type = auth.get('type', None) if auth else None
+        auth_type: AuthType = AuthType(auth_type) if auth_type else None
+        auth.pop('type', None)
+        auth = Auth.create(auth_type, **auth) if auth else None
         
         name = item.get('name', None)
         integration = item.get('integration', None)

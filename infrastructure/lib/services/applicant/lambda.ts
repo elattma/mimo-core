@@ -7,7 +7,7 @@ import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
 import { Key, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
-import { MethodConfig } from "../../model";
+import { AuthorizerType, MethodConfig } from "../../model";
 import path = require("path");
 
 export interface ApplicantStackProps extends StackProps {
@@ -106,7 +106,7 @@ export class ApplicantStack extends Stack {
       handler: handler,
       requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 
@@ -164,7 +164,7 @@ export class ApplicantStack extends Stack {
       handler: handler,
       idResource: "app",
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 
@@ -205,7 +205,7 @@ export class ApplicantStack extends Stack {
       handler: handler,
       idResource: "app",
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 
@@ -255,7 +255,7 @@ export class ApplicantStack extends Stack {
         "method.request.querystring.app": true,
       },
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.API_KEY,
     };
   };
 
@@ -319,7 +319,7 @@ export class ApplicantStack extends Stack {
       handler: handler,
       requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 }

@@ -6,13 +6,14 @@ from typing import Dict, List
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from shared.model import App
+from shared.model import ApiKey, App
 
 
 class KeyNamespaces(Enum):
     USER = "USER#"
     LIBRARY = "LIBRARY#"
     APP = "APP#"
+    API_KEY = "API_KEY#"
 
 @dataclass
 class ParentChildItem(ABC):
@@ -126,6 +127,53 @@ class LibraryAppItem(ParentChildItem):
             parent=parent,
             app_id=app_id,
             created_at=created_at,
+        )
+    
+@dataclass
+class AppApiKeyItem(ParentChildItem):
+    api_key: ApiKey = None
+
+    def get_raw_child(self):
+        return self.api_key.id if self.api_key else None
+    
+    def get_child(self):
+        return KeyNamespaces.API_KEY.value + self.api_key.id if self.api_key else None
+    
+    def is_valid(self):
+        return self.parent and self.api_key and self.api_key.is_valid()
+    
+    def as_dict(self):
+        if not self.is_valid():
+            return None
+        
+        return {
+            'parent': self.parent,
+            'child': self.get_child(),
+            'name': self.api_key.name,
+            'created_at': self.api_key.created_at
+        }
+    
+    @staticmethod
+    def from_dict(item: dict):
+        if not item:
+            return None
+        
+        parent: str = item.get('parent', None)
+        child: str = item.get('child', None)
+        if not (parent and child):
+            return None
+        
+        name = item.get('name', None)
+        created_at = item.get('created_at', None)
+        api_key = ApiKey(
+            id=child.split('#')[-1],
+            name=name,
+            created_at=int(created_at) if created_at else None,
+        )
+
+        return AppApiKeyItem(
+            parent=parent,
+            api_key=api_key,
         )
     
 class ParentChildDB:

@@ -18,7 +18,12 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
-import { MimoUsagePlan, RouteConfig, UsageConfig } from "./model";
+import {
+  AuthorizerType,
+  MimoUsagePlan,
+  RouteConfig,
+  UsageConfig,
+} from "./model";
 import path = require("path");
 
 export interface ApiStackProps extends StackProps {
@@ -30,12 +35,21 @@ export interface ApiStackProps extends StackProps {
 export class ApiStack extends Stack {
   readonly defaultUsagePlan: MimoUsagePlan;
   readonly api: RestApi;
+  readonly authorizerMap: Map<AuthorizerType, IAuthorizer>;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
     this.api = this.getRestApi(props.stageId, props.domainName);
-    const authorizer = this.getAuthorizer(this.api, props.stageId);
+    const appOAuthAuthorizer = this.getAppOAuthAuthorizer(
+      this.api,
+      props.stageId
+    );
+    const apiKeyAuthorizer = this.getApiKeyAuthorizer(this.api, props.stageId);
+    this.authorizerMap = new Map<AuthorizerType, IAuthorizer>([
+      [AuthorizerType.APP_OAUTH, appOAuthAuthorizer],
+      [AuthorizerType.API_KEY, apiKeyAuthorizer],
+    ]);
 
     const defaultUsageConfig: UsageConfig = {
       quotaLimit: 100,
@@ -57,7 +71,7 @@ export class ApiStack extends Stack {
     };
 
     for (const routeConfig of props.routeConfigs) {
-      this.getRoute(this.api, this.api.root, routeConfig, authorizer);
+      this.getRoute(this.api, this.api.root, routeConfig);
     }
   }
 
@@ -99,26 +113,51 @@ export class ApiStack extends Stack {
     return api;
   };
 
-  getAuthorizer = (api: RestApi, stage: string): IAuthorizer => {
+  getAppOAuthAuthorizer = (api: RestApi, stage: string): IAuthorizer => {
     const auth0SecretName = "beta/Mimo/Integrations/Auth0";
     const auth0Secret = Secret.fromSecretNameV2(
       this,
       "auth0-secret",
       auth0SecretName
     );
-    const authorizerLambda = new NodejsFunction(this, "authorizer-lambda", {
-      runtime: Runtime.NODEJS_18_X,
-      handler: "handler",
-      entry: path.join(__dirname, "authorizers/token.ts"),
-      environment: {
-        STAGE: "beta",
-      },
-    });
-    const authorizer = new TokenAuthorizer(this, "token-authorizer", {
+    const authorizerLambda = new NodejsFunction(
+      this,
+      "app-oauth-authorizer-lambda",
+      {
+        runtime: Runtime.NODEJS_18_X,
+        handler: "handler",
+        entry: path.join(__dirname, "authorizers/app_oauth.ts"),
+        environment: {
+          STAGE: "beta",
+        },
+      }
+    );
+    const authorizer = new TokenAuthorizer(this, "app-oauth-token-authorizer", {
       handler: authorizerLambda,
-      authorizerName: "token_auth",
+      authorizerName: "oauth_token",
     });
     auth0Secret.grantRead(authorizerLambda);
+    authorizer._attachToApi(api);
+    return authorizer;
+  };
+
+  getApiKeyAuthorizer = (api: RestApi, stage: string): IAuthorizer => {
+    const authorizerLambda = new NodejsFunction(
+      this,
+      "api-key-authorizer-lambda",
+      {
+        runtime: Runtime.NODEJS_18_X,
+        handler: "handler",
+        entry: path.join(__dirname, "authorizers/api_key.ts"),
+        environment: {
+          STAGE: stage,
+        },
+      }
+    );
+    const authorizer = new TokenAuthorizer(this, "api-key-token-authorizer", {
+      handler: authorizerLambda,
+      authorizerName: "api_key",
+    });
     authorizer._attachToApi(api);
     return authorizer;
   };
@@ -148,12 +187,7 @@ export class ApiStack extends Stack {
     });
   };
 
-  getRoute = (
-    api: RestApi,
-    resource: IResource,
-    routeConfig: RouteConfig,
-    authorizer: IAuthorizer
-  ) => {
+  getRoute = (api: RestApi, resource: IResource, routeConfig: RouteConfig) => {
     const route = resource.addResource(routeConfig.path);
     let idRoute = undefined;
     if (routeConfig.idResource) {
@@ -161,7 +195,7 @@ export class ApiStack extends Stack {
     }
     if (routeConfig.subRoutes) {
       for (const subRoute of routeConfig.subRoutes) {
-        this.getRoute(api, route, subRoute, authorizer);
+        this.getRoute(api, route, subRoute);
       }
     }
     const requestValidator = api.addRequestValidator(
@@ -191,9 +225,12 @@ export class ApiStack extends Stack {
         method.responseModelOptions
       );
 
+      let authorizer: IAuthorizer | undefined = this.authorizerMap.get(
+        method.authorizerType
+      );
+
       route.addMethod(method.name, new LambdaIntegration(method.handler), {
-        authorizer: method.use_authorizer ? authorizer : undefined,
-        apiKeyRequired: method.api_key_required,
+        authorizer: authorizer,
         requestValidator: requestValidator,
         requestModels: requestModel
           ? {
@@ -218,8 +255,7 @@ export class ApiStack extends Stack {
 
       if (method.idResource && idRoute) {
         idRoute.addMethod(method.name, new LambdaIntegration(method.handler), {
-          authorizer: method.use_authorizer ? authorizer : undefined,
-          apiKeyRequired: method.api_key_required,
+          authorizer: authorizer,
           requestValidator: requestValidator,
           requestModels: requestModel
             ? {

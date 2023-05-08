@@ -6,7 +6,7 @@ import { Duration, Stack, StackProps } from "aws-cdk-lib";
 import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
-import { MethodConfig } from "../../model";
+import { AuthorizerType, MethodConfig } from "../../model";
 import path = require("path");
 
 export interface ConnectorStackProps extends StackProps {
@@ -132,7 +132,7 @@ export class ConnectorStack extends Stack {
       handler: handler,
       requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 
@@ -196,7 +196,7 @@ export class ConnectorStack extends Stack {
       handler: handler,
       idResource: "connection",
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 
@@ -244,7 +244,7 @@ export class ConnectorStack extends Stack {
       handler: handler,
       idResource: "connection",
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 
@@ -311,7 +311,7 @@ export class ConnectorStack extends Stack {
       name: "GET",
       handler: handler,
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 
@@ -373,7 +373,7 @@ export class ConnectorStack extends Stack {
       handler: handler,
       idResource: "library",
       responseModelOptions: methodResponseOptions,
-      use_authorizer: true,
+      authorizerType: AuthorizerType.APP_OAUTH,
     };
   };
 }

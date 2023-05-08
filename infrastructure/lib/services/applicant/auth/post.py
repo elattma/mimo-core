@@ -60,6 +60,8 @@ def handler(event: dict, context):
         return to_response_error(Errors.APP_NOT_FOUND)
     
     now_timestamp = int(time())
+    if now_timestamp > payload.expiration:
+        return to_response_error(Errors.TOKEN_EXPIRED)
     try:
         library_app_item: LibraryAppItem = LibraryAppItem(
             parent='{namespace}{library}'.format(namespace=KeyNamespaces.LIBRARY.value, library=library),

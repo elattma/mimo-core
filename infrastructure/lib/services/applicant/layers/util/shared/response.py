@@ -18,6 +18,7 @@ class Errors(Enum):
     APP_NOT_FOUND = 'app not found'
     LIBRARY_NOT_FOUND = 'library not found'
     INVALID_TOKEN = 'invalid token'
+    TOKEN_EXPIRED = 'token expired'
 
 def to_response_error(error_message: Errors):
     return {

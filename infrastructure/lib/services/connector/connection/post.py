@@ -6,8 +6,7 @@ from typing import Dict
 from auth.authorizer import Authorizer
 from shared.model import Auth, AuthType, Connection, Integration, TokenAuth
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import (KeyNamespaces, LibraryConnectionItem, ParentChildDB,
-                          UserConnectionItem)
+from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
 from state.params import SSM
 from ulid import ulid
 
@@ -35,15 +34,15 @@ def handler(event: dict, context):
 
     now_timestamp: int = int(time())
 
-    auth: Auth = None    
+    if not _integrations_dict:
+        _ssm = SSM()
+        integration_params = _ssm.load_params(integrations_path)
+        _integrations_dict = {}
+        for id, integration_params in integration_params.items():
+            _integrations_dict[id] = Integration.from_dict(integration_params)
+    integration: Integration = _integrations_dict.get(integration_id) if _integrations_dict else None
+    auth: Auth = None
     if type == AuthType.TOKEN_OAUTH2.value:
-        if not _integrations_dict:
-            _ssm = SSM()
-            integration_params = _ssm.load_params(integrations_path)
-            _integrations_dict = {}
-            for id, integration_params in integration_params.items():
-                _integrations_dict[id] = Integration.from_dict(integration_params)
-        integration: Integration = _integrations_dict.get(integration_id) if _integrations_dict else None
         code: str = auth_strategy.get('code', None) if auth_strategy else None
         redirect_uri: str = auth_strategy.get('redirect_uri', None) if auth_strategy else None
         auth_strategy = integration.auth_strategies.get(AuthType.TOKEN_OAUTH2, None)
@@ -61,7 +60,7 @@ def handler(event: dict, context):
             refresh_token=refresh_token,
             timestamp=now_timestamp
         )
-        
+
     if not auth:
         return to_response_error(Errors.AUTH_FAILED)
     

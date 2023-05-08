@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Dict
 
 
 @dataclass
@@ -29,7 +30,7 @@ class Payload:
         if not item:
             return None
         
-        app = item.get('app', None)
+        app: Dict = item.get('app', None)
         user = item.get('user', None)
         timestamp = item.get('timestamp', None)
         expiration = item.get('expiration', None)

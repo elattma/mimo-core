@@ -6,7 +6,7 @@ import { Duration, Stack, StackProps } from "aws-cdk-lib";
 import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
-import { MethodConfig } from "../../model";
+import { AuthorizerType, MethodConfig } from "../../model";
 import path = require("path");
 
 export interface UsageMonitorStackProps extends StackProps {
@@ -61,7 +61,7 @@ export class UsageMonitorStack extends Stack {
               remaining: {
                 type: JsonSchemaType.INTEGER,
               },
-            }
+            },
           },
         },
         required: ["usage"],
@@ -71,8 +71,7 @@ export class UsageMonitorStack extends Stack {
     return {
       name: "GET",
       handler: handler,
-      use_authorizer: true,
-      api_key_required: false,
+      authorizerType: AuthorizerType.APP_OAUTH,
       responseModelOptions: methodResponseOptions,
     };
   };

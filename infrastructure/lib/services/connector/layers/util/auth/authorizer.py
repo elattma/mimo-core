@@ -60,7 +60,7 @@ class Authorizer:
         print(timestamp)
         print(expiry_timestamp)
         return TokenAuth(
-            type=AuthType.TOKEN,
+            type=AuthType.TOKEN_OAUTH2,
             access_token=access_token,
             refresh_token=refresh_token,
             timestamp=timestamp,

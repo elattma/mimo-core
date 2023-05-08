@@ -6,7 +6,7 @@ import { Duration, Stack, StackProps } from "aws-cdk-lib";
 import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
-import { MethodConfig } from "../../model";
+import { AuthorizerType, MethodConfig } from "../../model";
 import path = require("path");
 
 export interface DetectiveStackProps extends StackProps {
@@ -98,8 +98,7 @@ export class DetectiveStack extends Stack {
         "method.request.querystring.max_tokens": false,
         "method.request.querystring.next_token": false,
       },
-      use_authorizer: false,
-      api_key_required: true,
+      authorizerType: AuthorizerType.API_KEY,
       responseModelOptions: methodResponseOptions,
     };
   };
