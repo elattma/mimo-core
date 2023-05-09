@@ -220,6 +220,8 @@ class ParentChildDB:
                     item = LibraryAppItem.from_dict(response_item)
                 elif child.startswith(KeyNamespaces.APP.value):
                     item = ParentAppItem.from_dict(response_item)
+                elif child.startswith(KeyNamespaces.API_KEY.value):
+                    item = AppApiKeyItem.from_dict(response_item)
                 if item:
                     items.append(item)
                 else:
@@ -250,6 +252,8 @@ class ParentChildDB:
                 item = LibraryAppItem.from_dict(response_item)
             elif child.startswith(KeyNamespaces.APP.value):
                 item = ParentAppItem.from_dict(response_item)
+            elif child.startswith(KeyNamespaces.API_KEY.value):
+                item = AppApiKeyItem.from_dict(response_item)
             
             if not item:
                 print("invalid item!")

@@ -25,7 +25,7 @@ def handler(event: dict, context):
         return to_response_error(Errors.MISSING_PARAMS)
     
     if not _db:
-        _db = ParentChildDB(stage)
+        _db = ParentChildDB(f'mimo-{stage}-pc')
     
     api_key = ApiKey(
         id=str(uuid4()),
