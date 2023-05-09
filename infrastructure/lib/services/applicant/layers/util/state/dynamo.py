@@ -150,6 +150,8 @@ class AppApiKeyItem(ParentChildItem):
             'parent': self.parent,
             'child': self.get_child(),
             'name': self.api_key.name,
+            'app': self.api_key.app,
+            'owner': self.api_key.owner,
             'created_at': self.api_key.created_at
         }
     
@@ -164,10 +166,14 @@ class AppApiKeyItem(ParentChildItem):
             return None
         
         name = item.get('name', None)
+        app = item.get('app', None)
+        owner = item.get('owner', None)
         created_at = item.get('created_at', None)
         api_key = ApiKey(
             id=child.split('#')[-1],
             name=name,
+            app=app,
+            owner=owner,
             created_at=int(created_at) if created_at else None,
         )
 

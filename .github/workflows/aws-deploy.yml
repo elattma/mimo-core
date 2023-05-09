@@ -27,6 +27,6 @@ jobs:
       - name: Synth stack
         working-directory: ./infrastructure
         run: npx cdk synth
-      - name: Deploy stack
-        working-directory: ./infrastructure
-        run: npx cdk deploy "mimo-${GITHUB_REF##*/}/*" --require-approval never --asset-parallelism true --concurrency 10
+      # - name: Deploy stack
+      #   working-directory: ./infrastructure
+      #   run: npx cdk deploy "mimo-${GITHUB_REF##*/}/*" --require-approval never --asset-parallelism true --concurrency 10
