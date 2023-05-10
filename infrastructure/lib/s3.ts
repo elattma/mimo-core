@@ -35,5 +35,11 @@ export class S3Stack extends Stack {
       destinationBucket: this.assetsBucket,
       destinationKeyPrefix: "icons",
     });
+
+    new BucketDeployment(this, "logos-deployment", {
+      sources: [Source.asset(path.join(__dirname, "./logos"))],
+      destinationBucket: this.assetsBucket,
+      destinationKeyPrefix: "logos",
+    });
   }
 }

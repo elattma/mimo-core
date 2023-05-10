@@ -59,7 +59,7 @@ export class MimoStage extends Stage {
       stageId: props.stageId,
     });
     routeConfigs.push({
-      path: "connector",
+      path: "connection",
       methods: connectorService.methods,
       idResource: "connection",
       subRoutes: [
@@ -75,8 +75,13 @@ export class MimoStage extends Stage {
       ],
     });
     routeConfigs.push({
-      path: "context",
-      methods: detectiveService.methods,
+      path: "v1",
+      subRoutes: [
+        {
+          path: "context",
+          methods: detectiveService.methods,
+        },
+      ],
     });
     routeConfigs.push({
       path: "usage",

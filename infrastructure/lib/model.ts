@@ -21,7 +21,7 @@ export interface MethodConfig {
 
 export interface RouteConfig {
   path: string;
-  methods: MethodConfig[];
+  methods?: MethodConfig[];
   subRoutes?: RouteConfig[];
   idResource?: string;
 }

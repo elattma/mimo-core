@@ -201,6 +201,9 @@ export class ApiStack extends Stack {
         this.getRoute(api, route, subRoute);
       }
     }
+    if (!routeConfig.methods) {
+      return;
+    }
     const requestValidator = api.addRequestValidator(
       `${routeConfig.path}-request-validator`,
       {
