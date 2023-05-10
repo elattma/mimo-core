@@ -38,7 +38,7 @@ def handler(event: dict, context):
         item = AppApiKeyItem(
             parent='{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app),
             api_key=api_key
-        )
+        ) 
         _db.write([item])
     except Exception as e:
         print(e)

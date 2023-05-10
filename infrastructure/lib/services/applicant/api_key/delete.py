@@ -13,18 +13,18 @@ def handler(event: dict, context):
     user: str = authorizer.get('principalId', None) if authorizer else None
     stage: str = os.getenv('STAGE')
     query_params: dict = event.get('queryStringParameters', None) if event else None
-    api_key: str = query_params.get('apiKey', None) if query_params else None
+    id: str = query_params.get('id', None) if query_params else None
     app: str = query_params.get('app', None) if query_params else None
 
-    if not (user and stage and api_key and app):
+    if not (user and stage and id and app):
         return to_response_error(Errors.MISSING_PARAMS)
     
     if not _db:
-        _db = ParentChildDB(stage)
+        _db = ParentChildDB(f'mimo-{stage}-pc')
     
     try:
         parent_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app)
-        child_key = '{namespace}{api_key}'.format(namespace=KeyNamespaces.API_KEY.value, api_key=api_key)
+        child_key = '{namespace}{api_key}'.format(namespace=KeyNamespaces.API_KEY.value, api_key=id)
         _db.delete(parent_key, child_key)
     except Exception as e:
         print(e)

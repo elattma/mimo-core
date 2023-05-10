@@ -55,7 +55,6 @@ def handler(event: dict, context):
         expiration=expiry_timestamp
     )
     token = _kms.sign(payload=payload, key_id=kms_key_id)
-    print(token)
     return to_response_success({
         'authLink': '{auth_endpoint}?token={token}'.format(auth_endpoint=auth_endpoint, token=token)
     })

@@ -36,7 +36,6 @@ export const handler = async (
       callback("Invalid Authorization header format");
     }
 
-    // query secondary index for api key prefixed with API_KEY# and no secondary key
     const items = await dynamoClient.query({
       TableName: process.env.TABLE_NAME,
       IndexName: "child-index",
@@ -49,11 +48,12 @@ export const handler = async (
     });
     const key = items.Items?.[0];
     const owner = key?.["owner"]?.S;
+    const ownerSanitized = owner?.replace(/[^a-zA-Z0-9._]/g, "-");
     if (!key) {
       callback("API Key not found!");
     } else {
       const response = await ssmClient.getParameter({
-        Name: `${process.env.DEVELOPER_SECRET_PATH_PREFIX}/${owner}/secret_key`,
+        Name: `${process.env.DEVELOPER_SECRET_PATH_PREFIX}/${ownerSanitized}/secret_key`,
         WithDecryption: true,
       });
 
@@ -61,9 +61,10 @@ export const handler = async (
         callback("Not a valid developer!");
       }
 
-      callback(null, generatePolicy(key.name, "Allow", "*"));
+      callback(null, generatePolicy(owner, "Allow", "*"));
     }
   } catch (error) {
+    console.log(error);
     callback("Unauthorized");
   }
 };

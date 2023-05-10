@@ -16,6 +16,7 @@ def handler(event: dict, context):
     user: str = authorizer.get('principalId', None) if authorizer else None
     path_parameters: dict = event.get('pathParameters', None) if event else None
     app: str = path_parameters.get('app', None) if path_parameters else None
+    query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     stage: str = os.getenv('STAGE')
 
     if not (user and stage):
@@ -39,7 +40,8 @@ def handler(event: dict, context):
             response_apps = [user_app_item.app]
             response_api_keys = get_api_keys(app)
         except Exception as e:
-            return to_response_error(Errors.DB_WRITE_FAILED)
+            print(e)
+            return to_response_error(Errors.DB_READ_FAILED)
     return to_response_success({
         'apps': [{
             'id': app.id,

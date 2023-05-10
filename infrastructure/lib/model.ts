@@ -11,6 +11,7 @@ export interface MethodConfig {
   handler: PythonFunction;
   responseModelOptions: ModelOptions;
   authorizerType: AuthorizerType;
+  apiKeyRequired?: boolean;
   requestModelOptions?: ModelOptions;
   idResource?: string;
   requestParameters?: {

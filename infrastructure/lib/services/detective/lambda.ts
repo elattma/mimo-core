@@ -98,6 +98,7 @@ export class DetectiveStack extends Stack {
         "method.request.querystring.max_tokens": false,
         "method.request.querystring.next_token": false,
       },
+      apiKeyRequired: true,
       authorizerType: AuthorizerType.API_KEY,
       responseModelOptions: methodResponseOptions,
     };

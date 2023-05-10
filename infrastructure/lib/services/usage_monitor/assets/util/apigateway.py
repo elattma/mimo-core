@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import List
 
 import boto3
 
@@ -17,12 +18,9 @@ class ApiGateway:
             self._apigateway = boto3.client('apigateway')
         self._rest_api_id = rest_api_id
 
-    def _get_api_key_name(self, user: str, stage: str) -> str:
-        return f'{stage}-{user}'
-
-    def get_id(self, user: str, stage: str) -> str:
+    def get_id(self, user: str) -> str:
         response = self._apigateway.get_api_keys(
-            nameQuery=self._get_api_key_name(user, stage),
+            nameQuery=user,
             includeValues=True,
         )
 
@@ -30,7 +28,20 @@ class ApiGateway:
         id = items[0].get('id', None) if items else None
         return id
 
-    def get_usage(self, usage_plan_id: str, key_id: str) -> SingleDayUsage:
+    def get_usage(self, key_id: str) -> SingleDayUsage:
+        response = self._apigateway.get_usage_plans(
+            keyId=key_id
+        )
+        usage_plan_id = None
+        for usage_plan in response.items:
+            api_stages = usage_plan.get('apiStages', [])
+            for api_stage in api_stages:
+                if api_stage.get('apiId') == self._rest_api_id:
+                    usage_plan_id = usage_plan.get('id', None)
+                    break
+        if not usage_plan_id:
+            return None
+
         todays_date = datetime.today().strftime('%Y-%m-%d')
         usage_response = self._apigateway.get_usage(
             usagePlanId=usage_plan_id,

@@ -446,7 +446,7 @@ export class ApplicantStack extends Stack {
       name: "DELETE",
       handler: handler,
       requestParameters: {
-        "method.request.querystring.apiKey": true,
+        "method.request.querystring.id": true,
         "method.request.querystring.app": true,
       },
       responseModelOptions: methodResponseOptions,
@@ -466,7 +466,7 @@ export class ApplicantStack extends Stack {
       timeout: Duration.seconds(30),
       memorySize: 1024,
       environment: {
-        DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer/`,
+        DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer`,
       },
       retryAttempts: 0,
       bundling: {

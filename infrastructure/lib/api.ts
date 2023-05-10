@@ -152,7 +152,7 @@ export class ApiStack extends Stack {
         entry: path.join(__dirname, "authorizers/api_key.ts"),
         environment: {
           TABLE_NAME: `mimo-${stage}-pc`,
-          DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer/`,
+          DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer`,
         },
       }
     );
@@ -234,6 +234,7 @@ export class ApiStack extends Stack {
 
       route.addMethod(method.name, new LambdaIntegration(method.handler), {
         authorizer: authorizer,
+        apiKeyRequired: method.apiKeyRequired,
         requestValidator: requestValidator,
         requestModels: requestModel
           ? {
@@ -259,6 +260,7 @@ export class ApiStack extends Stack {
       if (method.idResource && idRoute) {
         idRoute.addMethod(method.name, new LambdaIntegration(method.handler), {
           authorizer: authorizer,
+          apiKeyRequired: method.apiKeyRequired,
           requestValidator: requestValidator,
           requestModels: requestModel
             ? {
