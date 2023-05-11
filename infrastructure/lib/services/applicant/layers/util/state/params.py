@@ -41,3 +41,12 @@ class SSM:
                 accumulator = accumulator[name]
             accumulator[path_list[-1]] = parameter.get('Value')
         return params
+
+    def set_param(self, path: str, value: str) -> bool:
+        response = self._ssm.put_parameter(
+            Name='{path}'.format(path=path),
+            Value=value,
+            Type='SecureString',
+            Overwrite=True
+        )
+        return response.get('ResponseMetadata', {}).get('HTTPStatusCode', 0) == 200

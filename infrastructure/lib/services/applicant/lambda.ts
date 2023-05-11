@@ -20,6 +20,8 @@ export class ApplicantStack extends Stack {
   readonly authMethods: MethodConfig[] = [];
   readonly apiKeyMethods: MethodConfig[] = [];
   readonly developerMethods: MethodConfig[] = [];
+  readonly v1AuthMethods: MethodConfig[] = [];
+  readonly v1LibraryMethods: MethodConfig[] = [];
 
   constructor(scope: Construct, id: string, props: ApplicantStackProps) {
     super(scope, id, props);
@@ -45,8 +47,6 @@ export class ApplicantStack extends Stack {
       keySpec: KeySpec.RSA_2048,
       keyUsage: KeyUsage.SIGN_VERIFY,
     });
-    const authGetMethod = this.authGet(props.stageId, layers, authKey);
-    this.authMethods.push(authGetMethod);
     const authPostMethod = this.authPost(props.stageId, layers, authKey);
     this.authMethods.push(authPostMethod);
 
@@ -57,6 +57,16 @@ export class ApplicantStack extends Stack {
 
     const developerGetMethod = this.developerGet(props.stageId, layers);
     this.developerMethods.push(developerGetMethod);
+    const developerPatchMethod = this.developerPatch(props.stageId, layers);
+    this.developerMethods.push(developerPatchMethod);
+
+    const v1AuthGetMethod = this.v1AuthGet(props.stageId, layers, authKey);
+    this.v1AuthMethods.push(v1AuthGetMethod);
+    const v1AuthDeleteMethod = this.v1AuthDelete(props.stageId, layers);
+    this.v1AuthMethods.push(v1AuthDeleteMethod);
+
+    const v1LibraryGetMethod = this.v1LibraryGet(props.stageId, layers);
+    this.v1LibraryMethods.push(v1LibraryGetMethod);
   }
 
   appPost = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
@@ -216,56 +226,6 @@ export class ApplicantStack extends Stack {
       idResource: "app",
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
-    };
-  };
-
-  authGet = (
-    stage: string,
-    layers: PythonLayerVersion[],
-    kmsKey: Key
-  ): MethodConfig => {
-    const handler = new PythonFunction(this, `auth-get-lambda`, {
-      entry: path.join(__dirname, "auth"),
-      index: "get.py",
-      runtime: Runtime.PYTHON_3_9,
-      handler: "handler",
-      timeout: Duration.seconds(30),
-      memorySize: 1024,
-      environment: {
-        STAGE: stage,
-        KMS_KEY_ID: kmsKey.keyId,
-        AUTH_ENDPOINT: "https://www.mimo.team/auth",
-      },
-      retryAttempts: 0,
-      bundling: {
-        assetExcludes: ["**.venv**", "**__pycache__**"],
-      },
-      layers: layers,
-    });
-    kmsKey.grant(handler, "kms:Sign");
-
-    const methodResponseOptions: ModelOptions = {
-      contentType: "application/json",
-      modelName: "AuthGetResponse",
-      schema: {
-        type: JsonSchemaType.OBJECT,
-        properties: {
-          authLink: {
-            type: JsonSchemaType.STRING,
-          },
-        },
-        required: ["authLink"],
-      },
-    };
-
-    return {
-      name: "GET",
-      handler: handler,
-      requestParameters: {
-        "method.request.querystring.app": true,
-      },
-      responseModelOptions: methodResponseOptions,
-      authorizerType: AuthorizerType.API_KEY,
     };
   };
 
@@ -493,6 +453,220 @@ export class ApplicantStack extends Stack {
       handler: handler,
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
+    };
+  };
+
+  developerPatch = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `developer-patch-lambda`, {
+      entry: path.join(__dirname, "developer"),
+      index: "patch.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer`,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodRequestOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "DeveloperPatchRequest",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          regenerate_secret_key: {
+            type: JsonSchemaType.BOOLEAN,
+          },
+        },
+      },
+    };
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "DeveloperPatchResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          secret_key: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+      },
+    };
+
+    return {
+      name: "PATCH",
+      handler: handler,
+      requestModelOptions: methodRequestOptions,
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.APP_OAUTH,
+    };
+  };
+
+  v1AuthGet = (
+    stage: string,
+    layers: PythonLayerVersion[],
+    kmsKey: Key
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `v1-auth-get-lambda`, {
+      entry: path.join(__dirname, "v1"),
+      index: "auth_get.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+        KMS_KEY_ID: kmsKey.keyId,
+        AUTH_ENDPOINT:
+          stage === "beta"
+            ? "https://www.mimo.team/auth"
+            : "https://dev-frontend.mimo.team/auth",
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+    kmsKey.grant(handler, "kms:Sign");
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "AuthGetResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          authLink: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["authLink"],
+      },
+    };
+
+    return {
+      name: "GET",
+      handler: handler,
+      requestParameters: {
+        "method.request.querystring.app": true,
+      },
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.API_KEY,
+    };
+  };
+
+  v1AuthDelete = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `v1-auth-delete-lambda`, {
+      entry: path.join(__dirname, "v1"),
+      index: "auth_delete.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "AuthDeleteResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          success: {
+            type: JsonSchemaType.BOOLEAN,
+            default: true,
+          },
+        },
+        required: ["success"],
+      },
+    };
+
+    return {
+      name: "DELETE",
+      handler: handler,
+      requestParameters: {
+        "method.request.querystring.app": true,
+        "method.request.querystring.library": true,
+      },
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.API_KEY,
+    };
+  };
+
+  v1LibraryGet = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `v1-library-get-lambda`, {
+      entry: path.join(__dirname, "v1"),
+      index: "library_get.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        STAGE: stage,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "AppLibraryGetResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          libraries: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              type: JsonSchemaType.OBJECT,
+              properties: {
+                id: {
+                  type: JsonSchemaType.STRING,
+                },
+                created_at: {
+                  type: JsonSchemaType.NUMBER,
+                },
+              },
+            },
+            required: ["id", "created_at"],
+          },
+        },
+      },
+    };
+
+    return {
+      name: "GET",
+      handler: handler,
+      requestParameters: {
+        "method.request.querystring.app": true,
+      },
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.API_KEY,
     };
   };
 }

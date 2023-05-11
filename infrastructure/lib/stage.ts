@@ -68,7 +68,7 @@ export class MimoStage extends Stage {
           methods: connectorService.integrationMethods,
         },
         {
-          path: "library",
+          path: "user_library",
           methods: connectorService.libraryMethods,
           idResource: "library",
         },
@@ -80,6 +80,14 @@ export class MimoStage extends Stage {
         {
           path: "context",
           methods: detectiveService.methods,
+        },
+        {
+          path: "auth",
+          methods: applicantService.v1AuthMethods,
+        },
+        {
+          path: "library",
+          methods: applicantService.v1LibraryMethods,
         },
       ],
     });
@@ -94,7 +102,7 @@ export class MimoStage extends Stage {
       subRoutes: [
         {
           path: "auth",
-          methods: applicantService.authMethods,
+          methods: applicantService.authMethods.reverse(),
         },
         {
           path: "api_key",
@@ -142,6 +150,9 @@ export class MimoStage extends Stage {
     for (const method of connectorService.libraryMethods) {
       dynamo.mimoTable.grantReadWriteData(method.handler);
     }
+    for (const method of applicantService.v1LibraryMethods) {
+      dynamo.mimoTable.grantReadData(method.handler);
+    }
     for (const method of detectiveService.methods) {
       secrets.grantRead(method.handler);
     }
@@ -177,6 +188,7 @@ export class MimoStage extends Stage {
     for (const method of [
       ...applicantService.appMethods,
       ...applicantService.authMethods,
+      ...applicantService.v1AuthMethods,
     ]) {
       if (method.name === "GET") {
         dynamo.mimoTable.grantReadData(method.handler);
@@ -204,6 +216,14 @@ export class MimoStage extends Stage {
           resources: ["*"],
         })
       );
+      if (method.name === "PATCH") {
+        method.handler.addToRolePolicy(
+          new PolicyStatement({
+            actions: ["ssm:PutParameter"],
+            resources: ["*"],
+          })
+        );
+      }
     }
 
     const ssm = new SsmStack(this, "ssm", {

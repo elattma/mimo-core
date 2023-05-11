@@ -265,6 +265,43 @@ class ParentChildDB:
                 print("invalid item!")
             return item
         
+    def child_query(self, child: str) -> List[ParentAppItem]:
+        try:
+            response = self.table.query(
+                IndexName='child-index',
+                KeyConditionExpression=Key('child').eq(child),
+                ScanIndexForward=False,
+            )
+        except ClientError as err:
+            print("Couldn't query %s. Here's why: %s: %s", child,
+                err.response['Error']['Code'], err.response['Error']['Message'])
+            raise
+        else:
+            response_items = response.get('Items', None) if response else None
+            if not response:
+                return []
+            
+            items = []
+            for response_item in response_items:
+                item: ParentChildItem = None
+                parent = response_item.get('parent', None) if response_item else None
+                child = response_item.get('child', None) if response_item else None
+                if not (parent and child):
+                    continue
+                
+                if child.startswith(KeyNamespaces.LIBRARY.value):
+                    item = LibraryAppItem.from_dict(response_item)
+                elif child.startswith(KeyNamespaces.APP.value):
+                    item = ParentAppItem.from_dict(response_item)
+                elif child.startswith(KeyNamespaces.API_KEY.value):
+                    item = AppApiKeyItem.from_dict(response_item)
+                if item:
+                    items.append(item)
+                else:
+                    print("invalid item!")
+                    print(response_item)
+            return items
+        
     def delete(self, parent: str, child: str) -> None:
         try:
             self.table.delete_item(

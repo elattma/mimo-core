@@ -3,7 +3,7 @@ import os
 from time import time
 from typing import List
 
-from helper.kms import KMS
+from keys.kms import KMS
 from shared.response import Errors, to_response_error, to_response_success
 from state.dynamo import (KeyNamespaces, LibraryAppItem, ParentChildDB,
                           ParentChildItem)

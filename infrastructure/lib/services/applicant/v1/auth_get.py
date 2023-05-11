@@ -1,8 +1,8 @@
 import os
 from time import time
 
-from helper.kms import KMS
-from helper.payload import AppPayload, Payload
+from keys.kms import KMS
+from keys.payload import AppPayload, Payload
 from shared.model import App
 from shared.response import Errors, to_response_error, to_response_success
 from state.dynamo import KeyNamespaces, ParentAppItem, ParentChildDB

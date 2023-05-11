@@ -72,7 +72,7 @@ export class ApiStack extends Stack {
     };
 
     for (const routeConfig of props.routeConfigs) {
-      this.getRoute(this.api, this.api.root, routeConfig);
+      this.getRoute(this.api, this.api.root, routeConfig, routeConfig.path);
     }
   }
 
@@ -190,7 +190,12 @@ export class ApiStack extends Stack {
     });
   };
 
-  getRoute = (api: RestApi, resource: IResource, routeConfig: RouteConfig) => {
+  getRoute = (
+    api: RestApi,
+    resource: IResource,
+    routeConfig: RouteConfig,
+    path: string
+  ) => {
     const route = resource.addResource(routeConfig.path);
     let idRoute = undefined;
     if (routeConfig.idResource) {
@@ -198,14 +203,14 @@ export class ApiStack extends Stack {
     }
     if (routeConfig.subRoutes) {
       for (const subRoute of routeConfig.subRoutes) {
-        this.getRoute(api, route, subRoute);
+        this.getRoute(api, route, subRoute, `${path}/${subRoute.path}`);
       }
     }
     if (!routeConfig.methods) {
       return;
     }
     const requestValidator = api.addRequestValidator(
-      `${routeConfig.path}-request-validator`,
+      `${path}-request-validator`,
       {
         validateRequestBody: true,
         validateRequestParameters: true,
@@ -214,7 +219,7 @@ export class ApiStack extends Stack {
     for (const method of routeConfig.methods) {
       const requestModel = method.requestModelOptions
         ? api.addModel(
-            `${routeConfig.path}-${method.name}-request-model`,
+            `${path}-${method.name}-request-model`,
             method.requestModelOptions
           )
         : undefined;
@@ -227,7 +232,7 @@ export class ApiStack extends Stack {
       }
 
       const responseModel = api.addModel(
-        `${routeConfig.path}-${method.name}-response-model`,
+        `${path}-${method.name}-response-model`,
         method.responseModelOptions
       );
 
