@@ -150,6 +150,12 @@ class TokenAuth(Auth):
             'expiry_timestamp': self.expiry_timestamp,
         }
     
+class SyncStatus(Enum):
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    UNSYNCED = "UNSYNCED"
+    IN_PROGRESS = "IN_PROGRESS"
+    
 @dataclass
 class Connection:
     id: str = None
@@ -158,6 +164,7 @@ class Connection:
     auth: Auth = None
     created_at: int = None
     ingested_at: int = None
+    sync_status: SyncStatus = None
     
     def is_valid(self):
         return self.id and self.name and self.integration \

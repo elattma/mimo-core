@@ -21,13 +21,9 @@ def handler(event: dict, context):
     query: str = query_string_parameters.get('query', None) if query_string_parameters else None
     max_tokens: int = query_string_parameters.get('max_tokens', None) if query_string_parameters else None
     max_tokens = int(max_tokens) if max_tokens else 1600
-    use_sample_data: bool = query_string_parameters.get('use_sample_data', False) if query_string_parameters else False
+    library: str = query_string_parameters.get('library', 'google-oauth2|108573573074253667565') if query_string_parameters else None
 
-    # TODO: parse user from API key or OAuth token
-    user = ''
-    if use_sample_data:
-        user = 'google-oauth2|108573573074253667565'
-    if not (stage or graph_db_uri or query):
+    if not (stage or graph_db_uri or query or max_tokens or library):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if not secrets:
@@ -43,7 +39,7 @@ def handler(event: dict, context):
         )
         openai = OpenAI(api_key=secrets.get('OPENAI_API_KEY'))
         data_agent = DataAgent(
-            owner=user,
+            owner=library,
             vector_db=pinecone,
             graph_db=neo4j, 
             openai=openai, 

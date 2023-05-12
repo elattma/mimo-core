@@ -16,7 +16,6 @@ def handler(event: dict, context):
     user: str = authorizer.get('principalId', None) if authorizer else None
     path_parameters: dict = event.get('pathParameters', None) if event else None
     app: str = path_parameters.get('app', None) if path_parameters else None
-    query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     stage: str = os.getenv('STAGE')
 
     if not (user and stage):

@@ -6,7 +6,7 @@ from typing import Dict, List
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from shared.model import Auth, AuthType, Connection, Library
+from shared.model import Auth, AuthType, Connection, Library, SyncStatus
 
 
 class KeyNamespaces(Enum):
@@ -133,6 +133,7 @@ class LibraryConnectionItem(ParentChildItem):
         integration = item.get('integration', None)
         created_at = item.get('created_at', None)
         ingested_at = item.get('ingested_at', None)
+        sync_status = item.get('sync_status', None)
         connection = Connection(
             id=child.split('#')[-1],
             name=name,
@@ -140,6 +141,7 @@ class LibraryConnectionItem(ParentChildItem):
             auth=auth,
             created_at=int(created_at) if created_at else None,
             ingested_at=int(ingested_at) if ingested_at else None,
+            sync_status=SyncStatus(sync_status) if sync_status else None,
         )
 
         return LibraryConnectionItem(
@@ -164,27 +166,28 @@ class ParentChildDB:
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
 
-    def update(self, items: List[ParentChildItem], **kwargs) -> None:
-        if not kwargs or len(kwargs) < 1:
+    def update(self, parent: str, child: str, kv_update_map: Dict, **kwargs) -> Dict:
+        if not kv_update_map:
             return
-        update_expression = ', '.join([f'#{key} = :{key}' for key in kwargs.keys()])
-        expression_attribute_names = {f'#{key}': key for key in kwargs.keys()}
-        expression_attribute_values = {f':{key}': value for key, value in kwargs.items()}
-        for item in items:
-            try:
-                self.table.update_item(
-                    Key={
-                        'parent': item.parent,
-                        'child': item.get_child(),
-                    },
-                    UpdateExpression=f'set {update_expression}',
-                    ExpressionAttributeNames=expression_attribute_names,
-                    ExpressionAttributeValues=expression_attribute_values,
-                )
-            except ClientError as err:
-                print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
-                    err.response['Error']['Code'], err.response['Error']['Message'])
-                raise
+        update_expression = ', '.join([f'#{key} = :{key}' for key in kv_update_map.keys()])
+        expression_attribute_names = {f'#{key}': key for key in kv_update_map.keys()}
+        expression_attribute_values = {f':{key}': value for key, value in kv_update_map.items()}
+        try:
+            response = self.table.update_item(
+                Key={
+                    'parent': parent,
+                    'child': child
+                },
+                UpdateExpression=f'set {update_expression}',
+                ExpressionAttributeNames=expression_attribute_names,
+                ExpressionAttributeValues=expression_attribute_values,
+                **kwargs
+            )
+            return response.get('Attributes', None)
+        except ClientError as err:
+            print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
+                err.response['Error']['Code'], err.response['Error']['Message'])
+            raise
 
     def query(self, parent: str, child_namespace: str, **kwargs) -> List[ParentChildItem]:
         try:
@@ -220,13 +223,14 @@ class ParentChildDB:
                     print(response_item)
             return items
         
-    def get(self, parent: str, child: str) -> ParentChildItem:
+    def get(self, parent: str, child: str, **kwargs) -> ParentChildItem:
         try:
             response = self.table.get_item(
                 Key={
                     'parent': parent,
                     'child': child,
-                }
+                },
+                **kwargs,
             )
         except ClientError as err:
             print("Couldn't query %s. Here's why: %s: %s", parent,

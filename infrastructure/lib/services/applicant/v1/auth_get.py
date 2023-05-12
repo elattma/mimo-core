@@ -56,5 +56,5 @@ def handler(event: dict, context):
     )
     token = _kms.sign(payload=payload, key_id=kms_key_id)
     return to_response_success({
-        'authLink': '{auth_endpoint}?token={token}'.format(auth_endpoint=auth_endpoint, token=token)
+        'auth_link': '{auth_endpoint}?token={token}'.format(auth_endpoint=auth_endpoint, token=token)
     })

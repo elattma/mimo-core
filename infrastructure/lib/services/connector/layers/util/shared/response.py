@@ -22,6 +22,7 @@ class Errors(Enum):
     INVALID_AUTH = 'invalid auth'
     INVALID_CONNECTION = 'invalid connection'
     DB_READ_FAILED = 'db read failed'
+    SYNC_IN_PROGRESS = 'sync in progress'
 
 def to_response_error(error_message: Errors):
     return {
