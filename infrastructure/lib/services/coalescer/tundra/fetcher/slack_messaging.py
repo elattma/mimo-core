@@ -2,6 +2,8 @@
 # from typing import List
 
 # import requests
+from base import Fetcher
+
 # from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
 #                               Filter, Item)
 
@@ -11,8 +13,8 @@
 #     chunks: List[Chunk] 
 #     cursor: str = None
 
-# class SlackMessaging(Fetcher):
-#     _INTEGRATION = 'slack_messaging'
+class SlackMessaging(Fetcher):
+    _INTEGRATION = 'slack_messaging'
 
 #     def get_auth_type(self) -> str:
 #         return 'oauth'

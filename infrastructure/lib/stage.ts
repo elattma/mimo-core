@@ -8,10 +8,12 @@ import { RouteConfig } from "./model";
 import { S3Stack } from "./s3";
 import { SecretsStack } from "./secrets";
 import { ApplicantStack } from "./services/applicant/lambda";
+import { CoalescerStack } from "./services/coalescer/stack";
 import { ConnectorStack } from "./services/connector/lambda";
 import { DetectiveStack } from "./services/detective/lambda";
 import { UsageMonitorStack } from "./services/usage_monitor/lambda";
 import { SsmStack } from "./ssm";
+import { VpcStack } from "./vpc";
 
 export interface MimoStageProps extends StageProps {
   readonly domainName: string;
@@ -232,5 +234,13 @@ export class MimoStage extends Stage {
     ssm.defineIntegrationParams(integrationsPath, `${assetsPrefixPath}/icons`);
     ssm.defineUsagePlanParams(usagePlansPath, [api.defaultUsagePlan]);
     ssm.defineApiParams(apiPath, api.api);
+
+    const vpc = new VpcStack(this, "vpc", {
+      stageId: props.stageId,
+    });
+    const coalescer = new CoalescerStack(this, "coalescer", {
+      stageId: props.stageId,
+      vpc: vpc.vpc,
+    });
   }
 }
