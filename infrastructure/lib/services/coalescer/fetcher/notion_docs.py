@@ -2,7 +2,9 @@
 # from typing import Any, List
 
 # import requests
-from base import Fetcher
+# from app.fetcher.base import (Chunk, DiscoveryResponse, Fetcher, FetchResponse,
+#                               Filter, Item)
+
 
 # @dataclass
 # class NotionData:
@@ -10,8 +12,8 @@ from base import Fetcher
 #     children_block_ids: List[str]
 #     cursor: str = None
 
-class NotionDocs(Fetcher):
-    _INTEGRATION = 'notion_docs'
+# class Notion(Fetcher):
+#     _INTEGRATION = 'notion'
 
 #     def get_auth_type(self) -> str:
 #         return 'oauth'

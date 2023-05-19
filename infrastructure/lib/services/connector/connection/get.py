@@ -49,7 +49,7 @@ def handler(event: dict, context):
             },
             'created_at': connection.created_at,
             'ingested_at': connection.ingested_at,
-            'sync_status': connection.sync_status.value if connection.sync_status else None,
+            'sync_status': connection.sync_status.value,
         } for connection in response_connections],
         'next_token': None
     })

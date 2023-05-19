@@ -18,7 +18,6 @@ def handler(event: dict, context):
     user: str = authorizer.get('principalId', None) if authorizer else None
     query_parameters: dict = event.get('queryStringParameters', None) if event else None
     app: str = query_parameters.get('app', None) if query_parameters else None
-    redirect_uri: str = query_parameters.get('redirect_uri', None) if query_parameters else None
     kms_key_id: str = os.getenv('KMS_KEY_ID')
     auth_endpoint: str = os.getenv('AUTH_ENDPOINT')
     stage: str = os.getenv('STAGE')
@@ -52,7 +51,6 @@ def handler(event: dict, context):
             name=response_app.name
         ),
         user=user,
-        redirect_uri=redirect_uri,
         timestamp=now_timestamp,
         expiration=expiry_timestamp
     )

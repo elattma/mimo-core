@@ -11,7 +11,6 @@ class AppPayload:
 class Payload:
     app: AppPayload
     user: str
-    redirect_uri: str
     timestamp: int
     expiration: int
 
@@ -22,7 +21,6 @@ class Payload:
                 'name': self.app.name
             },
             'user': self.user,
-            'redirect_uri': self.redirect_uri,
             'timestamp': self.timestamp,
             'expiration': self.expiration
         }
@@ -34,10 +32,9 @@ class Payload:
         
         app: Dict = item.get('app', None)
         user = item.get('user', None)
-        redirect_uri = item.get('redirect_uri', None)
         timestamp = item.get('timestamp', None)
         expiration = item.get('expiration', None)
-        if not (app and user and redirect_uri and timestamp and expiration):
+        if not (app and user and timestamp and expiration):
             return None
         
         app_id = app.get('id', None)
@@ -51,7 +48,6 @@ class Payload:
                 name=app_name
             ),
             user=user,
-            redirect_uri=redirect_uri,
             timestamp=int(timestamp),
             expiration=int(expiration)
         )

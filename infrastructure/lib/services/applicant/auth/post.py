@@ -66,7 +66,7 @@ def handler(event: dict, context):
         library_app_item: LibraryAppItem = LibraryAppItem(
             parent='{namespace}{library}'.format(namespace=KeyNamespaces.LIBRARY.value, library=library),
             app_id=payload.app.id,
-            created_at=now_timestamp
+            timestamp=now_timestamp
         )
         _db.write([library_app_item])
     except Exception as e:
