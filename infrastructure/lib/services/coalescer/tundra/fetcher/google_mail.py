@@ -13,6 +13,9 @@ class ThreadSection(Section):
     body: str = None
     owners: List[Tuple] = None
 
+    def row(self) -> str:
+        return f'{self.discovery.id}, {self.title}, {self.body}, {self.owners}, {self.last_updated_timestamp}'
+
 class GoogleMail(Fetcher):
     _INTEGRATION = 'google_mail'
 
@@ -131,7 +134,7 @@ class GoogleMail(Fetcher):
         body = self._get_body(load_response.get('messages', None))
         owners = self._get_owners(load_response.get('messages', None))
         thread = ThreadSection(
-            id=discovery.id,
+            discovery=discovery,
             last_updated_timestamp=lut,
             title=title,
             body=body,

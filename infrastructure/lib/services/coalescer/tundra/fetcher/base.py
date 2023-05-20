@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generator
+from typing import Generator, List
 
 import requests
 
@@ -24,9 +24,13 @@ class Discovery:
 
 @dataclass
 class Section(ABC):
-    id: str
+    discovery: Discovery
     last_updated_timestamp: int
 
+    @abstractmethod
+    def row(self) -> str:
+        raise NotImplementedError('row not implemented')
+    
 class Fetcher(ABC):
     _INTEGRATION = 'base'
 
@@ -67,5 +71,5 @@ class Fetcher(ABC):
         raise NotImplementedError('discover not implemented')
 
     @abstractmethod
-    def fetch(self, discovery: Discovery) -> Generator[Section, None, None]:
+    def fetch(self, discovery: Discovery) -> List[Section]:
         raise NotImplementedError("fetch not implemented")

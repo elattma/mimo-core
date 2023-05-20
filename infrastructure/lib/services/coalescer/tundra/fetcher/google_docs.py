@@ -16,6 +16,9 @@ class DocumentSection(Section):
     owners: List[Tuple] = None
     last_updated_timestamp: int = None
 
+    def row(self) -> str:
+        return f'{self.discovery.id}, {self.title}, {self.body}, {self.owners}, {self.last_updated_timestamp}'
+
 class GoogleDocs(Fetcher):
     _INTEGRATION = 'google_docs'
 
@@ -108,7 +111,7 @@ class GoogleDocs(Fetcher):
         title = load_response.get('title', None)
         body = self._get_body(load_response.get('body', None))
         document = DocumentSection(
-            id=discovery.id,
+            discovery=discovery,
             last_updated_timestamp=lut,
             title=title,
             body=body,
