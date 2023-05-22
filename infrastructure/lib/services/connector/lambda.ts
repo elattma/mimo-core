@@ -76,22 +76,17 @@ export class ConnectorStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          name: {
+          library: {
             type: JsonSchemaType.STRING,
           },
           integration: {
             type: JsonSchemaType.STRING,
           },
-          token_oauth2: {
+          name: {
+            type: JsonSchemaType.STRING,
+          },
+          auth_strategy: {
             type: JsonSchemaType.OBJECT,
-            properties: {
-              code: {
-                type: JsonSchemaType.STRING,
-              },
-              redirect_uri: {
-                type: JsonSchemaType.STRING,
-              },
-            },
           },
         },
       },

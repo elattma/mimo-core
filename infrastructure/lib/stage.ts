@@ -235,12 +235,14 @@ export class MimoStage extends Stage {
     ssm.defineUsagePlanParams(usagePlansPath, [api.defaultUsagePlan]);
     ssm.defineApiParams(apiPath, api.api);
 
-    const vpc = new VpcStack(this, "vpc", {
-      stageId: props.stageId,
-    });
-    const coalescer = new CoalescerStack(this, "coalescer", {
-      stageId: props.stageId,
-      vpc: vpc.vpc,
-    });
+    if (props.stageId === "beta") {
+      const vpc = new VpcStack(this, "vpc", {
+        stageId: props.stageId,
+      });
+      const coalescer = new CoalescerStack(this, "coalescer", {
+        stageId: props.stageId,
+        vpc: vpc.vpc,
+      });
+    }
   }
 }

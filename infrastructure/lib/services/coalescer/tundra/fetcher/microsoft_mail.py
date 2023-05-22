@@ -1,6 +1,6 @@
 from typing import Generator, List
 
-from base import Discovery, Fetcher, Section
+from .base import Discovery, Fetcher, Section
 
 
 class MicrosoftMail(Fetcher):

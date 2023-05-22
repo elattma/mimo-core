@@ -2,22 +2,23 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
 import boto3
-from model import Drop, PourResult
-from mypy_boto3_s3 import S3Client
+
+from .model import Drop, PourResult
 
 
 class S3Lake:
-    _s3_client: S3Client
+    _owner: str
     _drops: List[Drop]
     _bucket_name: str
     _batch_size: int
     _failures: int
 
-    def __init__(self, bucket_name: str, _batch_size: int = 100):
+    def __init__(self, owner: str, bucket_name: str, batch_size: int = 100):
         self._s3_client = boto3.client('s3')
+        self._owner = owner
         self._drops = []
         self._bucket_name = bucket_name
-        self._batch_size = _batch_size
+        self._batch_size = batch_size
         self._failures = 0
 
     def pour(self, drop: Drop):
@@ -30,8 +31,8 @@ class S3Lake:
         print(f'pouring {drop} into {self._bucket_name}!')
         response = self._s3_client.put_object(
             Bucket=self._bucket_name,
-            Key=drop.key(),
-            Body=drop._batch.table(),
+            Key=f'{self._owner}/{drop.key()}',
+            Body=drop._batch.csv(),
         )
         status_code = response.get('ResponseMetadata', {}).get('HTTPStatusCode', 0)
         succeeded = status_code == 200
@@ -46,7 +47,7 @@ class S3Lake:
         if not self._drops:
             return True
         
-        with ThreadPoolExecutor(max_workers=len(10)) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(self._pour, drop) for drop in self._drops]
 
         failed_drops = []

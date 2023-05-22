@@ -1,8 +1,8 @@
 import base64
 from dataclasses import dataclass
-from typing import Dict, Generator, List, Set, Tuple
+from typing import Any, Dict, Generator, List, Set, Tuple
 
-from base import Discovery, Fetcher, Section
+from .base import Discovery, Fetcher, Section
 
 DISCOVERY_ENDPOINT = 'https://www.googleapis.com/gmail/v1/users/me/threads'
 FETCH_THREADS_ENDPOINT = 'https://www.googleapis.com/gmail/v1/users/me/threads/{id}'
@@ -13,8 +13,12 @@ class ThreadSection(Section):
     body: str = None
     owners: List[Tuple] = None
 
-    def row(self) -> str:
-        return f'{self.discovery.id}, {self.title}, {self.body}, {self.owners}, {self.last_updated_timestamp}'
+    @classmethod
+    def headers(cls) -> List[str]:
+        return ['id', 'title', 'body', 'owners', 'last_updated_timestamp']
+
+    def row(self) -> List[Any]:
+        return [self.discovery.id, self.title, self.body, self.owners, self.last_updated_timestamp]
 
 class GoogleMail(Fetcher):
     _INTEGRATION = 'google_mail'

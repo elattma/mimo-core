@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Generator, List, Tuple
+from typing import Any, Dict, Generator, List, Tuple
 
-from base import Discovery, Fetcher, Section, get_timestamp_from_format
+from .base import Discovery, Fetcher, Section, get_timestamp_from_format
 
 GOOGLE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 DISCOVERY_ENDPOINT = 'https://www.googleapis.com/drive/v3/files'
@@ -16,8 +16,12 @@ class DocumentSection(Section):
     owners: List[Tuple] = None
     last_updated_timestamp: int = None
 
-    def row(self) -> str:
-        return f'{self.discovery.id}, {self.title}, {self.body}, {self.owners}, {self.last_updated_timestamp}'
+    @classmethod
+    def headers(cls) -> List[str]:
+        return ['id', 'title', 'body', 'owners', 'last_updated_timestamp']
+
+    def row(self) -> List[Any]:
+        return [self.discovery.id, self.title, self.body, self.owners, self.last_updated_timestamp]
 
 class GoogleDocs(Fetcher):
     _INTEGRATION = 'google_docs'
@@ -53,7 +57,7 @@ class GoogleDocs(Fetcher):
                 break
     
     def _get_owners(self, owners_dict: Dict) -> List[Tuple]:
-        owners = List[Tuple] = []
+        owners: List[Tuple] = []
         for owner in owners_dict:
             if not owner or 'emailAddress' not in owner:
                 continue
@@ -62,7 +66,7 @@ class GoogleDocs(Fetcher):
         return owners
 
     def _get_body(self, body_dict: Dict) -> str:
-        content = body_dict.get('content', None) if body else None
+        content = body_dict.get('content', None) if body_dict else None
         if not content:
             return
         

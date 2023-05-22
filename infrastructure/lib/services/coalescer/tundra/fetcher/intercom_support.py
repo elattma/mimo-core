@@ -1,6 +1,6 @@
 from typing import Generator, List
 
-from base import Discovery, Fetcher, Section
+from .base import Discovery, Fetcher, Section
 
 
 class IntercomSupport(Fetcher):
@@ -8,7 +8,6 @@ class IntercomSupport(Fetcher):
 
     def discover(self) -> Generator[Discovery, None, None]:
         print('intercom discovery!')
-
 
     def fetch(self, discovery: Discovery) -> List[Section]:
         print('intercom fetch!')

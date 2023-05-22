@@ -22,8 +22,13 @@ export class VpcStack extends Stack {
         },
         {
           cidrMask: 24,
-          name: "private",
+          name: "isolated",
           subnetType: SubnetType.PRIVATE_ISOLATED,
+        },
+        {
+          cidrMask: 24,
+          name: "private",
+          subnetType: SubnetType.PRIVATE_WITH_EGRESS,
         },
       ],
     });
