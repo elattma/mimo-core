@@ -43,6 +43,15 @@ export class SsmStack extends Stack {
         }
       );
 
+      new StringParameter(
+        this,
+        `${integrationConfig.id}-airbyte_id-parameter`,
+        {
+          parameterName: `${integrationsPath}/${integrationConfig.id}/airbyte_id`,
+          stringValue: integrationConfig.airbyte_id || "batch",
+        }
+      );
+
       new StringParameter(this, `${integrationConfig.id}-icon-parameter`, {
         parameterName: `${integrationsPath}/${integrationConfig.id}/icon`,
         stringValue: `https://${prefixIconPath}/${integrationConfig.id}.svg`, // TODO: enforce somehow that the icon exists

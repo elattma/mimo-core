@@ -23,6 +23,7 @@ const zendeskSupportIntegrationConfig: IntegrationConfig = {
   id: "zendesk_support",
   name: "Zendesk Customer Support",
   description: "Some description for Zendesk Customer Support",
+  airbyte_id: "79c1aa37-dae3-42ae-b333-d1c105477715",
   auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
 };
 

@@ -24,7 +24,6 @@ _arg_parser.add_argument('--user', type=str, required=True)
 _arg_parser.add_argument('--connection', type=str, required=True)
 _arg_parser.add_argument('--integration', type=str, required=True)
 _arg_parser.add_argument('--access_token', type=str, required=True)
-_arg_parser.add_argument('--last_ingested_at', type=str, required=True)
 _arg_parser.add_argument('--limit', type=str, default="100")
 
 def main():
@@ -46,7 +45,7 @@ def main():
     fetcher: Fetcher = Fetcher.create(
         tundra_args.integration, 
         tundra_args.access_token, 
-        int(tundra_args.last_ingested_at), 
+        int(0), 
         int(tundra_args.limit)
     )
     

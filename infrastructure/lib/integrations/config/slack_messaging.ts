@@ -22,6 +22,7 @@ const slackMessagingIntegrationConfig: IntegrationConfig = {
   id: "slack_messaging",
   name: "Slack",
   description: "Some description for Slack",
+  airbyte_id: "c2281cee-86f9-4a86-bb48-d23286b4c7bd",
   auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
 };
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+
+require("dotenv").config();
+
 import { App } from "aws-cdk-lib";
 import { MimoStage } from "../lib/stage";
 

@@ -26,5 +26,6 @@ export interface IntegrationConfig {
   id: IntegrationId;
   name: string;
   description: string;
+  airbyte_id?: string;
   auth_strategies: AuthStrategy[];
 }

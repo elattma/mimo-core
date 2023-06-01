@@ -23,6 +23,7 @@ const zohoCrmIntegrationConfig: IntegrationConfig = {
   id: "zoho_crm",
   name: "Zoho CRM",
   description: "Some description for Zoho CRM",
+  airbyte_id: "4942d392-c7b5-4271-91f9-3b4f4e51eb3e",
   auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
 };
 

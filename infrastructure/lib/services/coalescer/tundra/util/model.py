@@ -65,7 +65,6 @@ class TundraArgs:
     connection: str
     integration: str
     access_token: str
-    last_ingested_at: str
     limit: str
 
     def valid(self) -> bool:
@@ -74,6 +73,5 @@ class TundraArgs:
             self.connection,
             self.integration,
             self.access_token,
-            self.last_ingested_at,
             self.limit
         ])

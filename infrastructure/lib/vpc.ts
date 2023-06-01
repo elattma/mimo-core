@@ -31,6 +31,7 @@ export class VpcStack extends Stack {
           subnetType: SubnetType.PRIVATE_WITH_EGRESS,
         },
       ],
+      natGateways: 0,
     });
 
     new CfnOutput(this, "vpcId", {

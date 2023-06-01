@@ -25,4 +25,4 @@ RUN poetry config virtualenvs.create false \
 # Run your app
 COPY . /app/
 
-CMD ["python", "app.py", "--user", "Ref::user", "--connection", "Ref::connection", "--integration", "Ref::integration", "--access_token", "Ref::access_token", "--last_ingested_at", "Ref::last_ingested_at"]
+CMD ["python", "app.py"]

@@ -90,5 +90,6 @@ const generatePolicy = (
             ],
       Version: "2012-10-17",
     },
+    usageIdentifierKey: principalId,
   };
 };

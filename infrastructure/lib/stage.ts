@@ -1,4 +1,17 @@
 import { Stage, StageProps } from "aws-cdk-lib";
+import {
+  AuthorizationType,
+  ConnectionType,
+  Integration,
+  IntegrationType,
+  VpcLink,
+} from "aws-cdk-lib/aws-apigateway";
+import {
+  GatewayVpcEndpointAwsService,
+  InterfaceVpcEndpointAwsService,
+  SubnetType,
+} from "aws-cdk-lib/aws-ec2";
+import { NetworkLoadBalancer } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { ApiStack } from "./api";
@@ -130,7 +143,6 @@ export class MimoStage extends Stage {
     );
 
     for (const method of connectorService.methods) {
-      secrets.grantRead(method.handler);
       method.handler.addEnvironment("INTEGRATIONS_PATH", integrationsPath);
       method.handler.addToRolePolicy(
         new PolicyStatement({
@@ -158,6 +170,7 @@ export class MimoStage extends Stage {
     for (const method of detectiveService.methods) {
       secrets.grantRead(method.handler);
     }
+    secrets.grantRead(detectiveService.indexLambda);
 
     for (const method of connectorService.integrationMethods) {
       secrets.grantRead(method.handler);
@@ -169,6 +182,18 @@ export class MimoStage extends Stage {
         })
       );
     }
+
+    connectorService.internalParamsLambda.addEnvironment(
+      "INTEGRATIONS_PATH",
+      integrationsPath
+    );
+    connectorService.internalParamsLambda.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+        resources: ["*"],
+      })
+    );
+    dynamo.mimoTable.grantReadData(connectorService.internalParamsLambda);
 
     for (const method of usageMonitorService.methods) {
       method.handler.addEnvironment("API_PATH", apiPath);
@@ -239,9 +264,70 @@ export class MimoStage extends Stage {
       const vpc = new VpcStack(this, "vpc", {
         stageId: props.stageId,
       });
+      vpc.vpc.addGatewayEndpoint("s3-gateway", {
+        service: GatewayVpcEndpointAwsService.S3,
+        subnets: [
+          {
+            subnetType: SubnetType.PRIVATE_ISOLATED,
+          },
+          {
+            subnetType: SubnetType.PRIVATE_WITH_EGRESS,
+          },
+        ],
+      });
+      vpc.vpc.addInterfaceEndpoint("ecr-interface", {
+        service: InterfaceVpcEndpointAwsService.ECR,
+      });
+      vpc.vpc.addInterfaceEndpoint("ecr-docker-interface", {
+        service: InterfaceVpcEndpointAwsService.ECR_DOCKER,
+      });
+      vpc.vpc.addInterfaceEndpoint("secrets-interface", {
+        service: InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+      });
+      vpc.vpc.addInterfaceEndpoint("cloudwatch-interface", {
+        service: InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+      });
+
+      // const airbyte = getAirbyte(this, props.stageId);
+
       const coalescer = new CoalescerStack(this, "coalescer", {
         stageId: props.stageId,
         vpc: vpc.vpc,
+        indexFunction: detectiveService.indexLambda,
+        paramsFunction: connectorService.internalParamsLambda,
+      });
+
+      const airbyteNlb = NetworkLoadBalancer.fromNetworkLoadBalancerAttributes(
+        api,
+        "airbyte-nlb",
+        {
+          loadBalancerArn: process.env.AIRBYTE_NLB_ARN!,
+          loadBalancerDnsName: process.env.AIRBYTE_NLB_DNS_NAME!,
+        }
+      );
+      const vpcLink = new VpcLink(api, "airbyte-vpc-link", {
+        vpcLinkName: "vpc-link",
+        targets: [airbyteNlb],
+      });
+      const integration = new Integration({
+        type: IntegrationType.HTTP_PROXY,
+        options: {
+          connectionType: ConnectionType.VPC_LINK,
+          vpcLink,
+          requestParameters: {
+            "integration.request.path.proxy": "method.request.path.proxy",
+          },
+        },
+        integrationHttpMethod: "POST",
+        uri: `http://${airbyteNlb.loadBalancerDnsName}:80/{proxy}`,
+      });
+      const airbyte = api.api.root.addResource("airbyte");
+      const proxy = airbyte.addProxy();
+      proxy.addMethod("POST", integration, {
+        authorizationType: AuthorizationType.NONE,
+        requestParameters: {
+          "method.request.path.proxy": true,
+        },
       });
     }
   }

@@ -3,25 +3,55 @@ from enum import Enum
 from typing import List
 
 import pinecone
+from graph.blocks import PageType
 
 
 @dataclass
+class RowType(Enum):
+    BLOCK = 'block'
+    PAGE = 'page'
+
+@dataclass
+class Row:
+    id: str
+    embedding: List[float]
+
+    library: str
+    row_type: RowType
+    date_day: int
+
+    page_types: List[PageType]
+    connection: str
+    block_label: str
+
+    def to_metadata_dict(self):
+        return {
+            'library': self.library,
+            'row_type': self.row_type.value,
+            'date_day': self.date_day,
+            'page_types': [page_type.value for page_type in self.page_types],
+            'connection': self.connection,
+            'block_label': self.block_label,
+        }
+
+@dataclass
 class Filter:
-    owner: str
-    type: set[RowType] = None
+    library: str
+    row_type: set[RowType] = None
     min_date_day: int = None
     max_date_day: int = None
-    integration: set[str] = None
+    page_types: set[PageType] = None
+    connection: set[str] = None
     page_id: set[str] = None
     block_label: set[str] = None
 
     def to_dict(self):
         filter = {
-            'owner': self.owner
+            'library': self.library
         }
-        if self.type:
-            filter['type'] = {
-                '$in': [t.value for t in self.type]
+        if self.row_type:
+            filter['row_type'] = {
+                '$in': [t.value for t in self.row_type]
             }
         if self.min_date_day or self.max_date_day:
             date_day = {}
@@ -31,9 +61,15 @@ class Filter:
                 date_day['$lte'] = self.max_date_day
 
             filter['date_day'] = date_day
-        if self.integration:
-            filter['integration'] = {
-                '$in': list(self.integration)
+        if self.page_types:
+            filter['page_types'] = {
+                '$or': [{
+                    '$in': type.value
+                } for type in self.page_types]
+            }
+        if self.connection:
+            filter['connection'] = {
+                '$in': list(self.connection)
             }
         if self.page_id:
             filter['page_id'] = {
@@ -53,34 +89,23 @@ class Pinecone:
         if indexes and index_name in indexes:
             self._index = pinecone.Index(index_name=index_name)
         else:
-            pinecone.create_index(
-                name=index_name,
-                dimension=1536,
-                metadata_config={
-                    'indexed': ['owner', 'type', 'date_day', 'integration', 'block_label']
-                }
-            )
-            self._index = pinecone.Index(index_name=index_name)
+            raise Exception(f'Pinecone index {index_name} not found')
 
-    def _delete_old_vectors(self, rows: List[Row]) -> bool:
-        if not (self._index and rows and len(rows) > 0):
+    def delete(self, page_ids: List[str], library: str) -> bool:
+        if not (self._index and page_ids and library):
             return False
-
-        owners = set([row.owner for row in rows])
-        page_ids = set([row.page_id for row in rows])
 
         delete_response = self._index.delete(
             filter={
-                'owner': {
-                    '$in': list(owners)
+                'library': {
+                    '$in': [library]
                 },
                 'page_id': {
-                    '$in': list(page_ids)
+                    '$in': page_ids
                 }
             }
         )
         print(f'[Pinecone] Delete response: {delete_response}')
-
         return True
 
     def _batched_upsert(self, vectors: List[dict], batch_size: int = 100) -> bool:
@@ -92,8 +117,9 @@ class Pinecone:
             upsert_response = self._index.upsert(
                 vectors=vectors[batch_index:batch_index + batch_size])
             print(f'[Pinecone] Upsert response: {upsert_response}')
-            if hasattr(upsert_response, 'upserted_count') and upsert_response.upserted_count >= min(len_vectors - batch_index, batch_size):
-                print(f'[Pinecone] Upsert response count: {upsert_response.upserted_count}')
+            upserted = upsert_response.get('upserted_count', 0) if upsert_response else 0
+            if hasattr(upsert_response, 'upserted_count') and upserted >= min(len_vectors - batch_index, batch_size):
+                print(f'[Pinecone] Upsert response count: {upserted}')
             else:
                 return False
         return True
@@ -102,21 +128,14 @@ class Pinecone:
         if not (self._index and rows and len(rows) > 0):
             return None
         vectors = []
-        owners = set()
-        page_ids = set()
         for row in rows:
-            owners.add(row.owner)
-            page_ids.add(row.page_id)
-
             vectors.append({
                 'id': row.id,
                 'values': row.embedding,
                 'metadata': row.to_metadata_dict()
             })
 
-        deleted = self._delete_old_vectors(rows)
-        upserted = self._batched_upsert(vectors=vectors)
-        return deleted and upserted
+        return self._batched_upsert(vectors=vectors)
 
     def query(self, embedding: List[float], query_filter: Filter, k: int = 5):
         if not (self._index and embedding and len(embedding) > 0):

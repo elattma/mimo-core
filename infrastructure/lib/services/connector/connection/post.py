@@ -63,7 +63,7 @@ def handler(event: dict, context):
 
     if not auth:
         return to_response_error(Errors.AUTH_FAILED)
-    
+
     connection = Connection(
         id=ulid(),
         name=name,

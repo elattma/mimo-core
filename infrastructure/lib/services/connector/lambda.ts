@@ -18,6 +18,7 @@ export class ConnectorStack extends Stack {
   readonly methods: MethodConfig[] = [];
   readonly integrationMethods: MethodConfig[] = [];
   readonly libraryMethods: MethodConfig[] = [];
+  readonly internalParamsLambda: PythonFunction;
 
   constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
@@ -43,6 +44,8 @@ export class ConnectorStack extends Stack {
 
     const libraryMethod = this.libraryGet(props.stageId, layers);
     this.libraryMethods.push(libraryMethod);
+
+    this.internalParamsLambda = this.internalParams(props.stageId, layers);
   }
 
   connectionPost = (
@@ -370,5 +373,31 @@ export class ConnectorStack extends Stack {
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
     };
+  };
+
+  internalParams = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): PythonFunction => {
+    return new PythonFunction(
+      this,
+      `${stage}-connection-internal-params-lambda`,
+      {
+        entry: path.join(__dirname, "internal"),
+        index: "params.py",
+        runtime: Runtime.PYTHON_3_9,
+        handler: "handler",
+        timeout: Duration.seconds(30),
+        memorySize: 1024,
+        environment: {
+          STAGE: stage,
+        },
+        retryAttempts: 0,
+        bundling: {
+          assetExcludes: ["**.venv**"],
+        },
+        layers: layers,
+      }
+    );
   };
 }

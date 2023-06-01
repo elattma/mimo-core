@@ -303,3 +303,10 @@ class ContactBlock(Block):
         if not isinstance(other, type(self)):
             return NotImplemented
         return self.name == other.name
+    
+
+class PageType(Enum):
+    MAIL_THREAD = 'mail_thread'
+    DOCUMENT = 'document'
+    ACCOUNT = 'account'
+    TICKET = 'ticket'

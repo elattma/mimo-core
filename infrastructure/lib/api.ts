@@ -1,9 +1,12 @@
 import { Stack, StackProps } from "aws-cdk-lib";
 import {
+  AccessLogFormat,
   ApiKeySourceType,
   Authorizer,
   IResource,
   LambdaIntegration,
+  LogGroupLogDestination,
+  MethodLoggingLevel,
   Period,
   RestApi,
   TokenAuthorizer,
@@ -15,6 +18,7 @@ import {
 } from "aws-cdk-lib/aws-certificatemanager";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { LogGroup } from "aws-cdk-lib/aws-logs";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
@@ -108,7 +112,14 @@ export class ApiStack extends Stack {
         allowCredentials: true,
         allowOrigins: ["https://www.mimo.team"],
       },
-      apiKeySourceType: ApiKeySourceType.HEADER,
+      apiKeySourceType: ApiKeySourceType.AUTHORIZER,
+      deployOptions: {
+        accessLogDestination: new LogGroupLogDestination(
+          new LogGroup(this, `${stageId}-api-access-log`)
+        ),
+        accessLogFormat: AccessLogFormat.jsonWithStandardFields(),
+        loggingLevel: MethodLoggingLevel.INFO,
+      },
     });
 
     return api;

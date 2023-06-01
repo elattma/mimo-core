@@ -2,7 +2,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
 import boto3
-from mypy_boto3_s3 import S3Client
 
 
 class S3Lake:
@@ -19,5 +18,3 @@ class S3Lake:
         self._bucket_name = bucket_name
         self._batch_size = batch_size
         self._failures = 0
-
-   

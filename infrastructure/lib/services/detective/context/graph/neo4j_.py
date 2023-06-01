@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Literal, Set
 
+from blocks import PageType
 from neo4j import GraphDatabase, Record
 
 UNIQUE_PATTERN_MIMO_PLACEHOLDER = '<UNQIUE_PLACEHOLDER>'
@@ -11,110 +12,96 @@ UNIQUE_PATTERN_MIMO_PLACEHOLDER = '<UNQIUE_PLACEHOLDER>'
 
 @dataclass
 class Node(ABC):
+    library: str
     id: str
+    timestamp: int = None
 
     @staticmethod
     @abstractmethod
     def get_index_properties():
-        pass
+        return ['timestamp']
 
     @staticmethod
     def get_index_keys():
-        return ['id']
+        return ['library', 'id']
+    
+    def __hash__(self):
+        return hash((self.library, self.id))
+    
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return self.library == other.library and self.id == other.id
 
-    def to_neo4j_map(self):
+    def get_neo4j_properties(self):
         return {
+            'library': self.library,
             'id': self.id,
+            'timestamp': self.timestamp,
         }
+
 
 @dataclass
 class Block(Node):
     embedding: List[float]
     label: str
     content: str
-    last_updated_timestamp: int
 
     @staticmethod
     def get_index_properties():
-        return ['label', 'content', 'last_updated_timestamp']
+        return super().get_index_properties() + ['label', 'content']
 
-    def to_neo4j_map(self):
-        map = super().to_neo4j_map()
+    def get_neo4j_properties(self):
+        map = super().get_neo4j_properties()
         map['label'] = self.label
         map['content'] = self.content
-        map['last_updated_timestamp'] = self.last_updated_timestamp
         return map
-    
-    def __hash__(self):
-        return hash((self.id))
 
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return NotImplemented
-        return self.id == other.id
 
 @dataclass
 class Consists:
-    target: Block
+    target: Node
 
 
 @dataclass
 class Page(Node):
-    integration: str
+    type: PageType
+    connection: str
+    summary: str
     consists: List[Consists]
 
     @staticmethod
-    def get_index_keys():
-        return super(Page, Page).get_index_keys() + ['integration']
-
-    @staticmethod
     def get_index_properties():
-        return []
+        return super().get_index_properties() + ['type', 'connection', 'summary']
 
-    def to_neo4j_map(self):
-        map = super().to_neo4j_map()
-        map['integration'] = self.integration
-        map['blocks'] = [consist.target.to_neo4j_map()
-                         for consist in self.consists]
+    def get_neo4j_properties(self):
+        map = super().get_neo4j_properties()
+        map['type'] = self.type.value
+        map['connection'] = self.connection
+        map['summary'] = self.summary
+        map['consists'] = [consist.target.get_neo4j_properties() for consist in self.consists]
         return map
 
 
 @dataclass
 class Mentioned:
-    target: Page
+    target: Node
 
 
 @dataclass
 class Name(Node):
     value: str
-    mentioned: List[Mentioned] = None
-
-    @staticmethod
-    def get_index_keys():
-        return super(Name, Name).get_index_keys()
+    mentioned: List[Mentioned]
 
     @staticmethod
     def get_index_properties():
-        return ['value']
+        return super().get_index_properties() + ['value']
 
-    def to_neo4j_map(self):
-        map = super().to_neo4j_map()
+    def get_neo4j_properties(self):
+        map = super().get_neo4j_properties()
         map['value'] = self.value
-        map['mentioned'] = [
-            {
-                'id': mentioned.target.id,
-                'integration': mentioned.target.integration,
-            } for mentioned in self.mentioned
-        ]
+        map['mentioned'] = [mention.target.get_neo4j_properties() for mention in self.mentioned]
         return map
-
-    def __hash__(self):
-        return hash((self.id, self.value, self.mentioned))
-
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return NotImplemented
-        return self.id == other.id and self.value == other.value and self.mentioned == other.mentioned
 
 
 @dataclass
@@ -214,7 +201,7 @@ class Limit:
 
 @dataclass
 class QueryFilter:
-    owner: str
+    library: str
     page_filter: PageFilter = None
     block_filter: BlockFilter = None
     name_filter: NameFilter = None
@@ -231,131 +218,98 @@ class Neo4j:
     def close(self):
         self.driver.close()
 
-    def write(self, pages: List[Page], names: List[Name], owner: str, timestamp: int):
+    def blocks(self, blocks: List[Block]):
         with self.driver.session(database='neo4j') as session:
-            page_result = session.execute_write(
-                self._create_page_blocks, pages, owner, timestamp=timestamp)
-            names_result = session.execute_write(
-                self._create_names, names, owner, timestamp=timestamp)
-            return [page_result, names_result]
+            page_result = session.execute_write(self._blocks, blocks)
+            return page_result
         
-    def infer(self, names: List[Name], owner: str, timestamp: int):
+    def pages(self, pages: List[Page]):
         with self.driver.session(database='neo4j') as session:
-            names_result = session.execute_write(self._infer_names, names, owner)
-            return [names_result]
-
-    @staticmethod
-    def _get_page_merge():
-        merge_object = ', '.join([f'{key}: page.{key}' for key in (
-            Page.get_index_keys())]) + ', owner: $owner'
-        index_properties = Page.get_index_properties()
-        if index_properties and len(index_properties) > 0:
-            set_object = ', '.join([f'd.{key} = page.{key}' for key in (
-                Page.get_index_properties())]) + ', d.timestamp = $timestamp'
-        else:
-            set_object = 'd.timestamp = $timestamp'
-        return (
-            f'MERGE (d: Page {{{merge_object}}}) '
-            'ON CREATE '
-            f'SET {set_object} '
-            'ON MATCH '
-            f'SET {set_object} '
-            'WITH d, page '
-            'CALL { '
-            'WITH d '
-            'MATCH (d)-[]-(b: Block) '
-            'DETACH DELETE b '
-            '} '
-        )
-
-    @staticmethod
-    def _get_block_merge():
-        merge_object = ', '.join([f'{key}: block.{key}' for key in (
-            Block.get_index_keys())]) + ', owner: $owner'
-        set_object = ', '.join([f'b.{key} = block.{key}' for key in (
-            Block.get_index_properties())]) + ', b.timestamp = $timestamp'
-        return (
-            f'MERGE (b: Block {{{merge_object}}}) '
-            'ON CREATE '
-            f'SET {set_object} '
-            'ON MATCH '
-            f'SET {set_object} '
-            'WITH b, d, block '
-            'MERGE (b)<-[:Consists]-(d) '
-        )
-
-    @staticmethod
-    def _create_page_blocks(tx, pages: List[Page], owner: str, timestamp: int):
-        if not (pages and len(pages) > 0 and owner and timestamp):
-            return None
-
-        neo4j_pages = [page.to_neo4j_map() for page in pages]
-        pages_query = (
-            'UNWIND $pages as page '
-            f'{Neo4j._get_page_merge()} '
-            'WITH page, d '
-            'UNWIND page.blocks as block '
-            f'{Neo4j._get_block_merge()} '
-        )
-
-        result = tx.run(pages_query, pages=neo4j_pages, owner=owner, timestamp=timestamp)
-        return result
-
-    @staticmethod
-    def _create_names(tx, names: List[Name], owner: str, timestamp: int = None):
-        if not (names and len(names) > 0 and owner):
-            return None
-
-        neo4j_names = [name.to_neo4j_map() for name in names]
-        names_query = (
-            'UNWIND $names as name '
-            'MERGE (n: Name {id: name.id, owner: $owner}) '
-            'WITH name, n '
-            'CALL { '
-            'WITH name, n '
-            'WITH name, n '
-            'WHERE name.value IS NOT NULL and n.value IS NULL '
-            'SET n.value = name.value '
-            '} '
-            'WITH name, n '
-            'UNWIND name.mentioned as mentioned '
-            'MATCH (d: Page {id: mentioned.id, integration: mentioned.integration, owner: $owner}) '
-            'WITH n, d '
-            'MERGE (n)-[:Mentioned]->(d) '
-        )
-
-        result = tx.run(names_query, names=neo4j_names, owner=owner)
-        return result
-    
-    @staticmethod
-    def _infer_names(tx, names: List[Name], owner: str):
-        if not (names and len(names) > 0 and owner):
-            return None
+            page_result = session.execute_write(self._pages, pages)
+            return page_result
         
-        neo4j_names = [name.to_neo4j_map() for name in names]
-        names_query = (
-            'UNWIND $names as name '
-            'MATCH (n: Name {value: name.value, owner: $owner}) '
-            'WITH name, n '
-            'UNWIND name.mentioned as mentioned '
-            'MATCH (d: Page {id: mentioned.id, integration: mentioned.integration, owner: $owner}) '
-            'WITH n, d '
-            'MERGE (n)-[:Mentioned]->(d) '
-        )
-
-        result = tx.run(names_query, names=neo4j_names, owner=owner)
-        return result
-
+    def names(self, names: List[Name]):
+        with self.driver.session(database='neo4j') as session:
+            names_result = session.execute_write(self._names, names)
+            return names_result
+        
     def get_by_filter(self, query_filter: QueryFilter) -> List[Page]:
         with self.driver.session(database='neo4j') as session:
             result = session.execute_read(self._get_by_filter, query_filter)
             return result
         
-    def discover(self, owner: str) -> List[Page]:
-        with self.driver.session(database='neo4j') as session:
-            result = session.execute_read(self._discover, owner)
-            return result
+    @staticmethod
+    def _blocks(tx, blocks: List[Block]):
+        if not blocks:
+            return None
 
+        neo4j_pages = [block.get_neo4j_properties() for block in blocks]
+        merge_object = ', '.join([f'{key}: block.{key}' for key in Block.get_index_keys()])
+        set_object = ', '.join([f'b.{key} = block.{key}' for key in Block.get_index_properties()])
+        blocks_query = (
+            'UNWIND $blocks as block '
+            f'MERGE (b: Block {{{merge_object}}}) '
+            'ON CREATE '
+            f'SET {set_object} '
+            'ON MATCH '
+            f'SET {set_object} '
+        )
+
+        return tx.run(blocks_query, pages=neo4j_pages)
+    
+    @staticmethod
+    def _pages(tx, pages: List[Page]):
+        if not pages:
+            return None
+
+        neo4j_pages = [page.get_neo4j_properties() for page in pages]
+        block_merge_object = ', '.join([f'{key}: block.{key}' for key in Block.get_index_keys()])
+        merge_object = ', '.join([f'{key}: page.{key}' for key in Page.get_index_keys()])
+        set_object = ', '.join([f'p.{key} = page.{key}' for key in Page.get_index_properties()])
+        pages_query = (
+            'UNWIND $pages as page '
+            f'MERGE (p: Page {{{merge_object}}}) '
+            'ON CREATE '
+            f'SET {set_object} '
+            'ON MATCH '
+            'CALL { '
+            'WITH p '
+            f'SET {set_object} '
+            'WITH p '
+            'MATCH (p)-[]-(old_block: Block) '
+            'DETACH DELETE old_block '
+            '} '
+            'WITH p, page '
+            'UNWIND page.consists as block '
+            f'MATCH (b: Block {{{block_merge_object}}}) '
+            'MERGE (p)-[:Consists]->(b) '
+        )
+
+        return tx.run(pages_query, pages=neo4j_pages)
+    
+    @staticmethod
+    def _names(tx, names: List[Name]):
+        if not names:
+            return None
+
+        neo4j_names = [name.get_neo4j_properties() for name in names]
+        page_merge_object = ', '.join([f'{key}: page.{key}' for key in Page.get_index_keys()])
+        merge_object = ', '.join([f'{key}: name.{key}' for key in Name.get_index_keys()])
+        set_object = ', '.join([f'n.{key} = name.{key}' for key in Name.get_index_properties()])
+        names_query = (
+            'UNWIND $names as name '
+            f'MERGE (n: Name {{{merge_object}}}) '
+            'ON CREATE '
+            f'SET {set_object} '
+            'WITH n, name '
+            'UNWIND name.mentioned as mentioned '
+            f'MATCH (p: Page {{{page_merge_object}}}) '
+            'WITH n, p '
+            'MERGE (n)-[:Mentioned]->(p) '
+        )
+
+        return tx.run(names_query, names=neo4j_names)
+        
     @staticmethod
     def _parse_record_pages(records: List[Record]) -> List[Page]:
         pages: List[Page] = []
@@ -392,14 +346,14 @@ class Neo4j:
     # TODO: make more efficient by using params instead of injecting
     @staticmethod
     def _get_by_filter(tx, query_filter: QueryFilter) -> List[Page]:
-        if not query_filter or not query_filter.owner:
+        if not query_filter or not query_filter.library:
             return None
 
         query_wheres = []
 
-        if query_filter.owner:
+        if query_filter.library:
             query_wheres.append(
-                'page.owner = $owner AND block.owner = $owner')
+                'page.library = $library AND block.library = $library')
 
         if query_filter.page_filter:
             page_filter = query_filter.page_filter
@@ -456,7 +410,7 @@ class Neo4j:
         if query_filter.name_filter:
             name_match = '(name:Name)-[:Mentioned]->'
             name_filter = query_filter.name_filter
-            query_wheres.append('name.owner = $owner')
+            query_wheres.append('name.library = $library')
             group_bys.append('COUNT(name.id) AS names_count')
             if name_filter.ids:
                 query_wheres.append(f'(name.id IN {list(name_filter.ids)})')
@@ -512,25 +466,10 @@ class Neo4j:
             f'{limit_query} '
         )
         print(f'[Neo4j]: Executing query... {query}')
-        result = tx.run(query, owner=query_filter.owner)
+        result = tx.run(query, library=query_filter.library)
         records = list(result)
         print('[Neo4j]: Query completed!')
         print(records)
 
         return Neo4j._parse_record_pages(records)
     
-    @staticmethod
-    def _discover(tx, owner: str) -> List[Page]:
-        query = (
-            'MATCH (page:Page) '
-            'WHERE page.owner = $owner '
-            'WITH page '
-            'OPTIONAL MATCH (page)-[:Consists]-(block:Block) '
-            'WHERE block.owner = $owner AND block.label = "title" '
-            'RETURN page, collect(block) as blocks '
-            'LIMIT 50'
-        )
-        result = tx.run(query, owner=owner)
-        records = list(result)
-
-        return Neo4j._parse_record_pages(records)

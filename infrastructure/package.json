@@ -26,12 +26,14 @@
     "@aws-cdk/aws-batch-alpha": "^2.79.1-alpha.0",
     "@aws-cdk/aws-lambda-python-alpha": "^2.79.1-alpha.0",
     "@aws-cdk/lambda-layer-kubectl-v26": "^2.0.0",
+    "@aws-quickstart/eks-blueprints": "^1.7.3",
     "@aws-sdk/client-dynamodb": "^3.332.0",
     "@aws-sdk/client-secrets-manager": "^3.332.0",
     "@aws-sdk/client-ssm": "^3.332.0",
     "aws-cdk-lib": "2.79.1",
     "aws-lambda": "^1.0.7",
     "constructs": "^10.2.22",
+    "dotenv": "^16.0.3",
     "source-map-support": "^0.5.21"
   }
 }

@@ -23,7 +23,7 @@ def handler(event: dict, context):
     max_tokens = int(max_tokens) if max_tokens else 1600
     library: str = query_string_parameters.get('library', 'google-oauth2|108573573074253667565') if query_string_parameters else None
 
-    if not (stage or graph_db_uri or query or max_tokens or library):
+    if not (stage and graph_db_uri and query and max_tokens and library):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     if not secrets:

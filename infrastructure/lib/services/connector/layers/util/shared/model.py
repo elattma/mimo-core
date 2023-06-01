@@ -68,6 +68,7 @@ class Integration:
     name: str
     description: str
     icon: str
+    airbyte_id: str
     auth_strategies: Dict[AuthType, AuthStrategy]
 
     @staticmethod
@@ -76,7 +77,8 @@ class Integration:
         name: str = params.get('name', None)
         description: str = params.get('description', None)
         icon: str = params.get('icon', None)
-        if not (id and name and description and icon):
+        airbyte_id: str = params.get('airbyte_id', None)
+        if not (id and name and description and icon and airbyte_id):
             print('Integration.from_dict() missing required params for:', id)
             return None
 
@@ -86,12 +88,13 @@ class Integration:
             auth_type = AuthType(type)
             auth_strategy = AuthStrategy.create(auth_type, **strategy)
             auth_strategies[auth_type] = auth_strategy
-            
+
         return Integration(
             id=id,
             name=name,
             description=description,
             icon=icon,
+            airbyte_id=airbyte_id,
             auth_strategies=auth_strategies
         )
 
