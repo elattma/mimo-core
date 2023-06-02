@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: airbyte
+    meta.helm.sh/release-namespace: kube-system
+  creationTimestamp: "2023-05-24T21:17:55Z"
+  finalizers:
+    - service.kubernetes.io/load-balancer-cleanup
+  labels:
+    app.kubernetes.io/instance: airbyte
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: connector-builder-server
+    app.kubernetes.io/version: 0.44.4
+    helm.sh/chart: connector-builder-server-0.45.20
+  name: airbyte-airbyte-connector-builder-server-svc
+  namespace: kube-system
+  uid: 88feeb1e-1ccf-4f55-b078-5840ab255ca4
+spec:
+  clusterIP: 172.20.192.82
+  clusterIPs:
+    - 172.20.192.82
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: http
+      nodePort: 32474
+      port: 80
+      protocol: TCP
+      targetPort: http
+  selector:
+    app.kubernetes.io/instance: airbyte
+    app.kubernetes.io/name: connector-builder-server
+  sessionAffinity: None
+  type: NodePort

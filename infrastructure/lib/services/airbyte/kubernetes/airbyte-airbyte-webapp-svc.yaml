@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: airbyte
+    meta.helm.sh/release-namespace: kube-system
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
+  creationTimestamp: "2023-05-24T21:17:55Z"
+  finalizers:
+    - service.kubernetes.io/load-balancer-cleanup
+  labels:
+    app.kubernetes.io/instance: airbyte
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: webapp
+    app.kubernetes.io/version: 0.44.4
+    helm.sh/chart: webapp-0.45.20
+  name: airbyte-airbyte-webapp-svc
+  namespace: kube-system
+  uid: 44ca3bfd-078f-4717-abad-d5c29672324c
+spec:
+  allocateLoadBalancerNodePorts: true
+  clusterIP: 172.20.86.221
+  clusterIPs:
+    - 172.20.86.221
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+    - name: http
+      nodePort: 30013
+      port: 80
+      protocol: TCP
+      targetPort: http
+  selector:
+    app.kubernetes.io/instance: airbyte
+    app.kubernetes.io/name: webapp
+  sessionAffinity: None
+  type: LoadBalancer
