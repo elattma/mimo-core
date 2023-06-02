@@ -126,8 +126,11 @@ class LibraryConnectionItem(ParentChildItem):
         auth: dict = item.get('auth', None)
         auth_type = auth.get('type', None) if auth else None
         auth_type: AuthType = AuthType(auth_type) if auth_type else None
+        print(auth)
+        print(auth_type)
         auth.pop('type', None)
         auth = Auth.create(auth_type, **auth) if auth else None
+        print(auth)
         
         name = item.get('name', None)
         integration = item.get('integration', None)

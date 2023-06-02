@@ -69,6 +69,7 @@ class Fetcher(ABC):
             fetcher._request_session.headers.update({
                 'Authorization': f'Bearer {access_token}'
             })
+            print(access_token)
         return fetcher
     
     @abstractmethod

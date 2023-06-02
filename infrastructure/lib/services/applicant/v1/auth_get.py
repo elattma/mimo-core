@@ -23,7 +23,7 @@ def handler(event: dict, context):
     auth_endpoint: str = os.getenv('AUTH_ENDPOINT')
     stage: str = os.getenv('STAGE')
 
-    if not (user and stage and app and kms_key_id and auth_endpoint):
+    if not (user and stage and app and kms_key_id and auth_endpoint and redirect_uri):
         return to_response_error(Errors.MISSING_PARAMS)
 
     if not _db:

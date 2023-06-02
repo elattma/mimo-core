@@ -67,13 +67,11 @@ def handler(event: dict, context):
         }
 
     return {
-        'params': {
-            'user': user,
-            'library': library,
-            'connection': connection,
-            'integration': integration_id,
-            'last_ingested_at': item.connection.ingested_at,
-            'airbyte_id': integration.airbyte_id,
-            **auth_params,
-        }
+        'user': user,
+        'library': library,
+        'connection': connection,
+        'integration': integration_id,
+        'last_ingested_at': item.connection.ingested_at,
+        'airbyte_id': integration.airbyte_id,
+        **auth_params,
     }

@@ -21,7 +21,7 @@ class Drop:
         return f'Drop(batch={self._batch}, id={self._id}, name={self._name}, _datetime={self._datetime})'
 
     def key(self):
-        return f'{self._name}/{self._batch._section_type}/{self._datetime.year}/{self._datetime.month}/{self._datetime.day}/{self._datetime.hour}/{self._id}'
+        return f'{self._name}/{self._datetime.year}/{self._datetime.month}/{self._datetime.day}/{self._datetime.hour}/{self._batch._section_type}/{self._id}'
 
     def __eq__(self, other):
         if isinstance(other, Drop):

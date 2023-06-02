@@ -33,7 +33,8 @@ class ApiGateway:
             keyId=key_id
         )
         usage_plan_id = None
-        for usage_plan in response.items:
+        for usage_plan in response.get('items', {}):
+            print(usage_plan)
             api_stages = usage_plan.get('apiStages', [])
             for api_stage in api_stages:
                 if api_stage.get('apiId') == self._rest_api_id:

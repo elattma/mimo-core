@@ -2,7 +2,8 @@ import os
 from typing import List
 
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import KeyNamespaces, LibraryAppItem, ParentChildDB
+from state.dynamo import (KeyNamespaces, LibraryAppItem, ParentChildDB,
+                          ParentChildItem)
 
 _db: ParentChildDB = None
 
@@ -22,16 +23,31 @@ def handler(event: dict, context):
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
 
+    library_namespace = KeyNamespaces.LIBRARY.value
     app_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app)
-    items: List[LibraryAppItem] = []
+    libraries = []
     try:
-        items = _db.child_query(app_key)
+        app_libraries: List[LibraryAppItem] = _db.child_query(app_key, library_namespace)
+        for app_library in app_libraries:
+            libraries.append({
+                'id': app_library.get_raw_parent(),
+                'created_at': app_library.created_at,
+            })
+    except Exception as e:
+        print(e)
+        return to_response_error(Errors.DB_READ_FAILED)
+    
+    user_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user)
+    try:
+        user_libraries: List[ParentChildItem] = _db.query(user_key, library_namespace)
+        for user_library in user_libraries:
+            libraries.append({
+                'id': user_library.get_raw_parent(),
+                'created_at': 0,
+            })
     except Exception as e:
         print(e)
         return to_response_error(Errors.DB_READ_FAILED)
     return to_response_success({
-        'libraries': [{
-            'id': item.get_raw_parent(),
-            'created_at': item.created_at,
-        } for item in items]
+        'libraries': libraries
     })

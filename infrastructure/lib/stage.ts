@@ -107,6 +107,15 @@ export class MimoStage extends Stage {
       ],
     });
     routeConfigs.push({
+      path: "v0",
+      subRoutes: [
+        {
+          path: "context",
+          methods: [detectiveService.v0GetContextMethod],
+        },
+      ],
+    });
+    routeConfigs.push({
       path: "usage",
       methods: usageMonitorService.methods,
     });
@@ -171,6 +180,7 @@ export class MimoStage extends Stage {
       secrets.grantRead(method.handler);
     }
     secrets.grantRead(detectiveService.indexLambda);
+    secrets.grantRead(detectiveService.v0GetContextMethod.handler);
 
     for (const method of connectorService.integrationMethods) {
       secrets.grantRead(method.handler);
@@ -289,25 +299,17 @@ export class MimoStage extends Stage {
       });
 
       // const airbyte = getAirbyte(this, props.stageId);
-
-      const coalescer = new CoalescerStack(this, "coalescer", {
-        stageId: props.stageId,
-        vpc: vpc.vpc,
-        indexFunction: detectiveService.indexLambda,
-        paramsFunction: connectorService.internalParamsLambda,
-      });
-
-      const airbyteNlb = NetworkLoadBalancer.fromNetworkLoadBalancerAttributes(
+      const airbyteLB = NetworkLoadBalancer.fromNetworkLoadBalancerAttributes(
         api,
-        "airbyte-nlb",
+        "airbyte-load-balancer",
         {
-          loadBalancerArn: process.env.AIRBYTE_NLB_ARN!,
-          loadBalancerDnsName: process.env.AIRBYTE_NLB_DNS_NAME!,
+          loadBalancerArn: process.env.AIRBYTE_LB_ARN!,
+          loadBalancerDnsName: process.env.AIRBYTE_LB_DNS_NAME!,
         }
       );
       const vpcLink = new VpcLink(api, "airbyte-vpc-link", {
         vpcLinkName: "vpc-link",
-        targets: [airbyteNlb],
+        targets: [airbyteLB],
       });
       const integration = new Integration({
         type: IntegrationType.HTTP_PROXY,
@@ -318,16 +320,26 @@ export class MimoStage extends Stage {
             "integration.request.path.proxy": "method.request.path.proxy",
           },
         },
-        integrationHttpMethod: "POST",
-        uri: `http://${airbyteNlb.loadBalancerDnsName}:80/{proxy}`,
+        integrationHttpMethod: "ANY",
+        uri: `http://${airbyteLB.loadBalancerDnsName}:80/{proxy}`,
       });
       const airbyte = api.api.root.addResource("airbyte");
-      const proxy = airbyte.addProxy();
-      proxy.addMethod("POST", integration, {
-        authorizationType: AuthorizationType.NONE,
-        requestParameters: {
-          "method.request.path.proxy": true,
+      airbyte.addProxy({
+        defaultIntegration: integration,
+        defaultMethodOptions: {
+          authorizationType: AuthorizationType.IAM,
+          requestParameters: {
+            "method.request.path.proxy": true,
+          },
         },
+      });
+
+      const coalescer = new CoalescerStack(this, "coalescer", {
+        stageId: props.stageId,
+        vpc: vpc.vpc,
+        indexFunction: detectiveService.indexLambda,
+        paramsFunction: connectorService.internalParamsLambda,
+        api: api.api,
       });
     }
   }

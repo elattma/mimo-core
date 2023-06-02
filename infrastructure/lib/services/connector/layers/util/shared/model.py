@@ -104,12 +104,12 @@ class Auth(ABC):
     type: AuthType
 
     @classmethod
-    def create(cls, type: str, **kwargs) -> 'Auth':
+    def create(cls, type: AuthType, **kwargs) -> 'Auth':
         if not cls.subclasses:
             cls.subclasses = {}
             for subclass in cls.__subclasses__():
-                for type in subclass.get_possible_types():
-                    cls.subclasses[type] = subclass
+                for possible_type in subclass.get_possible_types():
+                    cls.subclasses[possible_type] = subclass
 
         if not cls.subclasses.get(type, None):
             print(f'auth not found for {type}')

@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Dict, List
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 from shared.model import ApiKey, App
 
@@ -265,12 +265,13 @@ class ParentChildDB:
                 print("invalid item!")
             return item
         
-    def child_query(self, child: str) -> List[ParentAppItem]:
+    def child_query(self, child: str, parent_namespace: str) -> List[ParentChildItem]:
         try:
             response = self.table.query(
                 IndexName='child-index',
                 KeyConditionExpression=Key('child').eq(child),
                 ScanIndexForward=False,
+                FilterExpression=Attr('parent').begins_with(parent_namespace),
             )
         except ClientError as err:
             print("Couldn't query %s. Here's why: %s: %s", child,

@@ -39,9 +39,7 @@ class GoogleDocs(Fetcher):
                 })
             
             response = self._request_session.get(DISCOVERY_ENDPOINT, params=params)
-            print(str(response))
             discovery_response: Dict = response.json() if response else None
-            print(discovery_response)
             next_token = discovery_response.get('nextPageToken', None) if discovery_response else None
             files: List[Dict] = discovery_response.get('files', None) if discovery_response else None
             for file in files:

@@ -5,9 +5,16 @@ import {
   JobQueue,
 } from "@aws-cdk/aws-batch-alpha";
 import { Size, Stack, StackProps } from "aws-cdk-lib";
+import { RestApi } from "aws-cdk-lib/aws-apigateway";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { ContainerImage, LogDriver } from "aws-cdk-lib/aws-ecs";
-import { Cluster, ICluster } from "aws-cdk-lib/aws-eks";
+import {
+  Effect,
+  ManagedPolicy,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
 import { IFunction } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import {
@@ -20,15 +27,14 @@ import {
   Condition,
   IChainable,
   Map,
-  Parallel,
   StateMachine,
   TaskInput,
   TaskStateBase,
 } from "aws-cdk-lib/aws-stepfunctions";
 import {
   BatchSubmitJob,
-  EksCall,
-  HttpMethods,
+  CallApiGatewayRestApiEndpoint,
+  HttpMethod,
   LambdaInvoke,
 } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Construct } from "constructs";
@@ -39,6 +45,7 @@ export interface CoalescerStackProps extends StackProps {
   readonly vpc: IVpc;
   readonly paramsFunction: IFunction;
   readonly indexFunction: IFunction;
+  readonly api: RestApi;
 }
 
 export class CoalescerStack extends Stack {
@@ -62,26 +69,18 @@ export class CoalescerStack extends Stack {
       STAGE: props.stageId,
       DATA_LAKE: dataLakeS3.bucketName,
     });
+    if (!tundra.container.jobRole) throw new Error("Job role not found");
+    dataLakeS3.grantReadWrite(tundra.container.jobRole);
     const telescope = this.getJob("telescope", Size.gibibytes(8), 2, {
       STAGE: props.stageId,
       DATA_LAKE: dataLakeS3.bucketName,
     });
 
-    const clusterName = process.env.CLUSTER_NAME || "";
-    const clusterEndpoint = process.env.CLUSTER_ENDPOINT;
-    const clusterCertificateAuthorityData = process.env.CLUSTER_CAD;
-    const airbyteCluster = Cluster.fromClusterAttributes(
-      this,
-      "airbyte-cluster",
-      {
-        clusterName: clusterName,
-        clusterEndpoint: clusterEndpoint,
-        clusterCertificateAuthorityData: clusterCertificateAuthorityData,
-      }
-    );
+    if (!telescope.container.jobRole) throw new Error("Job role not found");
+    dataLakeS3.grantReadWrite(telescope.container.jobRole);
 
     const params = this.getParamsChainable(props.paramsFunction);
-    const airbyteChainable = this.getAirbyteChainable(airbyteCluster);
+    const airbyteChainable = this.getAirbyteChainable(props.api);
     const indexChainable = this.getIndexChainable(props.indexFunction);
 
     const stateMachine = this.getIngestMachine(
@@ -92,6 +91,13 @@ export class CoalescerStack extends Stack {
       queue.jobQueueArn,
       airbyteChainable,
       indexChainable
+    );
+    stateMachine.addToRolePolicy(
+      new PolicyStatement({
+        actions: ["execute-api:Invoke"],
+        effect: Effect.ALLOW,
+        resources: ["*"],
+      })
     );
   }
 
@@ -133,6 +139,14 @@ export class CoalescerStack extends Stack {
           "--access_token",
           "Ref::access_token",
         ],
+        jobRole: new Role(this, `${name}-role`, {
+          assumedBy: new ServicePrincipal("ecs-tasks.amazonaws.com"),
+          managedPolicies: [
+            ManagedPolicy.fromAwsManagedPolicyName(
+              "service-role/AmazonECSTaskExecutionRolePolicy"
+            ),
+          ],
+        }),
       }
     );
     return new EcsJobDefinition(this, `${name}-job`, {
@@ -190,67 +204,125 @@ export class CoalescerStack extends Stack {
     });
   };
 
-  getAirbyteChainable = (airbyte: ICluster): IChainable => {
-    const createSource = new EksCall(this, "airbyte-create-source", {
-      cluster: airbyte,
-      httpMethod: HttpMethods.POST,
-      httpPath: "/api/v1/sources/create",
-      requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
+  getAirbyteChainable = (api: RestApi): IChainable => {
+    const ingestJob = new CallApiGatewayRestApiEndpoint(this, "ingest-job", {
+      api: api,
+      method: HttpMethod.POST,
+      apiPath: "/airbyte/api/v1/connections/sync",
+      requestBody: TaskInput.fromJsonPathAt("$.params.connection"),
+      stageName: api.deploymentStage.stageName,
     });
+    return ingestJob;
+    // const listWorkspaces = new CallApiGatewayRestApiEndpoint(
+    //   this,
+    //   "list-workspaces",
+    //   {
+    //     api: api,
+    //     apiPath: "/airbyte/api/v1/workspaces/list",
+    //     stageName: api.deploymentStage.stageName,
+    //     method: HttpMethod.POST,
+    //     resultSelector: {
+    //       workspaceId: "$.workspaces[0].workspaceId",
+    //     },
+    //     resultPath: "$.airbyte",
+    //   }
+    // );
 
-    const createDestination = new EksCall(this, "airbyte-create-destination", {
-      cluster: airbyte,
-      httpMethod: HttpMethods.POST,
-      httpPath: "/api/v1/destinations/create",
-      requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
-    });
+    // const createSource = new CallApiGatewayRestApiEndpoint(
+    //   this,
+    //   "create-source",
+    //   {
+    //     api: api,
+    //     apiPath: "/airbyte/api/v1/sources/create",
+    //     requestBody: TaskInput.fromObject({
+    //       workspaceId: JsonPath.stringAt("$.airbyte.workspaceId"),
+    //       name: JsonPath.stringAt("$.params.connection"),
+    //       sourceDefinitionId: JsonPath.stringAt("$.params.airbyte_id"),
+    //     }),
+    //     stageName: api.deploymentStage.stageName,
+    //     method: HttpMethod.POST,
+    //   }
+    // );
 
-    const createConnection = new EksCall(this, "airbyte-create-connection", {
-      cluster: airbyte,
-      httpMethod: HttpMethods.POST,
-      httpPath: "/api/v1/connections/create",
-      requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
-    });
+    // const createDestination = new CallApiGatewayRestApiEndpoint(
+    //   this,
+    //   "create-destination",
+    //   {
+    //     api: api,
+    //     method: HttpMethod.POST,
+    //     apiPath: "/airbyte/api/v1/destinations/create",
+    //     requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
+    //     stageName: api.deploymentStage.stageName,
+    //   }
+    // );
 
-    const ingestJob = new EksCall(this, "airbyte-ingest-job", {
-      cluster: airbyte,
-      httpMethod: HttpMethods.POST,
-      httpPath: "/api/v1/connections/sync",
-      requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
-    });
+    // const createConnection = new CallApiGatewayRestApiEndpoint(
+    //   this,
+    //   "create-connection",
+    //   {
+    //     api: api,
+    //     method: HttpMethod.POST,
+    //     apiPath: "/airbyte/api/v1/connections/create",
+    //     requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
+    //     stageName: api.deploymentStage.stageName,
+    //   }
+    // );
 
-    const deleteConnection = new EksCall(this, "airbyte-delete-connection", {
-      cluster: airbyte,
-      httpMethod: HttpMethods.POST,
-      httpPath: "/api/v1/connections/delete",
-      requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
-    });
+    // const ingestJob = new CallApiGatewayRestApiEndpoint(this, "ingest-job", {
+    //   api: api,
+    //   method: HttpMethod.POST,
+    //   apiPath: "/airbyte/api/v1/connections/sync",
+    //   requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
+    //   stageName: api.deploymentStage.stageName,
+    // });
 
-    const deleteDestination = new EksCall(this, "airbyte-delete-destination", {
-      cluster: airbyte,
-      httpMethod: HttpMethods.POST,
-      httpPath: "/api/v1/destinations/delete",
-      requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
-    });
+    // const deleteConnection = new CallApiGatewayRestApiEndpoint(
+    //   this,
+    //   "delete-connection",
+    //   {
+    //     api: api,
+    //     method: HttpMethod.POST,
+    //     apiPath: "/airbyte/api/v1/connections/delete",
+    //     requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
+    //     stageName: api.deploymentStage.stageName,
+    //   }
+    // );
 
-    const deleteSource = new EksCall(this, "airbyte-delete-source", {
-      cluster: airbyte,
-      httpMethod: HttpMethods.POST,
-      httpPath: "/api/v1/sources/delete",
-      requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
-    });
+    // const deleteDestination = new CallApiGatewayRestApiEndpoint(
+    //   this,
+    //   "delete-destination",
+    //   {
+    //     api: api,
+    //     method: HttpMethod.POST,
+    //     apiPath: "/airbyte/api/v1/destinations/delete",
+    //     requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
+    //     stageName: api.deploymentStage.stageName,
+    //   }
+    // );
 
-    return new Parallel(this, "Create Source, Destination")
-      .branch(createSource)
-      .branch(createDestination)
-      .next(createConnection)
-      .next(ingestJob)
-      .next(deleteConnection)
-      .next(
-        new Parallel(this, "Delete Source, Destination")
-          .branch(deleteDestination)
-          .branch(deleteSource)
-      );
+    // const deleteSource = new CallApiGatewayRestApiEndpoint(
+    //   this,
+    //   "delete-source",
+    //   {
+    //     api: api,
+    //     method: HttpMethod.POST,
+    //     apiPath: "/airbyte/api/v1/sources/delete",
+    //     requestBody: TaskInput.fromJsonPathAt("$.params.Payload.params"),
+    //     stageName: api.deploymentStage.stageName,
+    //   }
+    // );
+
+    // return new Parallel(this, "Create Source, Destination")
+    //   .branch(createSource)
+    //   .branch(createDestination)
+    //   .next(createConnection)
+    //   .next(ingestJob)
+    //   .next(deleteConnection)
+    //   .next(
+    //     new Parallel(this, "Delete Source, Destination")
+    //       .branch(deleteDestination)
+    //       .branch(deleteSource)
+    //   );
   };
 
   getIndexChainable = (indexFunction: IFunction): IChainable => {
@@ -269,7 +341,9 @@ export class CoalescerStack extends Stack {
     return new LambdaInvoke(this, "mimo-params-job", {
       lambdaFunction: paramsFunction,
       payload: TaskInput.fromJsonPathAt("$.input"),
-      resultPath: "$.params",
+      resultSelector: {
+        params: "$.Payload.params",
+      },
     });
   };
 }
