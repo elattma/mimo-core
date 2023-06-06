@@ -12,6 +12,9 @@ authors = ["Mohamed Elattma <mo@mimo.team>"]
 python = "^3.9"
 boto3 = "^1.26.84"
 requests = "^2.28.2"
+openai = "^0.27.7"
+pinecone-client = "^2.2.1"
+neo4j = "^5.9.0"
 
 [build-system]
 requires = ["poetry-core"]

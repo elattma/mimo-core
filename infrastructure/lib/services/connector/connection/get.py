@@ -44,12 +44,8 @@ def handler(event: dict, context):
             'id': connection.id,
             'name': connection.name,
             'integration': connection.integration,
-            'auth': {
-                'type': connection.auth.type.value,
-            },
+            'auth': connection.auth.as_dict(),
             'created_at': connection.created_at,
-            'ingested_at': connection.ingested_at,
-            'sync_status': connection.sync_status.value if connection.sync_status else None,
         } for connection in response_connections],
         'next_token': None
     })

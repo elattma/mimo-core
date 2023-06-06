@@ -7,6 +7,8 @@ while IFS= read -r line; do
     value=${line#*=}
     
     # Write the key-value pair to Parameter Store as a secure string
+    echo $key
+    echo $value
     aws ssm put-parameter --profile mimo \
         --name "${key}" \
         --value "${value}" \

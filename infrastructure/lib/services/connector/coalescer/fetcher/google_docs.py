@@ -1,30 +1,26 @@
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Dict, Generator, List, Tuple
+from time import time
+from typing import Dict, Generator, List
 
-from .base import Discovery, Fetcher, Section, get_timestamp_from_format
+import requests
+from auth.base import AuthType
+from auth.basic import Basic
+from auth.direct_token import TokenDirect
+from auth.oauth2_token import TokenOAuth2
+from dstruct.model import Block, Discovery, Entity
+
+from .base import Fetcher, get_timestamp_from_format
 
 GOOGLE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 DISCOVERY_ENDPOINT = 'https://www.googleapis.com/drive/v3/files'
 GET_METADATA_ENDPOINT = 'https://www.googleapis.com/drive/v3/files/{id}'
 GET_DOCUMENT_ENDPOINT = 'https://docs.googleapis.com/v1/documents/{id}'
 
-@dataclass
-class DocumentSection(Section):
-    title: str = None
-    body: str = None
-    owners: List[Tuple] = None
-    last_updated_timestamp: int = None
-
-    @classmethod
-    def headers(cls) -> List[str]:
-        return ['id', 'title', 'body', 'owners', 'last_updated_timestamp']
-
-    def row(self) -> List[Any]:
-        return [self.discovery.id, self.title, self.body, self.owners, self.last_updated_timestamp]
 
 class GoogleDocs(Fetcher):
     _INTEGRATION = 'google_docs'
+
+    def _get_supported_auth_types(self) -> List[AuthType]:
+        return [AuthType.BASIC, AuthType.TOKEN_OAUTH2, AuthType.TOKEN_DIRECT]
 
     def discover(self) -> Generator[Discovery, None, None]:
         discover_filters = ['mimeType="application/vnd.google-apps.document"', 'trashed=false']
@@ -38,10 +34,9 @@ class GoogleDocs(Fetcher):
                     'pageToken': next_token
                 })
             
-            response = self._request_session.get(DISCOVERY_ENDPOINT, params=params)
-            discovery_response: Dict = response.json() if response else None
-            next_token = discovery_response.get('nextPageToken', None) if discovery_response else None
-            files: List[Dict] = discovery_response.get('files', None) if discovery_response else None
+            response = self.request(DISCOVERY_ENDPOINT, params=params)
+            next_token = response.get('nextPageToken', None) if response else None
+            files: List[Dict] = response.get('files', None) if response else None
             for file in files:
                 file_id = file.get('id', None) if file else None
                 yield Discovery(
@@ -52,13 +47,15 @@ class GoogleDocs(Fetcher):
             if not next_token:
                 break
     
-    def _get_owners(self, owners_dict: Dict) -> List[Tuple]:
-        owners: List[Tuple] = []
+    def _get_owners(self, owners_dict: Dict) -> List[Entity]:
+        owners: List[Entity] = []
         for owner in owners_dict:
             if not owner or 'emailAddress' not in owner:
                 continue
-            owners.append((owner.get('emailAddress'), owner.get('displayName', None)))
-
+            owners.append(Entity(
+                id=owner.get('emailAddress'),
+                value=owner.get('displayName', None)
+            ))
         return owners
 
     def _get_body(self, body_dict: Dict) -> str:
@@ -91,30 +88,31 @@ class GoogleDocs(Fetcher):
         
         return '\n\n'.join(body)
 
-    def _get_lut(self, modifiedTime: str) -> int:
+    def _get_last_updated_timestamp(self, modifiedTime: str) -> int:
         return get_timestamp_from_format(modifiedTime, GOOGLE_TIME_FORMAT)
 
-    def fetch(self, discovery: Discovery) -> List[Section]:
-        print('google_docs load!')
-        response = self._request_session.get(
+    def fetch(self, discovery: Discovery) -> None:
+        response = self.request(
             GET_METADATA_ENDPOINT.format(id=discovery.id),
             params={
                 'fields': 'modifiedTime, owners'
             }
         )
-        metadata_response: dict = response.json() if response else None
-        lut = self._get_lut(metadata_response.get('modifiedTime', None)) if metadata_response else None
-        owners = self._get_owners(metadata_response.get('owners', None) if metadata_response else None)
+        last_updated_timestamp = self._get_last_updated_timestamp(response.get('modifiedTime', None)) if response else None
+        owners = self._get_owners(response.get('owners', None) if response else None)
+        discovery.add_entities(owners)
 
-        response = self._request_session.get(GET_DOCUMENT_ENDPOINT.format(id=discovery.id))
-        load_response: dict = response.json() if response else None
-        title = load_response.get('title', None)
-        body = self._get_body(load_response.get('body', None))
-        document = DocumentSection(
-            discovery=discovery,
-            last_updated_timestamp=lut,
-            title=title,
-            body=body,
-            owners=owners,
-        )
-        return [document]
+        response = self.request(GET_DOCUMENT_ENDPOINT.format(id=discovery.id))
+        title = response.get('title', None)
+        discovery.add_blocks([Block(
+            last_updated_timestamp=last_updated_timestamp,
+            label='title',
+            unstructured=title
+        )])
+
+        body = self._get_body(response.get('body', None))
+        discovery.add_blocks([Block(
+            last_updated_timestamp=last_updated_timestamp,
+            label='body',
+            unstructured=body
+        )])

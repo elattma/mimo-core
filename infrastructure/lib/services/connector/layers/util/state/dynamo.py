@@ -4,9 +4,10 @@ from enum import Enum
 from typing import Dict, List
 
 import boto3
+from auth.base import AuthStrategy
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from shared.model import Auth, AuthType, Connection, Library, SyncStatus
+from shared.model import Auth, AuthType, Connection, Library, Sync
 
 
 class KeyNamespaces(Enum):
@@ -109,8 +110,8 @@ class LibraryConnectionItem(ParentChildItem):
             'name': self.connection.name,
             'integration': self.connection.integration,
             'auth': self.connection.auth.as_dict() if self.connection.auth else None,
+            'sync': self.connection.sync.as_dict() if self.connection.sync else None,
             'created_at': self.connection.created_at,
-            'ingested_at': self.connection.ingested_at,
         }
 
     @staticmethod
@@ -126,25 +127,19 @@ class LibraryConnectionItem(ParentChildItem):
         auth: dict = item.get('auth', None)
         auth_type = auth.get('type', None) if auth else None
         auth_type: AuthType = AuthType(auth_type) if auth_type else None
-        print(auth)
-        print(auth_type)
         auth.pop('type', None)
-        auth = Auth.create(auth_type, **auth) if auth else None
-        print(auth)
         
         name = item.get('name', None)
         integration = item.get('integration', None)
         created_at = item.get('created_at', None)
-        ingested_at = item.get('ingested_at', None)
-        sync_status = item.get('sync_status', None)
+        sync = item.get('sync', None)
         connection = Connection(
             id=child.split('#')[-1],
             name=name,
             integration=integration,
-            auth=auth,
+            auth=AuthStrategy.auth_from_params(auth_type, **auth) if auth and auth_type else None,
             created_at=int(created_at) if created_at else None,
-            ingested_at=int(ingested_at) if ingested_at else None,
-            sync_status=SyncStatus(sync_status) if sync_status else None,
+            sync=Sync.from_dict(sync) if sync else None,
         )
 
         return LibraryConnectionItem(
@@ -169,7 +164,7 @@ class ParentChildDB:
                 err.response['Error']['Code'], err.response['Error']['Message'])
             raise
 
-    def update(self, parent: str, child: str, kv_update_map: Dict, **kwargs) -> Dict:
+    def update(self, parent: str, child: str, kv_update_map: Dict, **kwargs) -> bool:
         if not kv_update_map:
             return
         update_expression = ', '.join([f'#{key} = :{key}' for key in kv_update_map.keys()])
@@ -186,7 +181,7 @@ class ParentChildDB:
                 ExpressionAttributeValues=expression_attribute_values,
                 **kwargs
             )
-            return response.get('Attributes', None)
+            return response.get('ResponseMetadata', {}).get('HTTPStatusCode', None) == 200
         except ClientError as err:
             print("Couldn't load data into table %s. Here's why: %s: %s", self.table.name,
                 err.response['Error']['Code'], err.response['Error']['Message'])

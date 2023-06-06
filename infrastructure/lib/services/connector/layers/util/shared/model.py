@@ -1,66 +1,9 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict
 
+from auth.base import Auth, AuthStrategy, AuthType
 
-class AuthType(Enum):
-    TOKEN_OAUTH2 = 'token_oauth2'
-    TOKEN_DIRECT = 'token_direct'
-
-@dataclass
-class AuthStrategy(ABC):
-    subclasses = {}
-
-    @classmethod
-    def create(cls, type: AuthType, **kwargs) -> 'AuthStrategy':
-        if not cls.subclasses:
-            cls.subclasses = {
-                subclass.get_type(): subclass for subclass in cls.__subclasses__()
-            }
-
-        if not cls.subclasses.get(type, None):
-            print(f'auth strategy not found for {type}')
-            return None
-
-        return cls.subclasses[type](**kwargs)
-
-    @classmethod
-    @abstractmethod
-    def get_type(cls) -> AuthType:
-        raise Exception('get_type() not implemented')
-    
-    @abstractmethod
-    def get_params(self):
-        raise Exception('get_params() not implemented')
-    
-@dataclass
-class TokenOAuth2Strategy(AuthStrategy):
-    oauth2_link: str
-    authorize_endpoint: str
-    client_id: str
-    client_secret: str
-    refresh_endpoint: str = None
-
-    @classmethod
-    def get_type(cls) -> AuthType:
-        return AuthType.TOKEN_OAUTH2
-    
-    def get_params(self):
-        return {
-            'oauth2_link': self.oauth2_link,
-        }
-
-@dataclass
-class TokenDirectStrategy(AuthStrategy):
-    id: str
-    
-    @classmethod
-    def get_type(cls) -> AuthType:
-        return AuthType.TOKEN_DIRECT
-    
-    def get_params(self):
-        return {}
 
 @dataclass
 class Integration:
@@ -97,68 +40,44 @@ class Integration:
             airbyte_id=airbyte_id,
             auth_strategies=auth_strategies
         )
-
-@dataclass
-class Auth(ABC):
-    subclasses = {}
-    type: AuthType
-
-    @classmethod
-    def create(cls, type: AuthType, **kwargs) -> 'Auth':
-        if not cls.subclasses:
-            cls.subclasses = {}
-            for subclass in cls.__subclasses__():
-                for possible_type in subclass.get_possible_types():
-                    cls.subclasses[possible_type] = subclass
-
-        if not cls.subclasses.get(type, None):
-            print(f'auth not found for {type}')
-            return None
-
-        return cls.subclasses[type](type, **kwargs)
-
-    @classmethod
-    @abstractmethod
-    def get_possible_types(cls) -> List[AuthType]:
-        raise Exception('get_possible_types() not implemented')
-
-    @abstractmethod
-    def is_valid(self):
-        pass
-
-    @abstractmethod
-    def as_dict(self):
-        pass
-    
-@dataclass
-class TokenAuth(Auth):
-    access_token: str
-    refresh_token: str = None
-    timestamp: int = None
-    expiry_timestamp: int = None
-
-    @classmethod
-    def get_possible_types(cls) -> List[AuthType]:
-        return [AuthType.TOKEN_OAUTH2, AuthType.TOKEN_DIRECT]
-
-    def is_valid(self):
-        return self.access_token or self.refresh_token
-    
-    def as_dict(self):
-        return {
-            'type': self.type.value,
-            'access_token': self.access_token,
-            'refresh_token': self.refresh_token,
-            'timestamp': self.timestamp,
-            'expiry_timestamp': self.expiry_timestamp,
-        }
     
 class SyncStatus(Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     UNSYNCED = "UNSYNCED"
     IN_PROGRESS = "IN_PROGRESS"
+
+@dataclass
+class Sync:
+    status: SyncStatus
+    checkpoint_at: int
+    ingested_at: int
+
+    def is_valid(self) -> bool:
+        return self.status and self.checkpoint_at and self.ingested_at
+
+    @staticmethod
+    def from_dict(item: dict) -> 'Sync':
+        if not item:
+            return None
+
+        status = item.get('status', None)
+        checkpoint_at = item.get('checkpoint_at', None)
+        ingested_at = item.get('ingested_at', None)
+
+        return Sync(
+            status=SyncStatus(status) if status else None,
+            checkpoint_at=checkpoint_at,
+            ingested_at=ingested_at,
+        )
     
+    def as_dict(self) -> dict:
+        return {
+            'status': self.status.value,
+            'checkpoint_at': self.checkpoint_at,
+            'ingested_at': self.ingested_at,
+        }
+
 @dataclass
 class Connection:
     id: str = None
@@ -166,12 +85,12 @@ class Connection:
     integration: str = None
     auth: Auth = None
     created_at: int = None
-    ingested_at: int = None
-    sync_status: SyncStatus = None
+    sync: Sync = None
     
     def is_valid(self):
-        return self.id and self.name and self.integration \
-            and self.auth and self.auth.is_valid() and self.created_at
+        return self.id and self.name and self.integration and self.auth \
+            and self.auth.is_valid() and self.created_at
+            # and self.sync and self.sync.is_valid()
     
 @dataclass
 class Library:

@@ -3,8 +3,8 @@ import os
 from time import time
 from typing import Dict
 
-from auth.authorizer import Authorizer
-from shared.model import Auth, AuthType, Connection, Integration, TokenAuth
+from auth.base import AuthStrategy
+from shared.model import Auth, AuthType, Connection, Integration
 from shared.response import Errors, to_response_error, to_response_success
 from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
 from state.params import SSM
@@ -28,12 +28,12 @@ def handler(event: dict, context):
     name: str = body.get('name', None) if body else None
     auth_strategy: Dict = body.get('auth_strategy', None) if body else None
     type: str = auth_strategy.get('type', None) if auth_strategy else None
+    type: AuthType = AuthType(type) if type else None
 
     if not (user and stage and library and name and integration_id and type):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     now_timestamp: int = int(time())
-
     if not _integrations_dict:
         _ssm = SSM()
         integration_params = _ssm.load_params(integrations_path)
@@ -41,26 +41,12 @@ def handler(event: dict, context):
         for id, integration_params in integration_params.items():
             _integrations_dict[id] = Integration.from_dict(integration_params)
     integration: Integration = _integrations_dict.get(integration_id) if _integrations_dict else None
-    auth: Auth = None
-    if type == AuthType.TOKEN_OAUTH2.value:
-        code: str = auth_strategy.get('code', None) if auth_strategy else None
-        redirect_uri: str = auth_strategy.get('redirect_uri', None) if auth_strategy else None
-        auth_strategy = integration.auth_strategies.get(AuthType.TOKEN_OAUTH2, None)
-        if not (integration  and code and redirect_uri and auth_strategy):
-            return to_response_error(Errors.INVALID_AUTH)
-        auth = Authorizer.token_oauth2(auth_strategy, code, redirect_uri)
-    elif type == AuthType.TOKEN_DIRECT.value:
-        access_token: str = auth_strategy.get('access_token', None) if auth_strategy else None
-        refresh_token: str = auth_strategy.get('refresh_token', None) if auth_strategy else None
-        if not (access_token or refresh_token):
-            return to_response_error(Errors.INVALID_AUTH)
-        auth = TokenAuth(
-            type=AuthType.TOKEN_DIRECT,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            timestamp=now_timestamp
-        )
-
+    strategy: AuthStrategy = integration.auth_strategies.get(type, None)
+    if not (integration and strategy):
+        return to_response_error(Errors.INVALID_AUTH.value)
+    
+    auth_strategy.pop('type', None)
+    auth: Auth = strategy.auth(**auth_strategy, grant_type='authorization_code')
     if not auth:
         return to_response_error(Errors.AUTH_FAILED)
 
@@ -86,10 +72,7 @@ def handler(event: dict, context):
             'id': connection.id,
             'name': connection.name,
             'integration': connection.integration,
-            'auth': {
-                'type': connection.auth.type.value,
-            },
-            'created_at': connection.created_at,
-            'ingested_at': connection.ingested_at
+            'auth': connection.auth.as_dict() if connection.auth else None,
+            'created_at': connection.created_at
         }
     })

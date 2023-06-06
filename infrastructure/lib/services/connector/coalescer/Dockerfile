@@ -24,5 +24,6 @@ RUN poetry config virtualenvs.create false \
 
 # Run your app
 COPY . /app/
+COPY ../layers/util/. /app/.
 
 CMD ["python", "app.py"]

@@ -116,9 +116,6 @@ export class ConnectorStack extends Stack {
               created_at: {
                 type: JsonSchemaType.STRING,
               },
-              ingested_at: {
-                type: JsonSchemaType.STRING,
-              },
             },
           },
         },
@@ -176,9 +173,6 @@ export class ConnectorStack extends Stack {
                   type: JsonSchemaType.STRING,
                 },
                 created_at: {
-                  type: JsonSchemaType.STRING,
-                },
-                ingested_at: {
                   type: JsonSchemaType.STRING,
                 },
               },
