@@ -18,12 +18,12 @@ ENV PATH="${PATH}:${POETRY_VENV}/bin"
 WORKDIR /app
 
 # Install dependencies
-COPY poetry.lock pyproject.toml ./
+COPY coalescer/poetry.lock coalescer/pyproject.toml ./
 RUN poetry config virtualenvs.create false \
   && poetry install $(test "$YOUR_ENV" == production && echo "--only main") --no-interaction --no-ansi
 
 # Run your app
-COPY . /app/
-COPY ../layers/util/. /app/.
+COPY coalescer/. /app/
+COPY layers/util/. /app/.
 
 CMD ["python", "app.py"]

@@ -4,7 +4,8 @@ from time import time
 from typing import Dict
 
 from auth.base import AuthStrategy
-from shared.model import Auth, AuthType, Connection, Integration
+from shared.model import (Auth, AuthType, Connection, Integration, Sync,
+                          SyncStatus)
 from shared.response import Errors, to_response_error, to_response_success
 from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
 from state.params import SSM
@@ -55,7 +56,8 @@ def handler(event: dict, context):
         name=name,
         integration=integration.id,
         auth=auth,
-        created_at=now_timestamp
+        created_at=now_timestamp,
+        sync=Sync(status=SyncStatus.UNSYNCED, checkpoint_at=0, ingested_at=0)
     )
 
     if not _db: 
@@ -73,6 +75,7 @@ def handler(event: dict, context):
             'name': connection.name,
             'integration': connection.integration,
             'auth': connection.auth.as_dict() if connection.auth else None,
-            'created_at': connection.created_at
+            'created_at': connection.created_at,
+            'sync': connection.sync.as_dict() if connection.sync else None
         }
     })

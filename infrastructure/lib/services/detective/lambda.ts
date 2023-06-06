@@ -25,7 +25,6 @@ export class DetectiveStack extends Stack {
     const layers: PythonLayerVersion[] = [];
     const getContextMethod = this.getContextMethod(props.stageId, layers);
     this.methods.push(getContextMethod);
-    this.indexLambda = this.getIndexFunction(props.stageId, layers);
     this.v0GetContextMethod = this.getV0GetContextMethod(props.stageId, layers);
   }
 
@@ -185,25 +184,5 @@ export class DetectiveStack extends Stack {
       authorizerType: AuthorizerType.API_KEY,
       responseModelOptions: methodResponseOptions,
     };
-  };
-
-  getIndexFunction = (stage: string, layers: PythonLayerVersion[]) => {
-    return new PythonFunction(this, `${stage}-index-lambda`, {
-      entry: path.join(__dirname, "context"),
-      index: "index.py",
-      runtime: Runtime.PYTHON_3_9,
-      handler: "handler",
-      timeout: Duration.minutes(15),
-      memorySize: 1024,
-      environment: {
-        STAGE: stage,
-        GRAPH_DB_URI: "neo4j+s://67eff9a1.databases.neo4j.io",
-      },
-      retryAttempts: 0,
-      bundling: {
-        assetExcludes: ["**.venv**", "**__pycache__**"],
-      },
-      layers: layers,
-    });
   };
 }

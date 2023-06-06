@@ -11,19 +11,17 @@ import path = require("path");
 
 export interface ConnectorStackProps extends StackProps {
   readonly stageId: string;
-  readonly layers?: Map<string, PythonLayerVersion>;
 }
 
 export class ConnectorStack extends Stack {
   readonly methods: MethodConfig[] = [];
   readonly integrationMethods: MethodConfig[] = [];
   readonly libraryMethods: MethodConfig[] = [];
-  readonly internalParamsLambda: PythonFunction;
+  readonly layers: PythonLayerVersion[] = [];
 
   constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
 
-    const layers: PythonLayerVersion[] = [];
     const util = new PythonLayerVersion(this, `${props.stageId}-util-layer`, {
       entry: path.join(__dirname, `layers/util`),
       bundling: {
@@ -31,27 +29,22 @@ export class ConnectorStack extends Stack {
       },
       compatibleRuntimes: [Runtime.PYTHON_3_9],
     });
-    layers.push(util);
-    const createMethod = this.connectionPost(props.stageId, layers);
+    this.layers.push(util);
+    const createMethod = this.connectionPost(props.stageId);
     this.methods.push(createMethod);
-    const getMethod = this.connectionGet(props.stageId, layers);
+    const getMethod = this.connectionGet(props.stageId);
     this.methods.push(getMethod);
-    const deleteMethod = this.connectionDelete(props.stageId, layers);
+    const deleteMethod = this.connectionDelete(props.stageId);
     this.methods.push(deleteMethod);
 
-    const integrationsMethod = this.integrationGet(props.stageId, layers);
+    const integrationsMethod = this.integrationGet(props.stageId);
     this.integrationMethods.push(integrationsMethod);
 
-    const libraryMethod = this.libraryGet(props.stageId, layers);
+    const libraryMethod = this.libraryGet(props.stageId);
     this.libraryMethods.push(libraryMethod);
-
-    this.internalParamsLambda = this.internalParams(props.stageId, layers);
   }
 
-  connectionPost = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
+  connectionPost = (stage: string): MethodConfig => {
     const handler = new PythonFunction(
       this,
       `${stage}-connector-create-lambda`,
@@ -69,7 +62,7 @@ export class ConnectorStack extends Stack {
         bundling: {
           assetExcludes: ["**.venv**", "**__pycache__**"],
         },
-        layers: layers,
+        layers: this.layers,
       }
     );
 
@@ -131,10 +124,7 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  connectionGet = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
+  connectionGet = (stage: string): MethodConfig => {
     const handler = new PythonFunction(this, `${stage}-connector-get-lambda`, {
       entry: path.join(__dirname, "connection"),
       index: "get.py",
@@ -149,7 +139,7 @@ export class ConnectorStack extends Stack {
       bundling: {
         assetExcludes: ["**.venv**", "**__pycache__**"],
       },
-      layers: layers,
+      layers: this.layers,
     });
 
     const methodResponseOptions: ModelOptions = {
@@ -192,10 +182,7 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  connectionDelete = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
+  connectionDelete = (stage: string): MethodConfig => {
     const handler = new PythonFunction(
       this,
       `${stage}-connector-delete-lambda`,
@@ -213,7 +200,7 @@ export class ConnectorStack extends Stack {
         bundling: {
           assetExcludes: ["**.venv**", "**__pycache__**"],
         },
-        layers: layers,
+        layers: this.layers,
       }
     );
 
@@ -240,10 +227,7 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  integrationGet = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): MethodConfig => {
+  integrationGet = (stage: string): MethodConfig => {
     const handler = new PythonFunction(
       this,
       `${stage}-connector-integrations-lambda`,
@@ -261,7 +245,7 @@ export class ConnectorStack extends Stack {
         bundling: {
           assetExcludes: ["**.venv**"],
         },
-        layers: layers,
+        layers: this.layers,
       }
     );
 
@@ -307,7 +291,7 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  libraryGet = (stage: string, layers: PythonLayerVersion[]): MethodConfig => {
+  libraryGet = (stage: string): MethodConfig => {
     const handler = new PythonFunction(
       this,
       `${stage}-connector-library-lambda`,
@@ -325,7 +309,7 @@ export class ConnectorStack extends Stack {
         bundling: {
           assetExcludes: ["**.venv**"],
         },
-        layers: layers,
+        layers: this.layers,
       }
     );
 
@@ -367,31 +351,5 @@ export class ConnectorStack extends Stack {
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
     };
-  };
-
-  internalParams = (
-    stage: string,
-    layers: PythonLayerVersion[]
-  ): PythonFunction => {
-    return new PythonFunction(
-      this,
-      `${stage}-connection-internal-params-lambda`,
-      {
-        entry: path.join(__dirname, "internal"),
-        index: "params.py",
-        runtime: Runtime.PYTHON_3_9,
-        handler: "handler",
-        timeout: Duration.seconds(30),
-        memorySize: 1024,
-        environment: {
-          STAGE: stage,
-        },
-        retryAttempts: 0,
-        bundling: {
-          assetExcludes: ["**.venv**"],
-        },
-        layers: layers,
-      }
-    );
   };
 }

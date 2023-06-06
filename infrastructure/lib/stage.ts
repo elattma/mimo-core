@@ -1,17 +1,4 @@
 import { Stage, StageProps } from "aws-cdk-lib";
-import {
-  AuthorizationType,
-  ConnectionType,
-  Integration,
-  IntegrationType,
-  VpcLink,
-} from "aws-cdk-lib/aws-apigateway";
-import {
-  GatewayVpcEndpointAwsService,
-  InterfaceVpcEndpointAwsService,
-  SubnetType,
-} from "aws-cdk-lib/aws-ec2";
-import { NetworkLoadBalancer } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { ApiStack } from "./api";
@@ -73,6 +60,13 @@ export class MimoStage extends Stage {
     const applicantService = new ApplicantStack(this, "applicant", {
       stageId: props.stageId,
     });
+    const vpc = new VpcStack(this, "vpc", {
+      stageId: props.stageId,
+    });
+    const coalescer = new CoalescerStack(this, "coalescer", {
+      stageId: props.stageId,
+      vpc: vpc.vpc,
+    });
     routeConfigs.push({
       path: "connection",
       methods: connectorService.methods,
@@ -86,6 +80,10 @@ export class MimoStage extends Stage {
           path: "user_library",
           methods: connectorService.libraryMethods,
           idResource: "library",
+        },
+        {
+          path: "sync",
+          methods: [coalescer.syncPost],
         },
       ],
     });
@@ -179,7 +177,6 @@ export class MimoStage extends Stage {
     for (const method of detectiveService.methods) {
       secrets.grantRead(method.handler);
     }
-    secrets.grantRead(detectiveService.indexLambda);
     secrets.grantRead(detectiveService.v0GetContextMethod.handler);
 
     for (const method of connectorService.integrationMethods) {
@@ -192,18 +189,6 @@ export class MimoStage extends Stage {
         })
       );
     }
-
-    connectorService.internalParamsLambda.addEnvironment(
-      "INTEGRATIONS_PATH",
-      integrationsPath
-    );
-    connectorService.internalParamsLambda.addToRolePolicy(
-      new PolicyStatement({
-        actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
-        resources: ["*"],
-      })
-    );
-    dynamo.mimoTable.grantReadData(connectorService.internalParamsLambda);
 
     for (const method of usageMonitorService.methods) {
       method.handler.addEnvironment("API_PATH", apiPath);
@@ -269,78 +254,5 @@ export class MimoStage extends Stage {
     ssm.defineIntegrationParams(integrationsPath, `${assetsPrefixPath}/icons`);
     ssm.defineUsagePlanParams(usagePlansPath, [api.defaultUsagePlan]);
     ssm.defineApiParams(apiPath, api.api);
-
-    if (props.stageId === "beta") {
-      const vpc = new VpcStack(this, "vpc", {
-        stageId: props.stageId,
-      });
-      vpc.vpc.addGatewayEndpoint("s3-gateway", {
-        service: GatewayVpcEndpointAwsService.S3,
-        subnets: [
-          {
-            subnetType: SubnetType.PRIVATE_ISOLATED,
-          },
-          {
-            subnetType: SubnetType.PRIVATE_WITH_EGRESS,
-          },
-        ],
-      });
-      vpc.vpc.addInterfaceEndpoint("ecr-interface", {
-        service: InterfaceVpcEndpointAwsService.ECR,
-      });
-      vpc.vpc.addInterfaceEndpoint("ecr-docker-interface", {
-        service: InterfaceVpcEndpointAwsService.ECR_DOCKER,
-      });
-      vpc.vpc.addInterfaceEndpoint("secrets-interface", {
-        service: InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      });
-      vpc.vpc.addInterfaceEndpoint("cloudwatch-interface", {
-        service: InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-      });
-
-      // const airbyte = getAirbyte(this, props.stageId);
-      const airbyteLB = NetworkLoadBalancer.fromNetworkLoadBalancerAttributes(
-        api,
-        "airbyte-load-balancer",
-        {
-          loadBalancerArn: process.env.AIRBYTE_LB_ARN!,
-          loadBalancerDnsName: process.env.AIRBYTE_LB_DNS_NAME!,
-        }
-      );
-      const vpcLink = new VpcLink(api, "airbyte-vpc-link", {
-        vpcLinkName: "vpc-link",
-        targets: [airbyteLB],
-      });
-      const integration = new Integration({
-        type: IntegrationType.HTTP_PROXY,
-        options: {
-          connectionType: ConnectionType.VPC_LINK,
-          vpcLink,
-          requestParameters: {
-            "integration.request.path.proxy": "method.request.path.proxy",
-          },
-        },
-        integrationHttpMethod: "ANY",
-        uri: `http://${airbyteLB.loadBalancerDnsName}:80/{proxy}`,
-      });
-      const airbyte = api.api.root.addResource("airbyte");
-      airbyte.addProxy({
-        defaultIntegration: integration,
-        defaultMethodOptions: {
-          authorizationType: AuthorizationType.IAM,
-          requestParameters: {
-            "method.request.path.proxy": true,
-          },
-        },
-      });
-
-      const coalescer = new CoalescerStack(this, "coalescer", {
-        stageId: props.stageId,
-        vpc: vpc.vpc,
-        indexFunction: detectiveService.indexLambda,
-        paramsFunction: connectorService.internalParamsLambda,
-        api: api.api,
-      });
-    }
   }
 }
