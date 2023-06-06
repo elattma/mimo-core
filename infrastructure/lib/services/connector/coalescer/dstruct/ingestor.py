@@ -193,7 +193,7 @@ class Ingestor:
         try:
             deleted_blocks = self._neo4j.cleanup(self._library)
             print(deleted_blocks)
-            self._pinecone.delete(deleted_blocks, self._library)
+            self._pinecone.delete(deleted_blocks)
         except Exception as e:
             print(f'failed to cleanup: {str(e)}')
     

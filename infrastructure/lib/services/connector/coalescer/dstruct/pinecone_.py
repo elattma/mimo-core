@@ -23,24 +23,31 @@ class Row:
 
 
 class Pinecone:
-    def __init__(self, api_key: str, environment: str, index_name: str = 'beta'):
+    def __init__(self, library: str, api_key: str, environment: str, index_name: str = 'beta'):
         pinecone.init(api_key=api_key, environment=environment)
         indexes = pinecone.list_indexes()
         if indexes and index_name in indexes:
             self._index = pinecone.Index(index_name=index_name)
-        else:
-            raise Exception(f'Pinecone index {index_name} not found')
+        self._library = library
+        if not (self._index and self._library):
+            raise Exception('Pinecone index or library not found')
+        
+    def _with_library(self, id: str):
+        return f'{self._library}#{id}'
+    
+    def _without_library(self, id: str):
+        return id.split('#')[-1]
 
-    def delete(self, ids: List[str], library: str) -> bool:
-        if not (self._index and ids and library):
+    def delete(self, ids: List[str]) -> bool:
+        if not ids:
             return False
 
-        delete_response = self._index.delete(ids=ids)
+        delete_response = self._index.delete(ids=[self._with_library(id) for id in ids])
         print(f'[Pinecone] Delete response: {delete_response}')
         return True
 
     def _batched_upsert(self, vectors: List[dict], batch_size: int = 100) -> bool:
-        if not vectors or len(vectors) < 1:
+        if not vectors:
             return False
 
         len_vectors = len(vectors)
@@ -61,7 +68,7 @@ class Pinecone:
         vectors = []
         for row in rows:
             vectors.append({
-                'id': row.id,
+                'id': self._with_library(row.id),
                 'values': row.embedding,
                 'metadata': row.to_metadata_dict()
             })
@@ -72,5 +79,5 @@ class Pinecone:
         if not (self._index and ids and len(ids) > 0):
             return None
 
-        fetch_response = self._index.fetch(ids=ids)
+        fetch_response = self._index.fetch(ids=[self._with_library(id) for id in ids])
         return fetch_response.get('vectors', None) if fetch_response else None

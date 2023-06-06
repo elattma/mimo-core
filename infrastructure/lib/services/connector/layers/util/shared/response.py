@@ -23,6 +23,7 @@ class Errors(Enum):
     INVALID_CONNECTION = 'invalid connection'
     DB_READ_FAILED = 'db read failed'
     SYNC_IN_PROGRESS = 'sync in progress'
+    BATCH_SUBMIT_FAILED = 'batch submit failed'
 
 def to_response_error(error_message: Errors):
     return {

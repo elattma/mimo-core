@@ -20,6 +20,12 @@ def handler(event: dict, context):
     if not (user and stage and connection and library):
         return to_response_error(Errors.MISSING_PARAMS)
 
+    # first delete data from underlying data stores and only if those are successful, delete from the parent-child db
+    # delete from s3 (if applicable)
+    # delete from pinecone
+    # delete from neo4j
+    # delete from dynamo
+
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
     

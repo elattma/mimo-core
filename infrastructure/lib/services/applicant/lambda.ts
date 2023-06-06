@@ -59,6 +59,8 @@ export class ApplicantStack extends Stack {
     this.developerMethods.push(developerGetMethod);
     const developerPatchMethod = this.developerPatch(props.stageId, layers);
     this.developerMethods.push(developerPatchMethod);
+    const developerPostMethod = this.developerPost(props.stageId, layers);
+    this.developerMethods.push(developerPostMethod);
 
     const v1AuthGetMethod = this.v1AuthGet(props.stageId, layers, authKey);
     this.v1AuthMethods.push(v1AuthGetMethod);
@@ -427,6 +429,7 @@ export class ApplicantStack extends Stack {
       memorySize: 1024,
       environment: {
         DEVELOPER_SECRET_PATH_PREFIX: `/${stage}/developer`,
+        WAITLIST_TABLE: `mimo-${stage}-waitlist`,
       },
       retryAttempts: 0,
       bundling: {
@@ -507,6 +510,49 @@ export class ApplicantStack extends Stack {
       name: "PATCH",
       handler: handler,
       requestModelOptions: methodRequestOptions,
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.APP_OAUTH,
+    };
+  };
+
+  developerPost = (
+    stage: string,
+    layers: PythonLayerVersion[]
+  ): MethodConfig => {
+    const handler = new PythonFunction(this, `developer-post-lambda`, {
+      entry: path.join(__dirname, "developer"),
+      index: "post.py",
+      runtime: Runtime.PYTHON_3_9,
+      handler: "handler",
+      timeout: Duration.seconds(30),
+      memorySize: 1024,
+      environment: {
+        WAITLIST_TABLE: `mimo-${stage}-waitlist`,
+      },
+      retryAttempts: 0,
+      bundling: {
+        assetExcludes: ["**.venv**", "**__pycache__**"],
+      },
+      layers: layers,
+    });
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "DeveloperPostResponse",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          success: {
+            type: JsonSchemaType.BOOLEAN,
+            default: true,
+          },
+        },
+      },
+    };
+
+    return {
+      name: "POST",
+      handler: handler,
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
     };

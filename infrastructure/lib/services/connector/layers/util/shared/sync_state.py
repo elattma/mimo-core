@@ -1,11 +1,10 @@
-from datetime import datetime
 from time import time
 
 from shared.model import SyncStatus
 from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
 
 
-class AppState:
+class SyncState:
     _db: ParentChildDB = None
     
     def __init__(self, db: ParentChildDB, library_id: str, connection_id: str):
@@ -19,10 +18,14 @@ class AppState:
             raise Exception('Failed to find connection!')
         self._library = library_id
         self._connection = item.connection
+
+    def is_locked(self) -> bool:
+        if not self._connection.sync:
+            return False
+        return self._connection.sync.status == SyncStatus.IN_PROGRESS
     
     def hold_lock(self) -> bool:
-        # TODO: generalize somehow, maybe pull into the enum itself
-        if self._connection.sync and self._connection.sync.status == SyncStatus.IN_PROGRESS:
+        if self.is_locked():
             print('lock is already held!', str(self._connection))
             return False
         
@@ -33,16 +36,14 @@ class AppState:
  
     def checkpoint(self, sync_status: SyncStatus) -> bool:
         now_timestamp = int(time())
-        kv_update_map = {
-            'status': sync_status.value,
-            'checkpoint_at': now_timestamp,
-        }
-        if sync_status == SyncStatus.SUCCESS:
-            kv_update_map['ingested_at'] = now_timestamp
         return self._db.update(
             f'{KeyNamespaces.LIBRARY.value}{self._library}',
             f'{KeyNamespaces.CONNECTION.value}{self._connection.id}',
             {
-                'sync': kv_update_map
+                'sync': {
+                    'status': sync_status.value,
+                    'checkpoint_at': now_timestamp,
+                    'ingested_at': now_timestamp if sync_status == SyncStatus.SUCCESS else self._connection.sync.ingested_at
+                }
             }
         )

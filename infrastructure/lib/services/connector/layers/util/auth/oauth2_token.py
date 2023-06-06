@@ -28,7 +28,7 @@ class TokenOAuth2Strategy(AuthStrategy):
     authorize_endpoint: str
     client_id: str
     client_secret: str
-    refresh_endpoint: str
+    refresh_endpoint: str = None
 
     @classmethod
     def get_type(cls) -> AuthType:
@@ -44,11 +44,11 @@ class TokenOAuth2Strategy(AuthStrategy):
                          timestamp: int,
                          refresh_token: str,
                          expiry_timestamp: int,
-                         access_token: str) -> TokenOAuth2:
+                         access_token: str = None) -> TokenOAuth2:
         return TokenOAuth2(
-            timestamp=timestamp, 
+            timestamp=int(timestamp) if timestamp else None, 
             refresh_token=refresh_token, 
-            expiry_timestamp=expiry_timestamp,
+            expiry_timestamp=int(expiry_timestamp) if expiry_timestamp else None,
             access_token=access_token
         )
     

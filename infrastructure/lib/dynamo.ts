@@ -7,7 +7,8 @@ export interface DynamoStackProps extends StackProps {
 }
 
 export class DynamoStack extends Stack {
-  public readonly mimoTable: Table;
+  readonly mimoTable: Table;
+  readonly waitlistTable: Table;
 
   constructor(scope: Construct, id: string, props: DynamoStackProps) {
     super(scope, id, props);
@@ -34,7 +35,7 @@ export class DynamoStack extends Stack {
       },
     });
 
-    new Table(this, `mimo-${props.stageId}-waitlist`, {
+    this.waitlistTable = new Table(this, `mimo-${props.stageId}-waitlist`, {
       partitionKey: {
         name: "email",
         type: AttributeType.STRING,

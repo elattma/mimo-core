@@ -7,7 +7,7 @@ import boto3
 from auth.base import AuthStrategy
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from shared.model import Auth, AuthType, Connection, Library, Sync
+from shared.model import AuthType, Connection, Library, Sync
 
 
 class KeyNamespaces(Enum):

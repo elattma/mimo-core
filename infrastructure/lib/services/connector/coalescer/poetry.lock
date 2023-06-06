@@ -156,6 +156,18 @@ tests = ["attrs[tests-no-zope]", "zope-interface"]
 tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
 
 [[package]]
+name = "backoff"
+version = "2.2.1"
+description = "Function decoration for backoff and retry"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8"},
+    {file = "backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba"},
+]
+
+[[package]]
 name = "boto3"
 version = "1.26.137"
 description = "The AWS SDK for Python"
@@ -804,6 +816,17 @@ files = [
 ]
 
 [[package]]
+name = "ulid"
+version = "1.1"
+description = "Pyhton version of this: https://github.com/alizain/ulid"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ulid-1.1.tar.gz", hash = "sha256:0943e8a751ec10dfcdb4df2758f96dffbbfbc055d0b49288caf2f92125900d49"},
+]
+
+[[package]]
 name = "urllib3"
 version = "1.26.15"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -926,4 +949,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "b172c98b699a1cbd7b82499ea2d8462aba96801ec2fe7d2381c6c3c04785f6a8"
+content-hash = "cce814d69d6d05433f7ea5533aa68cc0c6091db88d75167023175722fe02e9f5"

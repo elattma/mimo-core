@@ -66,6 +66,7 @@ export class MimoStage extends Stage {
     const coalescer = new CoalescerStack(this, "coalescer", {
       stageId: props.stageId,
       vpc: vpc.vpc,
+      layers: connectorService.layers,
     });
     routeConfigs.push({
       path: "connection",
@@ -246,7 +247,15 @@ export class MimoStage extends Stage {
           })
         );
       }
+      if (method.name === "POST") {
+        dynamo.waitlistTable.grantWriteData(method.handler);
+      }
+      if (method.name === "GET") {
+        dynamo.waitlistTable.grantReadData(method.handler);
+      }
     }
+
+    dynamo.mimoTable.grantReadWriteData(coalescer.syncPost.handler);
 
     const ssm = new SsmStack(this, "ssm", {
       stageId: props.stageId,

@@ -15,7 +15,7 @@ import {
   Role,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { ILayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import {
   BlockPublicAccess,
   Bucket,
@@ -28,6 +28,7 @@ import path = require("path");
 export interface CoalescerStackProps extends StackProps {
   readonly stageId: string;
   readonly vpc: IVpc;
+  readonly layers: ILayerVersion[];
 }
 
 export class CoalescerStack extends Stack {
@@ -49,14 +50,21 @@ export class CoalescerStack extends Stack {
     });
     queue.addComputeEnvironment(batch, 1);
     this.definition = this.getDefinition(props.stageId);
-    this.syncPost = this.getMethod(props.stageId, queue.jobQueueName);
+    if (!this.definition.container.jobRole) {
+      throw new Error("Job role is required");
+    }
+    this.syncPost = this.getMethod(
+      props.stageId,
+      queue.jobQueueName,
+      props.layers
+    );
     this.syncPost.handler.addToRolePolicy(
       new PolicyStatement({
         actions: ["batch:SubmitJob"],
         resources: ["*"],
       })
     );
-    this.definition.container.jobRole?.addToPrincipalPolicy(
+    this.definition.container.jobRole.addToPrincipalPolicy(
       new PolicyStatement({
         actions: [
           "dynamodb:PutItem",
@@ -69,9 +77,19 @@ export class CoalescerStack extends Stack {
         resources: ["*"],
       })
     );
+    this.definition.container.jobRole.addToPrincipalPolicy(
+      new PolicyStatement({
+        actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+        resources: ["*"],
+      })
+    );
   }
 
-  getMethod = (stage: string, jobQueue: string): MethodConfig => {
+  getMethod = (
+    stage: string,
+    jobQueue: string,
+    layers: ILayerVersion[]
+  ): MethodConfig => {
     const handler = new PythonFunction(this, `${stage}-coalescer-sync-lambda`, {
       entry: path.join(__dirname, "sync"),
       index: "post.py",
@@ -88,6 +106,7 @@ export class CoalescerStack extends Stack {
       bundling: {
         assetExcludes: ["**.venv**", "**__pycache__**"],
       },
+      layers: layers,
     });
 
     const methodResponseOptions: ModelOptions = {

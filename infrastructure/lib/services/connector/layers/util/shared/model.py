@@ -53,9 +53,6 @@ class Sync:
     checkpoint_at: int
     ingested_at: int
 
-    def is_valid(self) -> bool:
-        return self.status and self.checkpoint_at and self.ingested_at
-
     @staticmethod
     def from_dict(item: dict) -> 'Sync':
         if not item:
@@ -67,8 +64,8 @@ class Sync:
 
         return Sync(
             status=SyncStatus(status) if status else None,
-            checkpoint_at=checkpoint_at,
-            ingested_at=ingested_at,
+            checkpoint_at=int(checkpoint_at) if checkpoint_at else None,
+            ingested_at=int(ingested_at) if ingested_at else None,
         )
     
     def as_dict(self) -> dict:
@@ -90,7 +87,6 @@ class Connection:
     def is_valid(self):
         return self.id and self.name and self.integration and self.auth \
             and self.auth.is_valid() and self.created_at
-            # and self.sync and self.sync.is_valid()
     
 @dataclass
 class Library:
