@@ -21,7 +21,7 @@ def handler(event: dict, context):
     query: str = query_string_parameters.get('query', None) if query_string_parameters else None
     max_tokens: int = query_string_parameters.get('max_tokens', None) if query_string_parameters else None
     max_tokens = int(max_tokens) if max_tokens else 1600
-    library: str = query_string_parameters.get('library', 'google-oauth2|108573573074253667565') if query_string_parameters else None
+    library: str = query_string_parameters.get('library', 'default') if query_string_parameters else None
 
     if not (stage and graph_db_uri and query and max_tokens and library):
         return to_response_error(Errors.MISSING_PARAMS.value)

@@ -6,18 +6,11 @@ from shared.response import Errors, to_response_error, to_response_success
 from shared.sync_state import SyncState
 from state.dynamo import ParentChildDB
 
-HEADERS = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
-}
-
 _batch = None
-_sync_state: SyncState = None
+_db = None
 
 def handler(event: dict, context):
-    global _batch, _sync_state
+    global _batch, _db
 
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
@@ -35,10 +28,10 @@ def handler(event: dict, context):
     
     if not _batch:
         _batch = boto3.client('batch')
-    if not _sync_state:
+    if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
-        _sync_state = SyncState(_db, library_id=library, connection_id=connection)
-
+    _sync_state: SyncState = SyncState(_db, library_id=library, connection_id=connection)
+    
     if _sync_state.is_locked():
         return to_response_error(Errors.SYNC_IN_PROGRESS)
 
@@ -52,7 +45,6 @@ def handler(event: dict, context):
             'library': library,
         }
     )
-    print(response)
     if not (response and response.get('ResponseMetadata', {}).get('HTTPStatusCode', 0) == 200):
         _sync_state.release_lock(False)
         return to_response_error(Errors.BATCH_SUBMIT_FAILED)

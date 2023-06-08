@@ -9,10 +9,10 @@ from auth.base import Auth, AuthStrategy, AuthType
 class TokenOAuth2(Auth):
     refresh_token: str
     expiry_timestamp: int
-    access_token: str = None
+    access_token: str
 
     def is_valid(self):
-        return self.timestamp and self.refresh_token and self.expiry_timestamp
+        return self.timestamp and ((self.refresh_token and self.expiry_timestamp) or self.access_token)
     
     def as_dict(self):
         return {
@@ -20,6 +20,7 @@ class TokenOAuth2(Auth):
             'timestamp': self.timestamp,
             'refresh_token': self.refresh_token,
             'expiry_timestamp': self.expiry_timestamp,
+            'access_token': self.access_token
         }
 
 @dataclass
@@ -57,6 +58,7 @@ class TokenOAuth2Strategy(AuthStrategy):
              code: str = None, 
              redirect_uri: str = None,
              refresh_token: str = None,
+             access_token: str = None,
              access_type: str = 'offline',
              override_headers: dict = None,
              **kwargs) -> TokenOAuth2:
@@ -69,6 +71,8 @@ class TokenOAuth2Strategy(AuthStrategy):
             )
             return self._auth
         if grant_type == 'refresh_token':
+            if not refresh_token and access_token:
+                return self._auth
             self._auth = self._refresh_auth(
                 refresh_token=refresh_token,
                 override_headers=override_headers
@@ -100,6 +104,7 @@ class TokenOAuth2Strategy(AuthStrategy):
 
         response = requests.post(self.authorize_endpoint, data = data, headers = headers, auth = (self.client_id, self.client_secret))
         auth_response: dict = response.json() if response else None
+        access_token = auth_response.get('access_token', None) if auth_response else None
         refresh_token = auth_response.get('refresh_token', None) if auth_response else None
         expires_in = auth_response.get('expires_in', None) if auth_response else None
         timestamp = int(time())
@@ -110,13 +115,14 @@ class TokenOAuth2Strategy(AuthStrategy):
             issued_at = int(issued_at) // 1000 if issued_at else None
             expiry_timestamp = issued_at + 86400 if issued_at else None
         
-        if not (refresh_token and expiry_timestamp):
+        if not (refresh_token and expiry_timestamp) and not access_token:
             raise Exception('Invalid auth response')
 
         return TokenOAuth2(
             timestamp=timestamp,
             refresh_token=refresh_token,
-            expiry_timestamp=expiry_timestamp
+            expiry_timestamp=expiry_timestamp,
+            access_token=access_token
         )
     
     def _refresh_auth(self,

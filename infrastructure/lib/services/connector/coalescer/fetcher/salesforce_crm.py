@@ -1,13 +1,18 @@
-# from typing import Generator, List
+from typing import Generator, List
 
-# from .base import Discovery, Fetcher, Section
+from auth.base import AuthType
+from dstruct.model import Discovery
+from fetcher.base import Fetcher
 
 
-# class SalesforceCrm(Fetcher):
-#     _INTEGRATION = 'salesforce_crm'
+class SalesforceCrm(Fetcher):
+    _INTEGRATION = 'salesforce_crm'
+    
+    def _get_supported_auth_types(self) -> List[AuthType]:
+        return [AuthType.TOKEN_OAUTH2, AuthType.TOKEN_DIRECT, AuthType.BASIC]
+    
+    def discover(self) -> Generator[Discovery, None, None]:
+        return []
 
-#     def discover(self) -> Generator[Discovery, None, None]:
-#         print('salesforce crm discovery!')
-
-#     def fetch(self, discovery: Discovery) -> List[Section]:
-#         print('salesforce crm fetch!')
+    def fetch(self, discovery: Discovery) -> None:
+        return

@@ -49,6 +49,6 @@ def setup_neo4j():
     driver.close()
 
 if __name__ == '__main__':
-    setup_neo4j()
-    setup_pinecone('beta', 'us-east1-gcp', ['library', 'date_day', 'block_label', 'page_type'])
+    # setup_neo4j()
+    # setup_pinecone('beta', 'us-east1-gcp', ['library', 'date_day', 'block_label', 'page_type'])
     pass

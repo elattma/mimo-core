@@ -1,9 +1,9 @@
 import json
 import re
 from dataclasses import dataclass
-from math import sqrt
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
+import mystery.constants as constants
 from external.openai_ import OpenAI
 from graph.blocks import MemberBlock, entity
 from graph.neo4j_ import (Block, BlockFilter, ContentMatch, Document,
@@ -11,101 +11,19 @@ from graph.neo4j_ import (Block, BlockFilter, ContentMatch, Document,
                           QueryFilter)
 from graph.pinecone_ import Filter as VectorFilter
 from graph.pinecone_ import Pinecone, RowType
-from mystery.context_basket.model import ContextBasket, Request
+from mystery.context_basket.model import (ContextBasket, DataError,
+                                          DataRequest, DataResponse, Request)
 from mystery.context_basket.weaver import BasketWeaver
 from mystery.mrkl.open_ai import OpenAIChat
 from mystery.mrkl.prompt import (ChatPrompt, ChatPromptMessage,
                                  ChatPromptMessageRole)
-from mystery.query import (AbsoluteTimeFilter, BlocksFilter, BlocksToReturn,
-                           BlocksToSearch, Concepts, Count, IntegrationsFilter,
-                           PageIds, PageParticipantRole, PageParticipants,
-                           Query, QueryComponent, RelativeTimeFilter,
-                           ReturnType, ReturnTypeValue, SearchMethod,
-                           SearchMethodValue)
+from mystery.query import Block as QueryBlock
+from mystery.query import (BlocksFilter, BlocksToReturn, BlocksToSearch,
+                           Concepts, Count, IntegrationsFilter, PageIds,
+                           PageParticipantRole, PageParticipants, Query,
+                           QueryComponent, RelativeTimeFilter, ReturnType,
+                           ReturnTypeValue, SearchMethod, SearchMethodValue)
 from mystery.util import count_tokens
-
-# ----------------------------------------------------------------------------
-# Constants
-# ----------------------------------------------------------------------------
-
-
-DEFAULT_LIMIT = 20
-'''The default limit on results for Neo4j queries.'''
-
-SYSTEM_PROMPT = '''Pretend you are a data agent for a large company.
-You have access to a specialized database that contains all of the company's data.
-The database is represented as a graph, with three types of nodes: pages, blocks, and names.
-A page is a high-level document from a data source, like an email from Google Mail or a customer account from Salesforce.
-A block is a component of a page. For example, an email has a title block to store the subject, a body block to store the main message, and a member block to store the to, from, cc, and bcc.
-A name is a person or organization that is linked to a page or block.
-Below are descriptions about the different block types:
-
-{block_descriptions}
-
-Given a Request for information, your job is to create a well-formed Query to retrieve the requested information from the database.
-The Query must be formatted in a specific way, and the values must make sense based on the Request.
-All fields in the Query are optional, so you can leave any field blank if you don't know what to put there.
-Below is the schema for a Query and explanations for what each field means:
-
-{json_schema}
-
-{component_descriptions}
-
-Use the examples below to improve your understanding.
---------
-EXAMPLE 1
-Request: The subjects of my last 5 emails from Troy Wilkerson
-Query: {{
- "page_participants": [
-  {{
-   "name": "Troy Wilkerson",
-   "role": "author"
-  }}
- ],
- "time_sort": {{
-  "ascending": false,
- }},
- "count": 5,
- "sources": ["email"],
- "search_method": "exact",
- "return_type": "blocks",
- "blocks_to_return": ["title"]
-}}
-
-EXAMPLE 2
-Request: Zendesk tickets with a comment about the API
-Query: {{
- "concepts": ["the API"],
- "sources": ["customer_support"],
- "search_method": "relevant",
- "blocks_to_search": ["comment"],
- "return_type": "pages"
-}}
-
-EXAMPLE 3
-Request: Deals with Acme Inc. from Q2 2021
-Query: {{
- "page_participants": [
-  {{
-   "name": "Acme Inc.",
-   "role": "unknown"
-  }}
- ],
- "time_frame": {{
-  "start": "2021-04-01",
-  "end": "2021-06-30"
- }},
- "sources": ["crm"],
- "search_method": "exact",
- "blocks_to_search": ["deal"],
- "return_type": "blocks",
- "blocks_to_return": ["deal"]
-}}'''
-
-
-# ----------------------------------------------------------------------------
-# Data Agent
-# ----------------------------------------------------------------------------
 
 
 @dataclass
@@ -139,82 +57,80 @@ class DataAgent:
         block_descriptions = BlocksFilter.get_block_descriptions()
         json_schema = QueryComponent.get_json_schema()
         component_descriptions = QueryComponent.get_component_descriptions()
-        self._system_prompt = SYSTEM_PROMPT.format(
+        self._system_message = constants.DATA_AGENT_SYSTEM_MESSAGE.format(
             block_descriptions=block_descriptions,
             json_schema=json_schema,
             component_descriptions=component_descriptions
         )
         print('[DataAgent] Initialized.')
 
-    def generate_context(
-        self,
-        request: str,
-        query: Query = None,
-        page_ids: List[str] = None,
-        max_tokens: int = None
-    ) -> ContextBasket:
+    def _exceptional(self, func: callable) -> callable:
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                print(f'[DataAgent] Exception: {e}')
+                return None
+        return wrapper
+
+    def generate_context(self, data_request: DataRequest) -> DataResponse:
         print('[DataAgent] Generating context...')
-        # Generate query
-        if page_ids:
-            query = Query(
-                components={
-                    SearchMethod: SearchMethod(
-                        value=SearchMethodValue.RELEVANT
-                    ),
-                    ReturnType: ReturnType(value=ReturnTypeValue.BLOCKS),
-                    PageIds: PageIds(values=set(page_ids))
-                }
+
+        # Formulate query
+        self._exceptional(self._decorate_query)(data_request)
+        if not data_request.query:
+            return DataResponse(
+                successful=False,
+                context_basket=None,
+                error=DataError.QUERY_FORMATION_FAILURE
             )
-        if not query:
-            query = self._generate_query(request)
-        query.request = Request(
-            encoding_name=self._llm.encoding_name,
-            text=request,
-            embedding=self._openai.embed(request)
-        )
-        print(f'[DataAgent] Query Components: {query.components}')
 
         # Use query to fetch documents
-        documents = []
-        default = False
-        if SearchMethod not in query.components:
-            default = True
-        elif (query.components[SearchMethod].value
-              == SearchMethodValue.EXACT):
-            documents.extend(self._exact_context(query))
-        elif (query.components[SearchMethod].value
-              == SearchMethodValue.RELEVANT):
-            if PageParticipants in query.components:
-                documents.extend(
-                    self._relevant_context_by_page_participants(query)
-                )
-            if not documents:
-                default = True
-        else:
-            default = True
-        if default:
-            documents.extend(self._relevant_context(query))
-        filtered_documents = self._apply_return_filters(documents, query)
+        documents = self._exceptional(self._fetch_documents)(data_request)
+        if not documents:
+            return DataResponse(
+                successful=False,
+                context_basket=None,
+                error=DataError.FETCH_DOCUMENTS_FAILURE
+            )
+        
+        # Fetch corresponding documents to return
+        filtered_documents = self._exceptional(self._apply_return_filters)(documents, data_request.query)
+        if not filtered_documents:
+            return DataResponse(
+                successful=False,
+                context_basket=None,
+                error=DataError.FILTERED_DOCUMENTS_FAILURE
+            )
 
-        block_id_to_block: dict[str, Block] = {}
-        for document in filtered_documents:
-            for block in document.consists:
-                block_id_to_block[block.target.id] = block.target
-        vectors = self._vector_db.fetch(list(block_id_to_block.keys()))
-        for vector_id, vector in vectors.items():
-            print(len(vector.values))
-            block_id_to_block[vector_id].embedding = vector.values
+        # Decorate documents with embeddings
+        successful = self._exceptional(self._decorate_document_embeddings)(filtered_documents)
+        if not successful:
+            return DataResponse(
+                successful=False,
+                context_basket=None,
+                error=DataError.DECORATE_EMBEDDINGS_FAILURE
+            )
 
         # Weave basket from documents
-        basket = self._basket_weaver.weave_context_basket(
-            query.request,
-            filtered_documents
-        )
-        print(f'[DataAgent] Context generated! Raw: {str(basket)}'.replace('\n', '\r'))
-        if max_tokens:
-            self._basket_weaver.minify_context_basket(basket, max_tokens)
-        print(f'[DataAgent] Context generated! Minified: {str(basket)}'.replace('\n', '\r'))
-        return basket
+        basket: ContextBasket = self._exceptional(self._basket_weaver.weave_context_basket)(data_request.query.request,filtered_documents)
+        if not basket:
+            return DataResponse(
+                successful=False,
+                context_basket=None,
+                error=DataError.WEAVE_CONTEXT_FAILURE
+            )
+
+        # Minify basket
+        if data_request.max_tokens:
+            self._exceptional(self._basket_weaver.minify_context_basket)(basket, data_request.max_tokens)
+            if not basket or basket.tokens > data_request.max_tokens:
+                return DataResponse(
+                    successful=False,
+                    context_basket=None,
+                    error=DataError.MINIFY_CONTEXT_FAILURE
+                )
+        return DataResponse(successful=True, context_basket=basket)
 
     def _exact_context(self, query: Query) -> List[Document]:
         print('[DataAgent] Filling basket with exact context...')
@@ -225,7 +141,7 @@ class DataAgent:
     def _relevant_context(self, query: Query) -> List[Document]:
         print('[DataAgent] Filling basket with relevant context...')
         if Count in query.components:
-            c = query.components[Count]
+            c: Count = query.components[Count]
             k = c.value
             matches = self._query_vector_db(query, k=k)
         else:
@@ -308,28 +224,21 @@ class DataAgent:
     def _query_vector_db(
         self,
         query: Query,
-        k: int = 6,
+        k: int = 5,
         threshold: float = None
     ) -> Dict[str, float]:
         print('[DataAgent] Querying vector database...')
         vector_filter = self._make_vector_filter(query)
-        embeddings = []
         if Concepts in query.components:
             c: Concepts = query.components[Concepts]
-            for concept in c.values:
-                embeddings.append(self._openai.embed(concept))
-        if not embeddings:
-            embeddings = [query.request.embedding]
+            embedding = self._openai.embed(' '.join(c.values))
+        else:
+            embedding = query.request.embedding
+        relevant_blocks = self._vector_db.query(embedding, vector_filter, k=k)
         matches = {}
-        for embedding in embeddings:
-            relevant_blocks = self._vector_db.query(
-                embedding,
-                vector_filter,
-                k=k
-            )
-            for block in relevant_blocks:
-                if not threshold or block.score >= threshold:
-                    matches[block.id] = block.score
+        for block in relevant_blocks:
+            if not threshold or block.score >= threshold:
+                matches[block.id] = block.score
         print('[DataAgent] Queried vector database!')
         return matches
 
@@ -344,7 +253,7 @@ class DataAgent:
         time_range = None
         block_labels = None
         order_by = None
-        limit = Limit(0, DEFAULT_LIMIT)
+        limit = Limit(0, constants.GRAPH_DB_LIMIT)
         regex_matches = None
         if query and query.components and query.request:
             if PageParticipants in query.components:
@@ -368,9 +277,9 @@ class DataAgent:
                         label=MemberBlock._LABEL
                     )
                     regex_matches.add(content_match)
-            if AbsoluteTimeFilter in query.components:
-                atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
-                time_range = atf.neo4j_time_range
+            # if AbsoluteTimeFilter in query.components:
+            #     atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
+            #     time_range = atf.neo4j_time_range
             if RelativeTimeFilter in query.components:
                 rtf: RelativeTimeFilter = query.components[RelativeTimeFilter]
                 order_by = rtf.neo4j_order_by
@@ -417,10 +326,10 @@ class DataAgent:
         max_date_day = None
         block_labels = None
         document_id = None
-        if AbsoluteTimeFilter in query.components:
-            atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
-            min_date_day = atf.pinecone_min_date_day
-            max_date_day = atf.pinecone_max_date_day
+        # if AbsoluteTimeFilter in query.components:
+        #     atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
+        #     min_date_day = atf.pinecone_min_date_day
+        #     max_date_day = atf.pinecone_max_date_day
         if IntegrationsFilter in query.components:
             if_: IntegrationsFilter = query.components[IntegrationsFilter]
             integrations = if_.pinecone_integrations
@@ -442,42 +351,94 @@ class DataAgent:
         )
         return vector_filter
 
-    def _get_page_ids_from_results(self, results: List[Document]) -> Set[str]:
-        page_ids = [document.id for document in results]
-        return set(page_ids)
-
-    def _generate_query(self, request: str) -> Query:
+    def _generate_query(self, request: Request) -> Query:
         print('[DataAgent] Generating query...')
         system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM,
-            content=self._system_prompt
+            ChatPromptMessageRole.SYSTEM,
+            self._system_message
         )
         user_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.USER,
-            content=request
+            ChatPromptMessageRole.USER,
+            request.text
         )
         prompt = ChatPrompt([system_message, user_message])
         llm_response = self._llm.predict(prompt)
-        query = _query_from_llm_response(llm_response)
+        query = Query.from_string_and_request(llm_response, request)
         print('[DataAgent] Generated query!')
         return query
+    def _get_page_ids_from_results(self, results: List[Document]) -> Set[str]:
+        page_ids = [document.id for document in results]
+        return set(page_ids)
+    
+    def _decorate_query(self, data_request: DataRequest) -> Query:
+        query = data_request.query
+        if data_request.page_ids:
+            query = Query(
+                components={
+                    SearchMethod: SearchMethod(
+                        value=SearchMethodValue.RELEVANT
+                    ),
+                    ReturnType: ReturnType(value=ReturnTypeValue.BLOCKS),
+                    PageIds: PageIds(values=set(data_request.page_ids))
+                }
+            )
+        if not query:
+            print('[DataAgent] Generating query...')
+            system_message = ChatPromptMessage(
+                role=ChatPromptMessageRole.SYSTEM,
+                content=self._system_message
+            )
+            user_message = ChatPromptMessage(
+                role=ChatPromptMessageRole.USER,
+                content=data_request.request
+            )
+            prompt = ChatPrompt([system_message, user_message])
+            llm_response = self._llm.predict(prompt)
+            query = query = Query.from_string_and_request(llm_response, data_request.request)
+            print('[DataAgent] Generated query!')
+        if query:
+            query.request = Request(
+                encoding_name=self._llm.encoding_name,
+                text=data_request.request,
+                embedding=self._openai.embed(data_request.request)
+            )
+            print(f'[DataAgent] Query Components: {query.components}')
+        data_request.query = query
 
-    def _generate_prompt(
-        self,
-        request: str
-    ) -> ChatPrompt:
-        print('[DataAgent] Generating prompt...')
-        system_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.SYSTEM,
-            content=self._system_prompt
-        )
-        user_message = ChatPromptMessage(
-            role=ChatPromptMessageRole.USER,
-            content=request
-        )
-        prompt = ChatPrompt([system_message, user_message])
-        print('[DataAgent] Prompt generated!')
-        return prompt
+    def _fetch_documents(self, data_request: DataRequest) -> List[Document]:
+        query = data_request.query
+        documents = []
+        default_if_empty = True
+        if SearchMethod not in query.components:
+            pass
+        elif (query.components[SearchMethod].value == SearchMethodValue.EXACT):
+            documents.extend(self._exact_context(query))
+            print('hi!!!')
+            print(documents)
+            default_if_empty = False
+        elif (query.components[SearchMethod].value == SearchMethodValue.RELEVANT):
+            if PageParticipants in query.components:
+                documents.extend(self._relevant_context_by_page_participants(query))
+            else:
+                documents.extend(self._relevant_context(query))
+        if default_if_empty and not documents:
+            query.components = {
+                BlocksToSearch: BlocksToSearch(blocks=[QueryBlock.SUMMARY]),
+                ReturnType: ReturnType(value=ReturnTypeValue.PAGES),
+            }
+            print(f'[DataAgent] Using default summary->pages query: {query}')
+            documents.extend(self._relevant_context(query))
+        return documents
+
+    def _decorate_document_embeddings(self, documents: List[Document]) -> bool:
+        block_id_to_block: dict[str, Block] = {}
+        for document in documents:
+            for block in document.consists:
+                block_id_to_block[block.target.id] = block.target
+        vectors = self._vector_db.fetch(list(block_id_to_block.keys()))
+        for vector_id, vector in vectors.items():
+            block_id_to_block[vector_id].embedding = vector.values
+        return True
 
     def _context_basket_token_size(
         self,
@@ -488,24 +449,3 @@ class DataAgent:
             token_count += count_tokens(context.content,
                                         self._llm.encoding_name)
         return token_count
-
-
-# ----------------------------------------------------------------------------
-# Helpers
-# ----------------------------------------------------------------------------
-
-
-def _query_from_llm_response(llm_response: str) -> Query:
-    match = re.search(r'{[\s\S]*}', llm_response, re.DOTALL)
-    try:
-        stringified_json = match.group(0)
-        query_json = json.loads(stringified_json)
-        query = Query.from_llm_response(query_json)
-        return query
-    except:
-        print((
-            '[DataAgent] Error parsing query from LLM response!\n'
-            f'LLM response:\n{llm_response}'
-        ))
-        return Query()
-    

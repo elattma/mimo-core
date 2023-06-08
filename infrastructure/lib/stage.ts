@@ -8,8 +8,7 @@ import { RouteConfig } from "./model";
 import { S3Stack } from "./s3";
 import { SecretsStack } from "./secrets";
 import { ApplicantStack } from "./services/applicant/lambda";
-import { ConnectorStack } from "./services/connector/lambda";
-import { CoalescerStack } from "./services/connector/stack";
+import { ConnectorStack } from "./services/connector/stack";
 import { DetectiveStack } from "./services/detective/lambda";
 import { UsageMonitorStack } from "./services/usage_monitor/lambda";
 import { SsmStack } from "./ssm";
@@ -48,8 +47,12 @@ export class MimoStage extends Stage {
     const apiPath = `/${props.stageId}/api`;
 
     const routeConfigs: RouteConfig[] = [];
+    const vpc = new VpcStack(this, "vpc", {
+      stageId: props.stageId,
+    });
     const connectorService = new ConnectorStack(this, "connector", {
       stageId: props.stageId,
+      vpc: vpc.vpc,
     });
     const detectiveService = new DetectiveStack(this, "detective", {
       stageId: props.stageId,
@@ -59,14 +62,6 @@ export class MimoStage extends Stage {
     });
     const applicantService = new ApplicantStack(this, "applicant", {
       stageId: props.stageId,
-    });
-    const vpc = new VpcStack(this, "vpc", {
-      stageId: props.stageId,
-    });
-    const coalescer = new CoalescerStack(this, "coalescer", {
-      stageId: props.stageId,
-      vpc: vpc.vpc,
-      layers: connectorService.layers,
     });
     routeConfigs.push({
       path: "connection",
@@ -84,7 +79,7 @@ export class MimoStage extends Stage {
         },
         {
           path: "sync",
-          methods: [coalescer.syncPost],
+          methods: [connectorService.syncPost],
         },
       ],
     });
@@ -255,7 +250,7 @@ export class MimoStage extends Stage {
       }
     }
 
-    dynamo.mimoTable.grantReadWriteData(coalescer.syncPost.handler);
+    dynamo.mimoTable.grantReadWriteData(connectorService.syncPost.handler);
 
     const ssm = new SsmStack(this, "ssm", {
       stageId: props.stageId,

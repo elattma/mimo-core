@@ -46,7 +46,7 @@ class ChatSystem:
     ) -> Generator[str, None, None]:
         print('[ChatSystem] Running...')
         yield '[THOUGHT]Determining if I need more information...'
-        requests = generate_requests(message)
+        requests = self._generate_requests(message)
         if not requests:
             yield (
                 '[THOUGHT]I don\'t need more information. Thinking about my '

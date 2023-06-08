@@ -7,6 +7,7 @@ class AuthType(Enum):
     TOKEN_OAUTH2 = 'token_oauth2'
     TOKEN_DIRECT = 'token_direct'
     BASIC = 'basic'
+    API_KEY = 'api_key'
 
 @dataclass
 class Auth(ABC):

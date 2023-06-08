@@ -5,16 +5,18 @@ from auth.base import Auth, AuthStrategy, AuthType
 
 @dataclass
 class Basic(Auth):
-    key: str
+    user: str
+    password: str
 
     def is_valid(self):
-        return self.timestamp and self.key
+        return self.timestamp and self.user and self.password
 
     def as_dict(self):
         return {
             'type': AuthType.BASIC.value,
             'timestamp': self.timestamp,
-            'key': self.key
+            'user': self.user,
+            'password': self.password
         }
 
 @dataclass
@@ -29,11 +31,11 @@ class BasicStrategy(AuthStrategy):
         return {}
     
     @classmethod
-    def auth_from_params(cls, timestamp: int, key: str) -> Basic:
+    def auth_from_params(cls, timestamp: int, user: str, password: str) -> Basic:
         # validate with api
-        return Basic(timestamp=timestamp, key=key)
+        return Basic(timestamp=timestamp, user=user, password=password)
     
-    def auth(self, timestamp: int, key: str) -> Basic:
+    def auth(self, timestamp: int, user: str, password: str) -> Basic:
         # validate with api
-        self._auth = Basic(timestamp=timestamp, key=key)
+        self._auth = Basic(timestamp=timestamp, user=user, password=password)
         return self._auth

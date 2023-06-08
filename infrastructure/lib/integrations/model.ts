@@ -3,6 +3,7 @@ export type IntegrationId = string;
 export enum AuthType {
   TOKEN_OAUTH2 = "token_oauth2",
   TOKEN_DIRECT = "token_direct",
+  API_KEY = "api_key",
 }
 
 export interface AuthStrategy {
@@ -20,6 +21,10 @@ export interface TokenOAuth2AuthStrategy extends AuthStrategy {
 
 export interface TokenDirectAuthStrategy extends AuthStrategy {
   type: AuthType.TOKEN_DIRECT;
+}
+
+export interface ApiKeyAuthStrategy extends AuthStrategy {
+  type: AuthType.API_KEY;
 }
 
 export interface IntegrationConfig {

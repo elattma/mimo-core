@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List
 
-from mystery.query import Concepts, Integration, IntegrationsFilter, Query, QueryComponent, ReturnType, ReturnTypeValue, SearchMethod, SearchMethodValue
+from mystery.query import (Concepts, Integration, IntegrationsFilter, Query,
+                           QueryComponent, ReturnType, ReturnTypeValue,
+                           SearchMethod, SearchMethodValue)
 
 
 class Override(ABC):

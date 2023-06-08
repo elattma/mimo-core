@@ -1,11 +1,6 @@
-from time import time
 from typing import Dict, Generator, List
 
-import requests
 from auth.base import AuthType
-from auth.basic import Basic
-from auth.direct_token import TokenDirect
-from auth.oauth2_token import TokenOAuth2
 from dstruct.model import Block, Discovery, Entity
 
 from .base import Fetcher, get_timestamp_from_format

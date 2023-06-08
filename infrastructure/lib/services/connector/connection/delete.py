@@ -22,6 +22,7 @@ def handler(event: dict, context):
 
     # first delete data from underlying data stores and only if those are successful, delete from the parent-child db
     # delete from s3 (if applicable)
+    
     # delete from pinecone
     # delete from neo4j
     # delete from dynamo
@@ -36,4 +37,6 @@ def handler(event: dict, context):
     except Exception as e:
         print(e)
         return to_response_error(Errors.DB_WRITE_FAILED)
-    return to_response_success({})
+    return to_response_success({
+        'success': True,
+    })
