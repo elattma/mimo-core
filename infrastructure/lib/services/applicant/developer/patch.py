@@ -1,5 +1,7 @@
+import json
 import os
 import re
+from typing import Dict
 from uuid import uuid4
 
 from shared.response import Errors, to_response_error, to_response_success
@@ -13,14 +15,15 @@ def handler(event: dict, context):
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
-    body: dict = event.get('body', None) if event else None
-    regenerate_secret_key: bool = body.get('regenerate_secret_key', False) if body else False
+    body = event.get('body', None) if event else None
+    body = json.loads(body) if body else None
+    _regenerate_secret_key: bool = body.get('regenerate_secret_key', False) if body else False
     developer_secret_path_prefix: str = os.getenv('DEVELOPER_SECRET_PATH_PREFIX')
 
     if not (user and developer_secret_path_prefix):
         return to_response_error(Errors.MISSING_PARAMS)
 
-    if regenerate_secret_key:
+    if _regenerate_secret_key:
         if not _ssm:
             _ssm = SSM()
 

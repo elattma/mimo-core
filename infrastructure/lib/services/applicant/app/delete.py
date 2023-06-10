@@ -27,6 +27,8 @@ def handler(event: dict, context):
         _db.delete(parent_key, child_key)
     except Exception as e:
         return to_response_error(Errors.DB_WRITE_FAILED)
+    
+    parent_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app)
     return to_response_success({
         'success': True,
     })
