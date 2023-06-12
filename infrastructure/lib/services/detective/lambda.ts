@@ -23,12 +23,12 @@ export class DetectiveStack extends Stack {
     super(scope, id, props);
 
     const layers: PythonLayerVersion[] = [];
-    const getContextMethod = this.getContextMethod(props.stageId, layers);
-    this.methods.push(getContextMethod);
+    const contextMethod = this.contextMethod(props.stageId, layers);
+    this.methods.push(contextMethod);
     this.v0GetContextMethod = this.getV0GetContextMethod(props.stageId, layers);
   }
 
-  getContextMethod = (
+  contextMethod = (
     stage: string,
     layers: PythonLayerVersion[]
   ): MethodConfig => {
@@ -37,7 +37,7 @@ export class DetectiveStack extends Stack {
       `${stage}-detective-context-lambda`,
       {
         entry: path.join(__dirname, "context"),
-        index: "get.py",
+        index: "post.py",
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
         timeout: Duration.minutes(15),
@@ -54,9 +54,35 @@ export class DetectiveStack extends Stack {
       }
     );
 
+    const methodRequestOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "ContextRequest",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          query: {
+            type: JsonSchemaType.STRING,
+          },
+          max_tokens: {
+            type: JsonSchemaType.NUMBER,
+          },
+          library: {
+            type: JsonSchemaType.STRING,
+          },
+          next_token: {
+            type: JsonSchemaType.STRING,
+          },
+          overrides: {
+            type: JsonSchemaType.OBJECT,
+          },
+        },
+        required: ["query"],
+      },
+    };
+
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "ContextGetResponse",
+      modelName: "ContextResponse",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
@@ -65,8 +91,11 @@ export class DetectiveStack extends Stack {
             items: {
               type: JsonSchemaType.OBJECT,
               properties: {
-                text: {
-                  type: JsonSchemaType.STRING,
+                blocks: {
+                  type: JsonSchemaType.ARRAY,
+                  items: {
+                    type: JsonSchemaType.OBJECT,
+                  },
                 },
                 score: {
                   type: JsonSchemaType.NUMBER,
@@ -74,15 +103,17 @@ export class DetectiveStack extends Stack {
                 source: {
                   type: JsonSchemaType.OBJECT,
                   properties: {
-                    integration: {
+                    connection: {
                       type: JsonSchemaType.STRING,
                     },
-                    page: {
+                    id: {
                       type: JsonSchemaType.STRING,
                     },
                   },
+                  required: ["connection", "id"],
                 },
               },
+              required: ["blocks", "score", "source"],
             },
           },
           next_token: {
@@ -94,15 +125,11 @@ export class DetectiveStack extends Stack {
     };
 
     return {
-      name: "GET",
+      name: "POST",
       handler: handler,
-      requestParameters: {
-        "method.request.querystring.query": true,
-        "method.request.querystring.max_tokens": false,
-        "method.request.querystring.next_token": false,
-      },
       apiKeyRequired: true,
       authorizerType: AuthorizerType.API_KEY,
+      requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
     };
   };

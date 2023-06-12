@@ -3,14 +3,9 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Set, Tuple, Type, Union
+from typing import Dict, List, Set, Type, Union
 
-from graph.blocks import Relations
-from graph.neo4j_ import Limit, OrderBy, OrderDirection
-
-from .util import (date_day_to_timestamp, date_string_to_date_day,
-                   get_today_date_day, get_today_date_string,
-                   get_today_timestamp)
+from .util import date_string_to_date_day, get_today_date_string
 
 
 @dataclass
@@ -44,7 +39,7 @@ class QueryComponent(ABC):
     @classmethod
     def load_components_from_json(
         cls,
-        json_: Any
+        json_: Dict
     ) -> Dict[Type['QueryComponent'], 'QueryComponent']:
         components = {}
         for key, value in json_.items():
@@ -85,7 +80,7 @@ class QueryComponent(ABC):
             'time_frame': AbsoluteTimeFilter,
             'time_sort': RelativeTimeFilter,
             'count': Count,
-            'sources': IntegrationsFilter,
+            'sources': PageTypeFilter,
             'search_method': SearchMethod,
             'blocks_to_search': BlocksToSearch,
             'return_type': ReturnType,
@@ -155,15 +150,6 @@ class PageParticipant:
     name: str
     role: PageParticipantRole
 
-    @property
-    def neo4j_relation(self) -> Relations:
-        if self.role == PageParticipantRole.AUTHOR:
-            return Relations.AUTHOR
-        elif self.role == PageParticipantRole.RECIPIENT:
-            return Relations.RECIPIENT
-        elif self.role == PageParticipantRole.UNKNOWN:
-            raise NotImplementedError
-
 
 @dataclass
 class PageParticipants(QueryComponent):
@@ -205,11 +191,6 @@ class PageParticipants(QueryComponent):
                 '  "name": string,\n'
                 '  "role": "author" OR "recipient" OR "unknown"\n'
                 ' }[]')
-
-    @property
-    def neo4j_names(self) -> Set[str]:
-        '''Returns a set of names for use in Neo4j.'''
-        return set([participant.name for participant in self.values])
 
     @staticmethod
     def _validate_llm_response(
@@ -271,25 +252,6 @@ class AbsoluteTimeFilter(QueryComponent):
                 '  "end": string\n'
                 ' }')
 
-    @property
-    def neo4j_time_range(self) -> Tuple[int, int]:
-        '''Returns a range of timestamps for use in Neo4j.'''
-        start_timestamp = (date_day_to_timestamp(self.start)
-                           if self.start else 0)
-        end_timestamp = (date_day_to_timestamp(self.end)
-                         if self.end else get_today_timestamp())
-        return (start_timestamp, end_timestamp)
-
-    @property
-    def pinecone_min_date_day(self) -> int:
-        '''Returns the minimum date day for use in Pinecone.'''
-        return self.start if self.start else 0
-
-    @property
-    def pinecone_max_date_day(self) -> int:
-        '''Returns the maximum date day for use in Pinecone.'''
-        return self.end if self.end else get_today_date_day()
-
     @staticmethod
     def _validate_date(maybe_date: str) -> bool:
         try:
@@ -330,13 +292,6 @@ class RelativeTimeFilter(QueryComponent):
                 '  "ascending": boolean\n'
                 ' }')
 
-    @property
-    def neo4j_order_by(self) -> OrderBy:
-        '''Returns an OrderBy object for use in Neo4j.'''
-        direction = (OrderDirection.ASC
-                     if self.ascending else OrderDirection.DESC)
-        return OrderBy(direction, 'block', 'last_updated_timestamp')
-
     @staticmethod
     def _validate_llm_response(
         llm_response: Dict[str, Union[bool, int]]
@@ -367,45 +322,27 @@ class Count(QueryComponent):
     def json_for_prompt() -> str:
         return ' "count": integer'
 
-    @property
-    def neo4j_limit(self) -> Limit:
-        '''Returns a Limit object for use in Neo4j.'''
-        return Limit(0, self.value)
-
-
-class Integration(Enum):
-    CRM = 'crm'
-    CUSTOMER_SUPPORT = 'customer_support'
-    DOCUMENTS = 'documents'
-    EMAIL = 'email'
-
 
 @dataclass
-class IntegrationsFilter(QueryComponent):
-    '''Enforces that only results from these integrations are considered. e.g.
-    'gmail', 'zendesk' '''
-    integrations: List[Integration]
+class PageTypeFilter(QueryComponent):
+    '''Enforces that only results from these page types are considered'''
+    types: List[str]
 
     @classmethod
-    def from_llm_response(
-        cls, 
-        llm_response: List[str]
-    ) -> 'IntegrationsFilter':
+    def from_llm_response(cls, llm_response: List[str]) -> 'PageTypeFilter':
         if not llm_response:
             return None
         try:
-            integrations = [Integration(integration) for integration in
-                            llm_response]
+            types = types
         except ValueError:
-            print('Failed to create IntegrationsFilter from LLM response:\n')
+            print('Failed to create PageTypeFilter from LLM response:\n')
             print(str(llm_response).replace('\n', '||'))
             return None
-        return cls(integrations)
+        return cls(types)
 
     @staticmethod
     def description_for_prompt() -> str:
-        data_sources = ', '.join([f'"{integration.value}"' for integration in
-                                  Integration])
+        data_sources = ', '.join()
         data_sources = f'[{data_sources}]'
         return ('sources: Identify any data sources that are referenced in '
                 'the Request. The possible data sources are: '
@@ -414,28 +351,6 @@ class IntegrationsFilter(QueryComponent):
     @staticmethod
     def json_for_prompt() -> str:
         return ' "sources": string[]'
-
-    @property
-    def neo4j_integrations(self) -> Set[str]:
-        '''Returns a list of integration names for use in Neo4j.'''
-        return set([self._get_integration_name_from_category(integration)
-                    for integration in self.integrations])
-
-    @property
-    def pinecone_integrations(self) -> Set[str]:
-        '''Returns a list of integration names for use in Pinecone.'''
-        return set([self._get_integration_name_from_category(integration)
-                    for integration in self.integrations])
-
-    def _get_integration_name_from_category(self, category: str) -> str:
-        if category == Integration.CRM:
-            return 'zoho'
-        elif category == Integration.CUSTOMER_SUPPORT:
-            return 'zendesk'
-        elif category == Integration.DOCUMENTS:
-            return 'google_docs'
-        elif category == Integration.EMAIL:
-            return 'google_mail'
 
 
 class SearchMethodValue(Enum):
@@ -542,16 +457,6 @@ class BlocksFilter(QueryComponent, ABC):
                 'the author, recipients, etc.\n'
                 '"summary": A summary of the page.\n'
                 '"title": The title of the page.')
-    
-    @property
-    def neo4j_blocks(self) -> Set[str]:
-        '''Returns a list of block names for use in Neo4j.'''
-        return set([block.value for block in self.blocks])
-    
-    @property
-    def pinecone_blocks(self) -> Set[str]:
-        '''Returns a list of block names for use in Pinecone.'''
-        return set([block.value for block in self.blocks])
 
 
 @dataclass

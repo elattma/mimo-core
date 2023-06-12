@@ -1,16 +1,9 @@
-import json
-import re
-from dataclasses import dataclass
 from typing import Dict, List, Set
 
+from graph.neo4j_ import Neo4j
+from graph.pinecone_ import Pinecone
+
 import mystery.constants as constants
-from external.openai_ import OpenAI
-from graph.blocks import MemberBlock, entity
-from graph.neo4j_ import (Block, BlockFilter, ContentMatch, Document,
-                          DocumentFilter, Limit, NameFilter, Neo4j,
-                          QueryFilter)
-from graph.pinecone_ import Filter as VectorFilter
-from graph.pinecone_ import Pinecone, RowType
 from mystery.context_basket.model import (ContextBasket, DataError,
                                           DataRequest, DataResponse, Request)
 from mystery.context_basket.weaver import BasketWeaver
@@ -24,14 +17,7 @@ from mystery.query import (BlocksFilter, BlocksToReturn, BlocksToSearch,
                            QueryComponent, RelativeTimeFilter, ReturnType,
                            ReturnTypeValue, SearchMethod, SearchMethodValue)
 from mystery.util import count_tokens
-
-
-@dataclass
-class DataAgentConfig:
-    owner: str = None
-    graph_db: Neo4j = None
-    vector_db: Pinecone = None
-    openai: OpenAI = None
+from util.openai_ import OpenAI
 
 
 class DataAgent:
@@ -40,13 +26,13 @@ class DataAgent:
 
     def __init__(
         self,
-        owner: str,
+        library: str,
         graph_db: Neo4j,
         vector_db: Pinecone,
         openai: OpenAI
     ) -> None:
         print('[DataAgent] Initializing...')
-        self._owner: str = owner
+        self._library: str = library
         self._graph_db: Neo4j = graph_db
         self._vector_db: Pinecone = vector_db
         self._openai: OpenAI = openai
@@ -54,7 +40,7 @@ class DataAgent:
             self._llm = OpenAIChat(client=openai, model='gpt-4')
         if not self._basket_weaver:
             self._basket_weaver = BasketWeaver()
-        block_descriptions = BlocksFilter.get_block_descriptions()
+        block_descriptions = BlocksFilter.get_block_descriptions() # TODO: dynamically get depending on the library
         json_schema = QueryComponent.get_json_schema()
         component_descriptions = QueryComponent.get_component_descriptions()
         self._system_message = constants.DATA_AGENT_SYSTEM_MESSAGE.format(
@@ -85,26 +71,26 @@ class DataAgent:
                 error=DataError.QUERY_FORMATION_FAILURE
             )
 
-        # Use query to fetch documents
-        documents = self._exceptional(self._fetch_documents)(data_request)
-        if not documents:
+        # Use query to fetch pages
+        pages = self._exceptional(self._fetch_pages)(data_request)
+        if not pages:
             return DataResponse(
                 successful=False,
                 context_basket=None,
-                error=DataError.FETCH_DOCUMENTS_FAILURE
+                error=DataError.FETCH_PAGES_FAILURE
             )
         
-        # Fetch corresponding documents to return
-        filtered_documents = self._exceptional(self._apply_return_filters)(documents, data_request.query)
-        if not filtered_documents:
+        # Fetch corresponding pages to return
+        filtered_pages = self._exceptional(self._apply_return_filters)(pages, data_request.query)
+        if not filtered_pages:
             return DataResponse(
                 successful=False,
                 context_basket=None,
-                error=DataError.FILTERED_DOCUMENTS_FAILURE
+                error=DataError.FILTERED_PAGES_FAILURE
             )
 
-        # Decorate documents with embeddings
-        successful = self._exceptional(self._decorate_document_embeddings)(filtered_documents)
+        # Decorate pages with embeddings
+        successful = self._exceptional(self._decorate_page_embeddings)(filtered_pages)
         if not successful:
             return DataResponse(
                 successful=False,
@@ -112,8 +98,8 @@ class DataAgent:
                 error=DataError.DECORATE_EMBEDDINGS_FAILURE
             )
 
-        # Weave basket from documents
-        basket: ContextBasket = self._exceptional(self._basket_weaver.weave_context_basket)(data_request.query.request,filtered_documents)
+        # Weave basket from pages
+        basket: ContextBasket = self._exceptional(self._basket_weaver.weave_context_basket)(data_request.query.request,filtered_pages)
         if not basket:
             return DataResponse(
                 successful=False,
@@ -132,13 +118,13 @@ class DataAgent:
                 )
         return DataResponse(successful=True, context_basket=basket)
 
-    def _exact_context(self, query: Query) -> List[Document]:
+    def _exact_context(self, query: Query) -> List[Context]:
         print('[DataAgent] Filling basket with exact context...')
         results = self._query_graph_db(query=query)
         print('[DataAgent] Filled basket with exact context!')
         return results
 
-    def _relevant_context(self, query: Query) -> List[Document]:
+    def _relevant_context(self, query: Query) -> List[Page]:
         print('[DataAgent] Filling basket with relevant context...')
         if Count in query.components:
             c: Count = query.components[Count]
@@ -154,7 +140,7 @@ class DataAgent:
     def _relevant_context_by_page_participants(
         self,
         query: Query
-    ) -> List[Document]:
+    ) -> List[Page]:
         print((
             '[DataAgent] Filling basket with relevant context filtered by '
             'page participants...'
@@ -170,16 +156,16 @@ class DataAgent:
     
     def _apply_return_filters(
         self,
-        documents: List[Document],
+        pages: List[Page],
         query: Query
-    ) -> List[Document]:
+    ) -> List[Page]:
         print('[DataAgent] Applying return filters...')
-        filtered_documents = documents
+        filtered_pages = pages
         if ReturnType in query.components:
             rt: ReturnType = query.components[ReturnType]
-            page_ids = set([document.id for document in documents])
+            page_ids = set([page.id for page in pages])
             if rt.value == ReturnTypeValue.PAGES:
-                filtered_documents = self._query_graph_db(page_ids=page_ids)
+                filtered_pages = self._query_graph_db(page_ids=page_ids)
             elif rt.value == ReturnTypeValue.BLOCKS:
                 if BlocksToReturn in query.components:
                     btr: BlocksToReturn = query.components[BlocksToReturn]
@@ -192,12 +178,12 @@ class DataAgent:
                         },
                         request=query.request
                     )
-                    filtered_documents = self._query_graph_db(
+                    filtered_pages = self._query_graph_db(
                         query=new_query,
                         page_ids=page_ids
                     )
         print('[DataAgent] Applied return filters!')
-        return filtered_documents
+        return filtered_pages
 
     def _query_graph_db(
         self,
@@ -297,7 +283,7 @@ class DataAgent:
                 page_ids = (page_ids.union(pi.values)
                             if page_ids else set(pi.values))
 
-        page_filter = DocumentFilter(
+        page_filter = PageFilter(
             ids=page_ids if page_ids else None,
             integrations=integrations,
             time_range=time_range
@@ -311,7 +297,7 @@ class DataAgent:
         )
 
         query_filter = QueryFilter(
-            owner=self._owner,
+            library=self._library,
             page_filter=page_filter,
             name_filter=name_filter,
             block_filter=block_filter,
@@ -325,7 +311,7 @@ class DataAgent:
         min_date_day = None
         max_date_day = None
         block_labels = None
-        document_id = None
+        page_id = None
         # if AbsoluteTimeFilter in query.components:
         #     atf: AbsoluteTimeFilter = query.components[AbsoluteTimeFilter]
         #     min_date_day = atf.pinecone_min_date_day
@@ -338,16 +324,16 @@ class DataAgent:
             block_labels = bts.pinecone_blocks
         if PageIds in query.components:
             pi: PageIds = query.components[PageIds]
-            document_id = pi.values
+            page_id = pi.values
 
         vector_filter = VectorFilter(
-            owner=self._owner,
+            library=self._library,
             type=set([RowType.BLOCK]),
             min_date_day=min_date_day,
             max_date_day=max_date_day,
             integration=integrations,
             block_label=block_labels,
-            document_id=document_id
+            page_id=page_id
         )
         return vector_filter
 
@@ -366,8 +352,9 @@ class DataAgent:
         query = Query.from_string_and_request(llm_response, request)
         print('[DataAgent] Generated query!')
         return query
-    def _get_page_ids_from_results(self, results: List[Document]) -> Set[str]:
-        page_ids = [document.id for document in results]
+    
+    def _get_page_ids_from_results(self, results: List[Page]) -> Set[str]:
+        page_ids = [page.id for page in results]
         return set(page_ids)
     
     def _decorate_query(self, data_request: DataRequest) -> Query:
@@ -405,35 +392,35 @@ class DataAgent:
             print(f'[DataAgent] Query Components: {query.components}')
         data_request.query = query
 
-    def _fetch_documents(self, data_request: DataRequest) -> List[Document]:
+    def _fetch_pages(self, data_request: DataRequest) -> List[Page]:
         query = data_request.query
-        documents = []
+        pages = []
         default_if_empty = True
         if SearchMethod not in query.components:
             pass
         elif (query.components[SearchMethod].value == SearchMethodValue.EXACT):
-            documents.extend(self._exact_context(query))
+            pages.extend(self._exact_context(query))
             print('hi!!!')
-            print(documents)
+            print(pages)
             default_if_empty = False
         elif (query.components[SearchMethod].value == SearchMethodValue.RELEVANT):
             if PageParticipants in query.components:
-                documents.extend(self._relevant_context_by_page_participants(query))
+                pages.extend(self._relevant_context_by_page_participants(query))
             else:
-                documents.extend(self._relevant_context(query))
-        if default_if_empty and not documents:
+                pages.extend(self._relevant_context(query))
+        if default_if_empty and not pages:
             query.components = {
                 BlocksToSearch: BlocksToSearch(blocks=[QueryBlock.SUMMARY]),
                 ReturnType: ReturnType(value=ReturnTypeValue.PAGES),
             }
             print(f'[DataAgent] Using default summary->pages query: {query}')
-            documents.extend(self._relevant_context(query))
-        return documents
+            pages.extend(self._relevant_context(query))
+        return pages
 
-    def _decorate_document_embeddings(self, documents: List[Document]) -> bool:
+    def _decorate_page_embeddings(self, pages: List[Page]) -> bool:
         block_id_to_block: dict[str, Block] = {}
-        for document in documents:
-            for block in document.consists:
+        for page in pages:
+            for block in page.consists:
                 block_id_to_block[block.target.id] = block.target
         vectors = self._vector_db.fetch(list(block_id_to_block.keys()))
         for vector_id, vector in vectors.items():

@@ -124,9 +124,11 @@ class Ingestor:
                     library=self._library,
                     id=block_id,
                     properties={
+                        'connection': self._connection,
+                        'source': discovery.id,
                         'label': chunked_block[0].label,
                         'last_updated_timestamp': last_updated_timestamp,
-                        'blocks': str([block.as_dict() for block in chunked_block])
+                        'blocks': str([block.as_dict() for block in chunked_block]),
                     }
                 ))
                 
@@ -143,7 +145,6 @@ class Ingestor:
                 library=self._library,
                 id=discovery.id,
                 properties={
-                    'connection': self._connection,
                     'type': discovery.type,
                     'last_updated_timestamp': page_lut,
                     'summary': discovery.summary
@@ -168,7 +169,7 @@ class Ingestor:
                     id=entity.id,
                     properties={
                         'value': entity.value,
-                        'roles': entity.roles,
+                        'roles': entity.roles, # TODO: move to relationships
                     },
                     relationships=[Relationship(
                         library=self._library,

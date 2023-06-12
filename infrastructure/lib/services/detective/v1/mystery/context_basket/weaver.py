@@ -2,9 +2,6 @@ import json
 from math import sqrt
 from typing import Any, List
 
-from graph.blocks import BlockStream
-from graph.neo4j_ import Block, Document
-from graph.translator import Translator
 from mystery.util import count_tokens
 
 from .model import Context, ContextBasket, Request, Source
@@ -34,7 +31,7 @@ class BasketWeaver:
             translated = Translator.translate_block_streams(block_streams)
         return translated
 
-    def weave_context_basket(self, request: Request, documents: List[Document]) -> ContextBasket:
+    def weave_context_basket(self, request: Request, blocks: List[Dict]) -> ContextBasket:
         if not (request and documents):
             return None
 
@@ -134,7 +131,6 @@ def sort_list_embeddings(focal_embedding: List[float], _list: List[Any], embeddi
 def sort_contexts(focal_embedding: List[float], contexts: List[Context]) -> List[Context]:
     context_embeddings = []
     for context in contexts:
-        context.blocks = sort_list_embeddings(focal_embedding, context.blocks, [
-                             block.embedding for block in context.blocks])
+        context.blocks = sort_list_embeddings(focal_embedding, context.blocks, [block.embedding for block in context.blocks])
         context_embeddings.append(context.blocks[-1].embedding)
     return sort_list_embeddings(focal_embedding, contexts, context_embeddings)

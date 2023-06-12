@@ -1,22 +1,22 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List
+from typing import Dict, List
 
-from graph.neo4j_ import Block
 from mystery.query import Query, Request
 
 
 @dataclass
 class Source:
-    page_id: str
-    integration: str
+    connection: str
+    id: str
 
 @dataclass
 class Context:
     source: Source
-    blocks: List[Block]
-    translated: str
-    tokens: int
+    label: str
+    last_updated_timestamp: int
+    blocks: List[Dict]
+    tokens: int = None
 
 @dataclass
 class ContextBasket:
@@ -45,24 +45,24 @@ class ContextBasket:
     def __str__(self):
         stringified = self.request.text
         stringified += '\n--------\n'
-        stringified += '\n'.join([context.translated for context in self.contexts])
+        stringified += '\n'.join([str(context.blocks) for context in self.contexts])
         return stringified
 
 @dataclass
 class DataError(Enum):
     QUERY_FORMATION_FAILURE = 'Failed to dynamically formulate query!'
-    FETCH_DOCUMENTS_FAILURE = 'Failed to fetch documents!'
-    FILTERED_DOCUMENTS_FAILURE = 'Failed to fetched filtered documents!'
-    DECORATE_EMBEDDINGS_FAILURE = 'Failed to decorate documents with embeddings!'
+    FETCH_PAGES_FAILURE = 'Failed to fetch pages!'
+    FILTERED_PAGES_FAILURE = 'Failed to fetched filtered pages!'
+    DECORATE_EMBEDDINGS_FAILURE = 'Failed to decorate pages with embeddings!'
     WEAVE_CONTEXT_FAILURE = 'Failed to weave context!'
     MINIFY_CONTEXT_FAILURE = 'Failed to minify context!'
 
 @dataclass
 class DataRequest:
+    library: str
     request: str
-    query: Query = None
-    page_ids: List[str] = None
-    max_tokens: int = None
+    query: Query
+    max_tokens: int
 
 @dataclass
 class DataResponse:
