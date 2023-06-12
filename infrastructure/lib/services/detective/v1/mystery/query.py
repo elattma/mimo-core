@@ -76,15 +76,13 @@ class QueryComponent(ABC):
     def get_component_from_json_key(key: str) -> Type['QueryComponent']:
         lookup = {
             'concepts': Concepts,
-            'page_participants': PageParticipants,
+            'entities': Entities,
             'time_frame': AbsoluteTimeFilter,
             'time_sort': RelativeTimeFilter,
             'count': Count,
-            'sources': PageTypeFilter,
+            'sources': SourcesFilter,
             'search_method': SearchMethod,
-            'blocks_to_search': BlocksToSearch,
-            'return_type': ReturnType,
-            'blocks_to_return': BlocksToReturn
+            'return_type': ReturnType
         }
         if key not in lookup:
             raise ValueError(f'Invalid key: {key}')
@@ -95,15 +93,13 @@ class QueryComponent(ABC):
         '''Returns a list of all components as QueryComponent objects.'''
         return [
             Concepts,
-            PageParticipants,
+            Entities,
             AbsoluteTimeFilter,
             RelativeTimeFilter,
             Count,
-            IntegrationsFilter,
+            SourcesFilter,
             SearchMethod,
-            BlocksToSearch,
-            ReturnType,
-            BlocksToReturn
+            ReturnType
         ]
     
 
@@ -152,7 +148,7 @@ class PageParticipant:
 
 
 @dataclass
-class PageParticipants(QueryComponent):
+class Entities(QueryComponent):
     '''Enforces that only results linked to these names are considered.'''
     values: List[PageParticipant]
 
@@ -160,11 +156,11 @@ class PageParticipants(QueryComponent):
     def from_llm_response(
         cls,
         llm_response: List[Dict[str, str]]
-    ) -> 'PageParticipants':
+    ) -> 'Entities':
         # llm_response should be a list of dictionaries with each entry
         # containing keys "name" and "role" that map to strings
-        if not PageParticipants._validate_llm_response(llm_response):
-            print('Failed to create PageParticipants from LLM response:\n')
+        if not Entities._validate_llm_response(llm_response):
+            print('Failed to create Entities from LLM response:\n')
             print(str(llm_response).replace('\n', '||'))
             return None
         values = []
@@ -180,14 +176,14 @@ class PageParticipants(QueryComponent):
 
     @staticmethod
     def description_for_prompt() -> str:
-        return ('page_participants: A list of entities, e.g. people or '
+        return ('entities: A list of entities, e.g. people or '
                 'organizations, that are linked to the '
                 'information you are searching for. They should be paired '
                 'with their relationship to the information.')
 
     @staticmethod
     def json_for_prompt() -> str:
-        return (' "page_participants": {\n'
+        return (' "entities": {\n'
                 '  "name": string,\n'
                 '  "role": "author" OR "recipient" OR "unknown"\n'
                 ' }[]')
@@ -324,18 +320,18 @@ class Count(QueryComponent):
 
 
 @dataclass
-class PageTypeFilter(QueryComponent):
+class SourcesFilter(QueryComponent):
     '''Enforces that only results from these page types are considered'''
     types: List[str]
 
     @classmethod
-    def from_llm_response(cls, llm_response: List[str]) -> 'PageTypeFilter':
+    def from_llm_response(cls, llm_response: List[str]) -> 'SourcesFilter':
         if not llm_response:
             return None
         try:
             types = types
         except ValueError:
-            print('Failed to create PageTypeFilter from LLM response:\n')
+            print('Failed to create SourcesFilter from LLM response:\n')
             print(str(llm_response).replace('\n', '||'))
             return None
         return cls(types)
@@ -416,83 +412,73 @@ class ReturnType(QueryComponent):
     @staticmethod
     def json_for_prompt() -> str:
         return ' "return_type": "pages" OR "blocks"'
+
+
+# @dataclass
+# class BlocksFilter(QueryComponent, ABC):
+#     '''Abstract class for blocks filters.'''
+#     blocks: List[Block]
+
+#     @classmethod
+#     def from_llm_response(cls, llm_response: List[str]) -> 'BlocksFilter':
+#         if not llm_response:
+#             return None
+#         try:
+#             blocks = [Block(block) for block in llm_response]
+#         except ValueError:
+#             print('Failed to create BlockFilter from LLM response:\n')
+#             print(str(llm_response).replace('\n', '||'))
+#             return None
+#         return cls(blocks)
     
-
-class Block(Enum):
-    BODY = 'body'
-    COMMENT = 'comment'
-    CONTACT = 'contact'
-    DEAL = 'deal'
-    MEMBER = 'member'
-    SUMMARY = 'summary'
-    TITLE = 'title'
-
-
-@dataclass
-class BlocksFilter(QueryComponent, ABC):
-    '''Abstract class for blocks filters.'''
-    blocks: List[Block]
-
-    @classmethod
-    def from_llm_response(cls, llm_response: List[str]) -> 'BlocksFilter':
-        if not llm_response:
-            return None
-        try:
-            blocks = [Block(block) for block in llm_response]
-        except ValueError:
-            print('Failed to create BlockFilter from LLM response:\n')
-            print(str(llm_response).replace('\n', '||'))
-            return None
-        return cls(blocks)
-    
-    @staticmethod
-    def get_block_descriptions() -> str:
-        return ('"body": The body of the page, e.g. the text in a '
-                'Microsoft Word document.\n'
-                '"comment": A comment on the page, e.g. a comment on a Jira '
-                'ticket.\n'
-                '"contact": A contact associated with an account in a CRM.\n'
-                '"deal": A deal associated with an account in a CRM.\n'
-                '"member": A list of members associated with the page, e.g. '
-                'the author, recipients, etc.\n'
-                '"summary": A summary of the page.\n'
-                '"title": The title of the page.')
+#     @staticmethod
+#     def get_block_descriptions() -> str:
+#         return ('"body": The body of the page, e.g. the text in a '
+#                 'Microsoft Word document.\n'
+#                 '"comment": A comment on the page, e.g. a comment on a Jira '
+#                 'ticket.\n'
+#                 '"contact": A contact associated with an account in a CRM.\n'
+#                 '"deal": A deal associated with an account in a CRM.\n'
+#                 '"member": A list of members associated with the page, e.g. '
+#                 'the author, recipients, etc.\n'
+#                 '"summary": A summary of the page.\n'
+#                 '"title": The title of the page.')
 
 
-@dataclass
-class BlocksToSearch(BlocksFilter):
-    '''Enforces that only these blocks are searched.'''
-    @staticmethod
-    def description_for_prompt() -> str:
-        block_names = ', '.join([f'"{block.value}"' for block in Block])
-        block_names = '[' + block_names + ']'
-        return (
-            'blocks_to_search: A list of blocks to search. Used if you want '
-            'to search for information based on specific blocks. The '
-            f'possible blocks are: {block_names}'
-        )
+# @dataclass
+# class BlocksToSearch(BlocksFilter):
+#     '''Enforces that only these blocks are searched.'''
+#     @staticmethod
+#     def description_for_prompt() -> str:
+#         block_names = ', '.join([f'"{block.value}"' for block in Block])
+#         block_names = '[' + block_names + ']'
+#         return (
+#             'blocks_to_search: A list of blocks to search. Used if you want '
+#             'to search for information based on specific blocks. The '
+#             f'possible blocks are: {block_names}'
+#         )
 
-    @staticmethod
-    def json_for_prompt() -> str:
-        return ' "blocks_to_search": string[]'
+#     @staticmethod
+#     def json_for_prompt() -> str:
+#         return ' "blocks_to_search": string[]'
 
 
-@dataclass
-class BlocksToReturn(BlocksFilter):
-    '''Enforces that only these blocks are returned.'''
-    @staticmethod
-    def description_for_prompt() -> str:
-        block_names = ', '.join([f'"{block.value}"' for block in Block])
-        block_names = '[' + block_names + ']'
-        return (
-            'blocks_to_return: A list of blocks to return. Used if '
-            'it is explicitly specified that the results should be '
-            f'certain block type(s). The possible blocks are: {block_names}'
-        )
+# @dataclass
+# class BlocksToReturn(BlocksFilter):
+#     '''Enforces that only these blocks are returned.'''
+#     @staticmethod
+#     def description_for_prompt() -> str:
+#         block_names = ', '.join([f'"{block.value}"' for block in Block])
+#         block_names = '[' + block_names + ']'
+#         return (
+#             'blocks_to_return: A list of blocks to return. Used if '
+#             'it is explicitly specified that the results should be '
+#             f'certain block type(s). The possible blocks are: {block_names}'
+#         )
 
-    @staticmethod
-    def json_for_prompt() -> str:
-        return ' "blocks_to_return": string[]'
+#     @staticmethod
+#     def json_for_prompt() -> str:
+#         return ' "blocks_to_return": string[]'
     
 
 @dataclass

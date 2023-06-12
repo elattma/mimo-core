@@ -7,9 +7,6 @@ The database is represented as a graph, with three types of nodes: pages, blocks
 A page is a high-level document from a data source, like an email from Google Mail or a customer account from Salesforce.
 A block is a component of a page. For example, an email has a title block to store the subject, a body block to store the main message, and a member block to store the to, from, cc, and bcc.
 A name is a person or organization that is linked to a page or block.
-Below are descriptions about the different block types:
-
-{block_descriptions}
 
 Given a Request for information, your job is to create a well-formed Query to retrieve the requested information from the database.
 The Query must be formatted in a specific way, and the values must make sense based on the Request.

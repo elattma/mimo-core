@@ -70,37 +70,42 @@ class Neo4j:
             page_result = session.execute_write(self._blocks, blocks)
             return page_result
         
-    def pages(self, pages: List[Node]):
-        if not pages:
-            raise ValueError('pages must not be empty')
-        for page in pages:
-            if not page.library or not page.id:
-                raise ValueError('page must have library and id')
+    # def pages(self, pages: List[Node]):
+    #     if not pages:
+    #         raise ValueError('pages must not be empty')
+    #     for page in pages:
+    #         if not page.library or not page.id:
+    #             raise ValueError('page must have library and id')
 
-            if not (page.properties and 'connection' in page.properties and 'type' in page.properties and 'last_updated_timestamp' in page.properties and 'summary' in page.properties and page.relationships):
-                raise ValueError('page must have connection, type, last_updated_timestamp, summary, and blocks')
+    #         if not (page.properties and 'connection' in page.properties and 'type' in page.properties and 'last_updated_timestamp' in page.properties and 'summary' in page.properties and page.relationships):
+    #             raise ValueError('page must have connection, type, last_updated_timestamp, summary, and blocks')
 
-        with self.driver.session(database='neo4j') as session:
-            page_result = session.execute_write(self._pages, pages)
-            return page_result
+    #     with self.driver.session(database='neo4j') as session:
+    #         page_result = session.execute_write(self._pages, pages)
+    #         return page_result
         
-    def names(self, names: List[Node]):
-        if not names:
-            raise ValueError('names must not be empty')
-        for name in names:
-            if not name.library or not name.id:
-                raise ValueError('name must have library and id')
+    # def names(self, names: List[Node]):
+    #     if not names:
+    #         raise ValueError('names must not be empty')
+    #     for name in names:
+    #         if not name.library or not name.id:
+    #             raise ValueError('name must have library and id')
 
-            if not (name.properties and name.relationships):
-                raise ValueError('name must have value')
+    #         if not (name.properties and name.relationships):
+    #             raise ValueError('name must have value')
 
+    #     with self.driver.session(database='neo4j') as session:
+    #         names_result = session.execute_write(self._names, names)
+    #         return names_result
+        
+    def get_source_ids(self, library: str, sources: List[str]) -> List[str]:
         with self.driver.session(database='neo4j') as session:
-            names_result = session.execute_write(self._names, names)
-            return names_result
+            result = session.execute_read(self._get_source_ids, library, sources)
+            return result
     
-    def cleanup(self, library: str):
+    def delete(self, library: str, ids: List[str]) -> List[Node]:
         with self.driver.session(database='neo4j') as session:
-            result = session.execute_write(self._cleanup, library)
+            result = session.execute_write(self._delete, library, ids)
             return result
         
     @staticmethod
@@ -119,63 +124,71 @@ class Neo4j:
 
         return list(tx.run(blocks_query, blocks=neo4j_blocks))
     
-    @staticmethod
-    def _pages(tx, pages: List[Node]):
-        neo4j_pages = [page.get_neo4j_properties() for page in pages]
-        block_merge_object = ', '.join([f'{key}: block.{key}' for key in Node.get_index_keys()])
-        merge_object = ', '.join([f'{key}: page.{key}' for key in Node.get_index_keys()])
-        set_object = ', '.join([f'p.{key} = page.{key}' for key in pages[0].get_index_properties()])
-        print(neo4j_pages)
-        pages_query = (
-            'UNWIND $pages as page '
-            f'MERGE (p: Page {{{merge_object}}}) '
-            'ON CREATE '
-            f'SET {set_object} '
-            'ON MATCH '
-            f'SET {set_object} '
-            'WITH p, page '
-            'CALL { '
-            'WITH p, page '
-            'MATCH (p)-[c:Consists]-() '
-            'DETACH DELETE c '
-            '} '
-            'WITH p, page '
-            'UNWIND page.relationships as block '
-            f'MATCH (b: Block {{{block_merge_object}}}) '
-            'MERGE (p)-[:Consists]->(b)'
-        )
+    # @staticmethod
+    # def _pages(tx, pages: List[Node]):
+    #     neo4j_pages = [page.get_neo4j_properties() for page in pages]
+    #     block_merge_object = ', '.join([f'{key}: block.{key}' for key in Node.get_index_keys()])
+    #     merge_object = ', '.join([f'{key}: page.{key}' for key in Node.get_index_keys()])
+    #     set_object = ', '.join([f'p.{key} = page.{key}' for key in pages[0].get_index_properties()])
+    #     print(neo4j_pages)
+    #     pages_query = (
+    #         'UNWIND $pages as page '
+    #         f'MERGE (p: Page {{{merge_object}}}) '
+    #         'ON CREATE '
+    #         f'SET {set_object} '
+    #         'ON MATCH '
+    #         f'SET {set_object} '
+    #         'WITH p, page '
+    #         'CALL { '
+    #         'WITH p, page '
+    #         'MATCH (p)-[c:Consists]-() '
+    #         'DETACH DELETE c '
+    #         '} '
+    #         'WITH p, page '
+    #         'UNWIND page.relationships as block '
+    #         f'MATCH (b: Block {{{block_merge_object}}}) '
+    #         'MERGE (p)-[:Consists]->(b)'
+    #     )
 
-        return list(tx.run(pages_query, pages=neo4j_pages))
+    #     return list(tx.run(pages_query, pages=neo4j_pages))
     
-    @staticmethod
-    def _names(tx, names: List[Node]):
-        neo4j_names = [name.get_neo4j_properties() for name in names]
-        page_merge_object = ', '.join([f'{key}: page.{key}' for key in Node.get_index_keys()])
-        merge_object = ', '.join([f'{key}: name.{key}' for key in Node.get_index_keys()])
-        set_object = ', '.join([f'n.{key} = name.{key}' for key in names[0].get_index_properties()])
-        names_query = (
-            'UNWIND $names as name '
-            f'MERGE (n: Name {{{merge_object}}}) '
-            'ON CREATE '
-            f'SET {set_object} '
-            'WITH n, name '
-            'UNWIND name.relationships as page '
-            f'MATCH (p: Page {{{page_merge_object}}}) '
-            'WITH n, p '
-            'MERGE (n)-[:Mentioned]->(p) '
-        )
+    # @staticmethod
+    # def _names(tx, names: List[Node]):
+    #     neo4j_names = [name.get_neo4j_properties() for name in names]
+    #     page_merge_object = ', '.join([f'{key}: page.{key}' for key in Node.get_index_keys()])
+    #     merge_object = ', '.join([f'{key}: name.{key}' for key in Node.get_index_keys()])
+    #     set_object = ', '.join([f'n.{key} = name.{key}' for key in names[0].get_index_properties()])
+    #     names_query = (
+    #         'UNWIND $names as name '
+    #         f'MERGE (n: Name {{{merge_object}}}) '
+    #         'ON CREATE '
+    #         f'SET {set_object} '
+    #         'WITH n, name '
+    #         'UNWIND name.relationships as page '
+    #         f'MATCH (p: Page {{{page_merge_object}}}) '
+    #         'WITH n, p '
+    #         'MERGE (n)-[:Mentioned]->(p) '
+    #     )
 
-        return list(tx.run(names_query, names=neo4j_names))
+    #     return list(tx.run(names_query, names=neo4j_names))
 
     @staticmethod
-    def _cleanup(tx, library: str):
-        cleanup_query = (
-            'MATCH (b: Block {library: $library}) '
-            'WHERE NOT (b)-[:Consists]-() '
-            'WITH b, b.id AS id '
-            'DELETE b '
-            'RETURN id'
+    def _get_source_ids(tx, library: str, sources: List[str]) -> List[str]:
+        get_query = (
+            'MATCH (block: Block) '
+            'WHERE block.library = $library AND block.source IN $sources '
+            'RETURN block.id as id '
         )
-        result = tx.run(cleanup_query, library=library)
+        result = tx.run(get_query, library=library, sources=sources)
         records = list(result)
         return [record.get('id') for record in records]
+
+    @staticmethod
+    def _delete(tx, library: str, ids: List[str]):
+        delete_query = (
+            'MATCH (node {library: $library, id: $id}) '
+            'DETACH DELETE node '
+        )
+        result = tx.run(delete_query, library=library, id=ids)
+        records = list(result)
+        return [record.get('node') for record in records]

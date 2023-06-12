@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from dstruct.model import Block, Discovery, Metric, Stats
-from dstruct.neo4j_ import Neo4j, Node, Relationship
+from dstruct.neo4j_ import Neo4j, Node
 from dstruct.pinecone_ import Pinecone, Row
 from ulid import ulid
 from util.openai_ import OpenAI
@@ -17,9 +17,7 @@ CHUNK_SIZE = 1000
 class Ingest:
     succeeded: bool
     discovery: Discovery
-    pages: List[Node]
     blocks: List[Node]
-    names: List[Node]
     rows: List[Row]
     error: str
 
@@ -86,20 +84,6 @@ class Ingestor:
             chunked_blocks.extend(grouped_chunked_blocks)
         return chunked_blocks
     
-    def _summarize(self, chunked_blocks: List[List[Block]]) -> str:        
-        summaries = [block.translated for chunked_block in chunked_blocks for block in chunked_block]
-        while len(summaries) > 1:
-            summaries_len = len(summaries)
-            temp_summaries = []
-            for i in range(0, summaries_len, MAX_TREE_BLOCKS_CHILDREN):
-                summary_input = '\n\n'.join(summaries[i : min(i + MAX_TREE_BLOCKS_CHILDREN, summaries_len)])
-                summary = self._openai.summarize(summary_input)
-                temp_summaries.append(summary)
-            summaries = temp_summaries
-        if len(summaries) != 1:
-            raise Exception("_summarize: len(summaries) != 1")
-        return summaries[0]
-    
     def _construct(self, discovery: Discovery) -> Ingest:
         succeeded = True
         pages: List[Node] = []
@@ -108,15 +92,12 @@ class Ingestor:
         rows: List[Row] = []
         error = None
 
-        page_lut = -1
         try:
             chunked_blocks = self._chunkify_blocks(discovery.blocks)
-            discovery.summary = self._summarize(chunked_blocks)
             if not discovery.is_valid():
                 raise Exception('discovery is not valid')
             for chunked_block in chunked_blocks:
                 last_updated_timestamp = max([block.last_updated_timestamp for block in chunked_block])
-                page_lut = max([page_lut, last_updated_timestamp])
                 date_day = datetime.fromtimestamp(last_updated_timestamp).strftime('%Y%m%d')
                 block_id = ulid()
                 
@@ -141,41 +122,6 @@ class Ingestor:
                     block_label=chunked_block[0].label,
                     page_type=discovery.type
                 ))
-            pages = [Node(
-                library=self._library,
-                id=discovery.id,
-                properties={
-                    'type': discovery.type,
-                    'last_updated_timestamp': page_lut,
-                    'summary': discovery.summary
-                },
-                relationships=[Relationship(
-                    library=self._library,
-                    id=block.id
-                ) for block in blocks]
-            )]
-            embedding = self._openai.embed(discovery.summary)
-            rows.append(Row(
-                id=discovery.id,
-                embedding=embedding,
-                library=self._library,
-                date_day=datetime.fromtimestamp(page_lut).strftime('%Y%m%d'),
-                block_label='mimo#summary',
-                page_type=discovery.type
-            ))
-            for entity in discovery.entities:
-                names.append(Node(
-                    library=self._library,
-                    id=entity.id,
-                    properties={
-                        'value': entity.value,
-                        'roles': entity.roles, # TODO: move to relationships
-                    },
-                    relationships=[Relationship(
-                        library=self._library,
-                        id=discovery.id
-                    )]
-                ))
         except Exception as e:
             succeeded = False
             error = str(e)
@@ -189,14 +135,6 @@ class Ingestor:
             rows=rows,
             error=error
         )
-    
-    def _cleanup(self):
-        try:
-            deleted_blocks = self._neo4j.cleanup(self._library)
-            print(deleted_blocks)
-            self._pinecone.delete(deleted_blocks)
-        except Exception as e:
-            print(f'failed to cleanup: {str(e)}')
     
     def flush(self) -> bool:
         print('flushing!')
@@ -213,14 +151,13 @@ class Ingestor:
             ingests.append(result)
 
         try:
+            block_ids = self._neo4j.get_source_ids(self._library, [ingest.discovery.id for ingest in ingests])
             self._neo4j.blocks([block for ingest in ingests for block in ingest.blocks])
-            self._neo4j.pages([page for ingest in ingests for page in ingest.pages])
-            self._neo4j.names([name for ingest in ingests for name in ingest.names])
             self._pinecone.upsert([rows for ingest in ingests for rows in ingest.rows])
-            self._cleanup()
+            self._neo4j.delete(self._library, block_ids)
+            self._pinecone.delete(block_ids)
         except Exception as e:
             print(f'failed to flush: {str(e)}')
-            # TODO: undo changes? at the very least remove blocks, pages, names, and upserted
             self._stats.tally(Metric.FAILED, len(self.discovery_queue))
             return False
         

@@ -6,16 +6,18 @@ from mystery.query import Query, Request
 
 
 @dataclass
-class Source:
-    connection: str
+class Block:
     id: str
-
-@dataclass
-class Context:
-    source: Source
     label: str
     last_updated_timestamp: int
     blocks: List[Dict]
+    embedding: List[float] = None
+
+@dataclass
+class Context:
+    connection: str
+    source: str
+    blocks: List[Block]
     tokens: int = None
 
 @dataclass

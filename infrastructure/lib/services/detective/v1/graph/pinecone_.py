@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 import pinecone
 from graph.model import SemanticFilter
@@ -19,12 +19,15 @@ class Pinecone:
     def _without_library(self, row_id: str):
         return row_id.split('#')[-1]
 
-    def fetch(self, library: str, ids: List[str]):
+    def fetch(self, library: str, ids: List[str]) -> Dict[str, List[float]]:
         if not (self._index and library and ids and len(ids) > 0):
             return None
 
         fetch_response = self._index.fetch(ids=[self._with_library(library, id) for id in ids])
-        return fetch_response.get('vectors', None) if fetch_response else None
+        id_to_embedding: Dict[str, List[float]] = {}
+        for id, vector in fetch_response.items():
+            id_to_embedding[self._without_library(id)] = vector.values
+        return id_to_embedding
 
     def query(self, embedding: List[float], filter: SemanticFilter, k: int = 5):
         if not (self._index and embedding and len(embedding) > 0):

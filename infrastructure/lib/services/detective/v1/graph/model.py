@@ -42,22 +42,16 @@ class SemanticFilter:
 @dataclass
 class GraphFilter:
     library: str
-    page_filter: 'PageFilter' = None
     block_filter: 'BlockFilter' = None
     name_filter: 'NameFilter' = None
     order: 'Order' = None
     pagination: 'Pagination' = None
 
 @dataclass
-class PageFilter:
-    id: Set[str] = None
-    connection: Set[str] = None
-    type: Set[str] = None
-    time_range: tuple[int, int] = None
-
-@dataclass
 class BlockFilter:
     id: Set[str] = None
+    connection: Set[str] = None
+    source: Set[str] = None
     label: Set[str] = None
     time_range: tuple[int, int] = None
     kv_match: Set['KeyValueMatch'] = None
