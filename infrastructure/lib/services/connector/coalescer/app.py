@@ -19,7 +19,6 @@ _arg_parser: ArgumentParser = ArgumentParser()
 _arg_parser.add_argument('--connection', type=str, required=True)
 _arg_parser.add_argument('--library', type=str, required=True)
 
-
 def main():
     pc_table = os.getenv('PARENT_CHILD_TABLE')
     integrations_path = os.getenv('INTEGRATIONS_PATH')
@@ -92,4 +91,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f'error: {str(e)}')
+        

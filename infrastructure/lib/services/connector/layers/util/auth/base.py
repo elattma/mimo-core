@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from typing import Dict
 
 
 class AuthType(Enum):
@@ -14,11 +15,11 @@ class Auth(ABC):
     timestamp: int
 
     @abstractmethod
-    def is_valid(self):
+    def is_valid(self) -> bool:
         raise NotImplementedError('is_valid not implemented')
 
     @abstractmethod
-    def as_dict(self):
+    def as_dict(self) -> Dict:
         raise NotImplementedError('as_dict not implemented')
 
 class AuthStrategy(ABC):

@@ -3,6 +3,7 @@ import os
 from time import time
 from typing import Dict
 
+from airbyte.create import Airbyte
 from auth.base import AuthStrategy
 from shared.model import (Auth, AuthType, Connection, Integration, Sync,
                           SyncStatus)
@@ -11,17 +12,23 @@ from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
 from state.params import SSM
 from ulid import ulid
 
+_airbyte: Airbyte = None
 _db: ParentChildDB = None
 _integrations_dict: Dict[str, Integration] = None
 
+_airbyte_endpoint = os.getenv('AIRBYTE_ENDPOINT')
+_stage = os.getenv('STAGE')
+_integrations_path = os.getenv('INTEGRATIONS_PATH')
+if not (_airbyte_endpoint and _stage and _integrations_path):
+    raise Exception('missing env vars!')
+
 def handler(event: dict, context):
-    global _db, _integrations_dict
+    global _airbyte, _db, _integrations_dict
+    global _airbyte_endpoint, _stage, _integrations_path
 
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
     user: str = authorizer.get('principalId', None) if authorizer else None
-    stage: str = os.getenv('STAGE')
-    integrations_path: str = os.getenv('INTEGRATIONS_PATH')
     body: str = event.get('body', None) if event else None
     body: dict = json.loads(body) if body else None
     library: str = body.get('library', None) if body else None
@@ -31,13 +38,13 @@ def handler(event: dict, context):
     type: str = auth_strategy.get('type', None) if auth_strategy else None
     type: AuthType = AuthType(type) if type else None
 
-    if not (user and stage and library and name and integration_id and type):
+    if not (user and library and name and integration_id and type):
         return to_response_error(Errors.MISSING_PARAMS.value)
 
     now_timestamp: int = int(time())
     if not _integrations_dict:
         _ssm = SSM()
-        integration_params = _ssm.load_params(integrations_path)
+        integration_params = _ssm.load_params(_integrations_path)
         _integrations_dict = {}
         for id, integration_params in integration_params.items():
             _integrations_dict[id] = Integration.from_dict(integration_params)
@@ -51,8 +58,24 @@ def handler(event: dict, context):
     if not auth:
         return to_response_error(Errors.AUTH_FAILED)
 
+    connection_id = None
+    if integration.airbyte_id:
+        if not _airbyte:
+            _airbyte = Airbyte(_airbyte_endpoint)
+        connection_id = _airbyte.create(
+            strategy=strategy,
+            library=library,
+            name=name,
+            source_definition_id=integration.airbyte_id
+        )
+    else:
+        connection_id = ulid()
+
+    if not connection_id:
+        return to_response_error(Errors.CONNECTION_CREATION_FAILED)
+
     connection = Connection(
-        id=ulid(),
+        id=connection_id,
         name=name,
         integration=integration.id,
         auth=auth,
@@ -61,7 +84,7 @@ def handler(event: dict, context):
     )
 
     if not _db: 
-        _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
+        _db = ParentChildDB('mimo-{stage}-pc'.format(stage=_stage))
     parent = f'{KeyNamespaces.LIBRARY.value}{library}'
     try:
         _db.write([LibraryConnectionItem(parent, connection)])

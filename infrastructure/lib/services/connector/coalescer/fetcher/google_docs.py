@@ -1,7 +1,7 @@
 from typing import Dict, Generator, List
 
 from auth.base import AuthType
-from dstruct.model import Block, Discovery, Entity
+from dstruct.model import Block, Discovery
 
 from .base import Fetcher, get_timestamp_from_format
 
@@ -16,7 +16,7 @@ class GoogleDocs(Fetcher):
 
     def _get_supported_auth_types(self) -> List[AuthType]:
         return [AuthType.BASIC, AuthType.TOKEN_OAUTH2, AuthType.TOKEN_DIRECT]
-
+    
     def discover(self) -> Generator[Discovery, None, None]:
         discover_filters = ['mimeType="application/vnd.google-apps.document"', 'trashed=false']
         params = {
@@ -42,15 +42,12 @@ class GoogleDocs(Fetcher):
             if not next_token:
                 break
     
-    def _get_owners(self, owners_dict: Dict) -> List[Entity]:
-        owners: List[Entity] = []
+    def _get_owners(self, owners_dict: Dict) -> List[str]:
+        owners: List[str] = []
         for owner in owners_dict:
             if not owner or 'emailAddress' not in owner:
                 continue
-            owners.append(Entity(
-                id=owner.get('emailAddress'),
-                value=owner.get('displayName', None)
-            ))
+            owners.append(owner.get('emailAddress'))
         return owners
 
     def _get_body(self, body_dict: Dict) -> str:
@@ -86,7 +83,7 @@ class GoogleDocs(Fetcher):
     def _get_last_updated_timestamp(self, modifiedTime: str) -> int:
         return get_timestamp_from_format(modifiedTime, GOOGLE_TIME_FORMAT)
 
-    def fetch(self, discovery: Discovery) -> None:
+    def fetch_document(self, discovery: Discovery) -> None:
         response = self.request(
             GET_METADATA_ENDPOINT.format(id=discovery.id),
             params={
@@ -95,19 +92,20 @@ class GoogleDocs(Fetcher):
         )
         last_updated_timestamp = self._get_last_updated_timestamp(response.get('modifiedTime', None)) if response else None
         owners = self._get_owners(response.get('owners', None) if response else None)
-        discovery.add_entities(owners)
 
         response = self.request(GET_DOCUMENT_ENDPOINT.format(id=discovery.id))
         title = response.get('title', None)
-        discovery.add_blocks([Block(
-            last_updated_timestamp=last_updated_timestamp,
-            label='title',
-            unstructured=title
-        )])
-
         body = self._get_body(response.get('body', None))
         discovery.add_blocks([Block(
             last_updated_timestamp=last_updated_timestamp,
-            label='body',
-            unstructured=body
+            label='document',
+            properties={
+                'title': title,
+                'body': body,
+                'owners': owners
+            }
         )])
+
+    def fetch(self, discovery: Discovery) -> None:
+        if discovery.type == 'document':
+            self.fetch_document(discovery)

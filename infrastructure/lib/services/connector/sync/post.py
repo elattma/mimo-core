@@ -8,6 +8,7 @@ from state.dynamo import ParentChildDB
 
 _batch = None
 _db = None
+_params = None
 
 def handler(event: dict, context):
     global _batch, _db
