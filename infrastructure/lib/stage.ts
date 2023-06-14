@@ -158,7 +158,7 @@ export class MimoStage extends Stage {
       } else if (method.name === "POST") {
         dynamo.mimoTable.grantWriteData(method.handler);
       } else if (method.name === "DELETE") {
-        dynamo.mimoTable.grantWriteData(method.handler);
+        dynamo.mimoTable.grantReadWriteData(method.handler);
       } else {
         throw new Error(`Unknown method: ${method.name}`);
       }

@@ -25,6 +25,7 @@ class Errors(Enum):
     SYNC_IN_PROGRESS = 'sync in progress'
     BATCH_SUBMIT_FAILED = 'batch submit failed'
     CONNECTION_CREATION_FAILED = 'connection creation failed'
+    DELETE_FAILED = 'delete failed'
 
 def to_response_error(error_message: Errors):
     return {

@@ -1,6 +1,7 @@
 from typing import Dict
 
 import requests
+from airbyte.source_configs import source_definition_id_to_config
 from auth.base import AuthStrategy
 
 
@@ -20,13 +21,11 @@ class Airbyte:
         print('[call_airbyte] url:', url, ', with json:', json if json else 'None')
         response = requests.post(url, json=json)
         print('[call_airbyte] response status:', response.status_code if response else 'None')
-        print('[call_airbyte] response text:', response.text if response else 'None')
         try:
             response = response.json() if response else None
         except Exception as e:
             print('[call_airbyte] error:'. str(e))
             response = None
-        print('[call_airbyte] parsed response:', response if response else 'None')
         return response
 
     def _check_connection(self, source_id: str, delete_if_invalid: bool = True) -> bool:
@@ -60,23 +59,22 @@ class Airbyte:
         print('[with_catalog] update_catalog succeeded')
         return True
 
-    def _create_connection(self, workspace_id: str, library: str, source_id: str, destination_id: str, name: str) -> str:
+    def _create_connection(self, library: str, source_id: str, destination_id: str, name: str) -> str:
         connection = self._call('connections/create', {
-            'workspaceId': workspace_id,
+            'workspaceId': self._workspace_id,
             'sourceId': source_id,
             'destinationId': destination_id,
             'name': name,
             'namespaceDefinition': 'customformat',
             'namespaceFormat': f'{library}/{source_id}',
             'scheduleType': 'manual',
-            'status': 'active'
+            'status': 'inactive'
         })
         connection_id = connection.get('connectionId', None) if connection else None
         print('[create_connection] connection_id:', connection_id)
         return connection_id
 
-    def _create_source(self, source_definition_id: str, strategy: AuthStrategy) -> str:
-        from source_configs import source_definition_id_to_config
+    def _create_source(self, source_definition_id: str, strategy: AuthStrategy, name: str) -> str:
         config_function = source_definition_id_to_config.get(source_definition_id, None)
         config = config_function(strategy) if config_function else None
         print('[create_source] config:', config)
@@ -84,7 +82,7 @@ class Airbyte:
             print('[create_source] error generating config!')
             return None
         
-        source = self._call('sources/create', { 'sourceDefinitionId': source_definition_id, 'workspaceId': self._workspace_id, 'connectionConfiguration': config })
+        source = self._call('sources/create', { 'sourceDefinitionId': source_definition_id, 'workspaceId': self._workspace_id, 'connectionConfiguration': config, 'name': name })
         source_id = source.get('sourceId', None) if source else None
         print('[create_source] source_id:', source_id)
         return source_id
@@ -94,8 +92,8 @@ class Airbyte:
                library: str,
                name: str,
                source_definition_id: str) -> str:
-        source_id = self._create_source(source_definition_id, strategy)
-        if not self._check_connection(source_id):
+        source_id = self._create_source(source_definition_id, strategy, name)
+        if not (source_id and self._check_connection(source_id)):
             return None
         
         connection_id = self._create_connection(library, source_id, 'f23e7454-0fac-44f9-aa68-b4d7c3feb75a', name)
@@ -105,5 +103,10 @@ class Airbyte:
         added_catalog = self._with_catalog(library, connection_id)
         if not added_catalog:
             return None
-
         return connection_id
+    
+    def delete(self, id: str) -> bool:
+        deleted = self._call('sources/delete', { 'sourceId': id })
+        deleted = deleted.get('status', None) == 'succeeded' if deleted else False
+        print('[delete] id:', id, ', deleted:', deleted)
+        return deleted

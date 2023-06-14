@@ -36,8 +36,8 @@ export class DetectiveStack extends Stack {
       this,
       `${stage}-detective-context-lambda`,
       {
-        entry: path.join(__dirname, "context"),
-        index: "post.py",
+        entry: path.join(__dirname, "v1"),
+        index: "context.py",
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
         timeout: Duration.minutes(15),

@@ -3,7 +3,7 @@ import os
 from time import time
 from typing import Dict
 
-from airbyte.create import Airbyte
+from airbyte.client import Airbyte
 from auth.base import AuthStrategy
 from shared.model import (Auth, AuthType, Connection, Integration, Sync,
                           SyncStatus)

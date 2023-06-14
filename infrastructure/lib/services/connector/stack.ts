@@ -221,6 +221,7 @@ export class ConnectorStack extends Stack {
         memorySize: 1024,
         environment: {
           STAGE: stage,
+          AIRBYTE_ENDPOINT: "https://api.mimo.team/airbyte/api",
         },
         retryAttempts: 0,
         bundling: {
@@ -359,6 +360,7 @@ export class ConnectorStack extends Stack {
         memorySize: 1024,
         environment: {
           STAGE: stage,
+          AIRBYTE_ENDPOINT: "https://api.mimo.team/airbyte/api",
         },
         retryAttempts: 0,
         bundling: {

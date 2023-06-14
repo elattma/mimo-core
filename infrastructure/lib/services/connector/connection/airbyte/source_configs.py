@@ -126,5 +126,5 @@ source_definition_id_to_config: Dict[str, Callable[[AuthStrategy], Dict]] = {
     'c2281cee-86f9-4a86-bb48-d23286b4c7bd': slack_config,
     '79c1aa37-dae3-42ae-b333-d1c105477715': zendesk_config,
     '4942d392-c7b5-4271-91f9-3b4f4e51eb3e': zoho_config,
-    'b1c1b2a0-5b0a-4b0a-9b0a-6b0a6b0a6b0a': notion_config
+    '6e00b415-b02e-4160-bf02-58176a0ae687': notion_config
 }

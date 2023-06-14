@@ -33,3 +33,4 @@ node_modules
 /frontend/*.tsbuildinfo
 /frontend/next-env.d.ts
 **.venv**
+cdk.out*
