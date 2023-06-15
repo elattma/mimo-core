@@ -7,9 +7,8 @@ from dstruct.ingestor import Ingestor
 from dstruct.neo4j_ import Neo4j
 from dstruct.pinecone_ import Pinecone
 from fetcher.base import Fetcher
-from shared.model import Integration, SyncStatus
-from shared.sync_state import SyncState
-from state.dynamo import ParentChildDB
+from shared.model import Integration
+from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
 from state.params import SSM
 from util.model import CoalescerArgs
 from util.openai_ import OpenAI
@@ -44,11 +43,14 @@ def main():
         raise Exception('missing app secrets!')
 
     db = ParentChildDB(table_name=pc_table)
-    app_state = SyncState(db, coalescer_args.library, coalescer_args.connection)
-    integration_params = SSM().load_params(f'{integrations_path}/{app_state._connection.integration}')
+    item: LibraryConnectionItem = db.get(
+        f'{KeyNamespaces.LIBRARY.value}{coalescer_args.library}',
+        f'{KeyNamespaces.CONNECTION.value}{coalescer_args.connection}'
+    )
+    integration_params = SSM().load_params(f'{integrations_path}/{item.connection.integration}')
     integration = Integration.from_dict(integration_params)
 
-    auth_dict: Dict = app_state._connection.auth.as_dict()
+    auth_dict: Dict = item.connection.auth.as_dict()
     auth_type = auth_dict.pop('type')
     auth_type = AuthType(auth_type) if auth_type else None
     auth_strategy: AuthStrategy = integration.auth_strategies.get(auth_type)
@@ -63,12 +65,12 @@ def main():
             password=neo4j_password
         ),
         pinecone=Pinecone(
-            library=app_state._library,
+            library=coalescer_args.library,
             api_key=pinecone_api_key,
             environment='us-east1-gcp'
         ),
-        library=app_state._library,
-        connection=app_state._connection.id
+        library=coalescer_args.library,
+        connection=item.connection.id
     )
 
     succeeded = True
@@ -79,13 +81,11 @@ def main():
             if not succeeded:
                 succeeded = False
                 break
-            app_state.checkpoint(SyncStatus.IN_PROGRESS)
         except Exception as e:
             succeeded = False
             print(f'error: {str(e)}')
             break
     
-    app_state.release_lock(succeeded)
     ingestor.close()
     print(str(ingestor._stats.as_dict()))
 

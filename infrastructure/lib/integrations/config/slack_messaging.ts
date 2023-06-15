@@ -1,9 +1,4 @@
-import {
-  AuthType,
-  IntegrationConfig,
-  TokenDirectAuthStrategy,
-  TokenOAuth2AuthStrategy,
-} from "../model";
+import { AuthType, IntegrationConfig, TokenOAuth2AuthStrategy } from "../model";
 
 const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   type: AuthType.TOKEN_OAUTH2,
@@ -14,16 +9,12 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   enforce_secrets: ["client_secret"],
 };
 
-const tokenDirectStrategy: TokenDirectAuthStrategy = {
-  type: AuthType.TOKEN_DIRECT,
-};
-
 const slackMessagingIntegrationConfig: IntegrationConfig = {
   id: "slack_messaging",
   name: "Slack",
   description: "Some description for Slack",
   airbyte_id: "c2281cee-86f9-4a86-bb48-d23286b4c7bd",
-  auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
+  auth_strategies: [tokenOAuth2Strategy],
 };
 
 export default slackMessagingIntegrationConfig;

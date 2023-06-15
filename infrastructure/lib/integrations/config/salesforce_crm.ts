@@ -1,9 +1,4 @@
-import {
-  AuthType,
-  IntegrationConfig,
-  TokenDirectAuthStrategy,
-  TokenOAuth2AuthStrategy,
-} from "../model";
+import { AuthType, IntegrationConfig, TokenOAuth2AuthStrategy } from "../model";
 
 const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   type: AuthType.TOKEN_OAUTH2,
@@ -16,16 +11,12 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   enforce_secrets: ["client_secret"],
 };
 
-const tokenDirectStrategy: TokenDirectAuthStrategy = {
-  type: AuthType.TOKEN_DIRECT,
-};
-
 const salesforceCrmIntegrationConfig: IntegrationConfig = {
   id: "salesforce_crm",
   name: "Salesforce CRM",
   description: "Some description for Salesforce CRM",
   airbyte_id: "b117307c-14b6-41aa-9422-947e34922962",
-  auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
+  auth_strategies: [tokenOAuth2Strategy],
 };
 
 export default salesforceCrmIntegrationConfig;

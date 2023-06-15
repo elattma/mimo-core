@@ -25,7 +25,7 @@ class Integration:
             print('Integration.from_dict() missing required params for:', id)
             return None
 
-        auth_strategies_dict: Dict[str, Dict[str]] = params.get('auth_strategies', None)
+        auth_strategies_dict: Dict[str, Dict[str]] = params.get('auth_strategies', {})
         auth_strategies: Dict[AuthType, AuthStrategy] = {}
         for type, strategy in auth_strategies_dict.items():
             auth_type = AuthType(type)

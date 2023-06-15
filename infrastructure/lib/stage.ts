@@ -1,6 +1,7 @@
 import { Stage, StageProps } from "aws-cdk-lib";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
+import { AirbyteApiStack } from "./airbyteApi";
 import { ApiStack } from "./api";
 import { CdnStack } from "./cdn";
 import { DynamoStack } from "./dynamo";
@@ -50,8 +51,15 @@ export class MimoStage extends Stage {
     const vpc = new VpcStack(this, "vpc", {
       stageId: props.stageId,
     });
+
+    const airbyteApi = new AirbyteApiStack(this, "airbyteapi", {
+      stageId: props.stageId,
+    });
+
     const connectorService = new ConnectorStack(this, "connector", {
       stageId: props.stageId,
+      airbyteApi: airbyteApi.api,
+      mimoTable: dynamo.mimoTable,
       vpc: vpc.vpc,
     });
     const detectiveService = new DetectiveStack(this, "detective", {
@@ -79,7 +87,7 @@ export class MimoStage extends Stage {
         },
         {
           path: "sync",
-          methods: [connectorService.syncPost],
+          methods: [connectorService.syncMethod],
         },
       ],
     });
@@ -137,6 +145,7 @@ export class MimoStage extends Stage {
       domainName: props.domainName,
       routeConfigs: routeConfigs,
     });
+
     dynamo.mimoTable.grantReadData(api.apiKeyLambda);
     api.apiKeyLambda.addToRolePolicy(
       new PolicyStatement({
@@ -162,6 +171,13 @@ export class MimoStage extends Stage {
       } else {
         throw new Error(`Unknown method: ${method.name}`);
       }
+      // add policy to call api gateway airbyte api
+      method.handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: ["execute-api:Invoke"],
+          resources: [airbyteApi.api.arnForExecuteApi()],
+        })
+      );
     }
 
     for (const method of connectorService.libraryMethods) {
@@ -249,8 +265,6 @@ export class MimoStage extends Stage {
         dynamo.waitlistTable.grantReadData(method.handler);
       }
     }
-
-    dynamo.mimoTable.grantReadWriteData(connectorService.syncPost.handler);
 
     const ssm = new SsmStack(this, "ssm", {
       stageId: props.stageId,

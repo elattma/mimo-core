@@ -1,9 +1,4 @@
-import {
-  AuthType,
-  IntegrationConfig,
-  TokenDirectAuthStrategy,
-  TokenOAuth2AuthStrategy,
-} from "../model";
+import { AuthType, IntegrationConfig, TokenOAuth2AuthStrategy } from "../model";
 
 const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   type: AuthType.TOKEN_OAUTH2,
@@ -15,16 +10,12 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   enforce_secrets: ["client_secret"],
 };
 
-const tokenDirectStrategy: TokenDirectAuthStrategy = {
-  type: AuthType.TOKEN_DIRECT,
-};
-
 const zohoCrmIntegrationConfig: IntegrationConfig = {
   id: "zoho_crm",
   name: "Zoho CRM",
   description: "Some description for Zoho CRM",
   airbyte_id: "4942d392-c7b5-4271-91f9-3b4f4e51eb3e",
-  auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
+  auth_strategies: [tokenOAuth2Strategy],
 };
 
 export default zohoCrmIntegrationConfig;

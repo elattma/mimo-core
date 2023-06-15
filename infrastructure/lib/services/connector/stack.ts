@@ -9,7 +9,12 @@ import {
   PythonLayerVersion,
 } from "@aws-cdk/aws-lambda-python-alpha";
 import { Duration, Size, Stack, StackProps } from "aws-cdk-lib";
-import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
+import {
+  IRestApi,
+  JsonSchemaType,
+  ModelOptions,
+} from "aws-cdk-lib/aws-apigateway";
+import { ITable } from "aws-cdk-lib/aws-dynamodb";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { ContainerImage, LogDriver } from "aws-cdk-lib/aws-ecs";
 import {
@@ -18,12 +23,36 @@ import {
   Role,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
-import { ILayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { LogGroup } from "aws-cdk-lib/aws-logs";
 import {
   BlockPublicAccess,
   Bucket,
   BucketEncryption,
 } from "aws-cdk-lib/aws-s3";
+import {
+  Choice,
+  Condition,
+  Fail,
+  IChainable,
+  JsonPath,
+  Pass,
+  Result,
+  StateMachine,
+  Succeed,
+  TaskInput,
+  Wait,
+  WaitTime,
+} from "aws-cdk-lib/aws-stepfunctions";
+import {
+  BatchSubmitJob,
+  CallApiGatewayRestApiEndpoint,
+  CallAwsService,
+  DynamoAttributeValue,
+  DynamoGetItem,
+  DynamoUpdateItem,
+  HttpMethod,
+} from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Construct } from "constructs";
 import { AuthorizerType, MethodConfig } from "../../model";
 import path = require("path");
@@ -31,6 +60,8 @@ import path = require("path");
 export interface ConnectorStackProps extends StackProps {
   readonly stageId: string;
   readonly vpc: IVpc;
+  readonly mimoTable: ITable;
+  readonly airbyteApi: IRestApi;
 }
 
 export class ConnectorStack extends Stack {
@@ -38,8 +69,8 @@ export class ConnectorStack extends Stack {
   readonly integrationMethods: MethodConfig[] = [];
   readonly libraryMethods: MethodConfig[] = [];
   readonly layers: PythonLayerVersion[] = [];
-  readonly syncPost: MethodConfig;
   readonly definition: EcsJobDefinition;
+  readonly syncMethod: MethodConfig;
 
   constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
@@ -87,11 +118,11 @@ export class ConnectorStack extends Stack {
       compatibleRuntimes: [Runtime.PYTHON_3_9],
     });
     this.layers.push(util);
-    const createMethod = this.connectionPost(props.stageId);
+    const createMethod = this.connectionPost(props.stageId, props.airbyteApi);
     this.methods.push(createMethod);
     const getMethod = this.connectionGet(props.stageId);
     this.methods.push(getMethod);
-    const deleteMethod = this.connectionDelete(props.stageId);
+    const deleteMethod = this.connectionDelete(props.stageId, props.airbyteApi);
     this.methods.push(deleteMethod);
 
     const integrationsMethod = this.integrationGet(props.stageId);
@@ -100,52 +131,60 @@ export class ConnectorStack extends Stack {
     const libraryMethod = this.libraryGet(props.stageId);
     this.libraryMethods.push(libraryMethod);
 
-    this.syncPost = this.getMethod(
+    const syncSfn = this.getSyncSfn(
       props.stageId,
-      queue.jobQueueName,
-      this.layers
+      props.mimoTable,
+      props.airbyteApi,
+      this.definition,
+      queue
     );
-    this.syncPost.handler.addToRolePolicy(
-      new PolicyStatement({
-        actions: ["batch:SubmitJob"],
-        resources: ["*"],
-      })
-    );
+    this.syncMethod = this.sync(props.stageId, syncSfn);
   }
 
-  getMethod = (
-    stage: string,
-    jobQueue: string,
-    layers: ILayerVersion[]
-  ): MethodConfig => {
-    const handler = new PythonFunction(this, `${stage}-connector-sync-lambda`, {
-      entry: path.join(__dirname, "sync"),
-      index: "post.py",
+  sync = (stage: string, syncSfn: StateMachine): MethodConfig => {
+    const handler = new PythonFunction(this, "sync-lambda", {
+      entry: path.join(__dirname, "connection"),
+      index: "sync.py",
       runtime: Runtime.PYTHON_3_9,
       handler: "handler",
       timeout: Duration.seconds(30),
       memorySize: 1024,
       environment: {
         STAGE: stage,
-        JOB_QUEUE: jobQueue,
-        JOB_DEFINITION: this.definition.jobDefinitionName,
+        SFN_ARN: syncSfn.stateMachineArn,
       },
       retryAttempts: 0,
       bundling: {
         assetExcludes: ["**.venv**", "**__pycache__**"],
       },
-      layers: layers,
+      layers: this.layers,
     });
+    syncSfn.grantStartExecution(handler);
+
+    const methodRequestOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "SyncRequest",
+      schema: {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          connection: {
+            type: JsonSchemaType.STRING,
+          },
+          library: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+      },
+    };
 
     const methodResponseOptions: ModelOptions = {
       contentType: "application/json",
-      modelName: "SyncPostResponse",
+      modelName: "SyncResponse",
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
           success: {
             type: JsonSchemaType.BOOLEAN,
-            default: true,
           },
         },
       },
@@ -154,10 +193,215 @@ export class ConnectorStack extends Stack {
     return {
       name: "POST",
       handler: handler,
-      idResource: "sync",
+      requestModelOptions: methodRequestOptions,
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
     };
+  };
+
+  getUpdateStatus = (
+    table: ITable,
+    name: string,
+    status: "IN_PROGRESS" | "SUCCESS" | "FAILED" | string
+  ): IChainable => {
+    return new DynamoUpdateItem(this, `${name}-${status}`, {
+      table: table,
+      key: {
+        parent: DynamoAttributeValue.fromString(
+          JsonPath.format("LIBRARY#{}", JsonPath.stringAt("$.input.library"))
+        ),
+        child: DynamoAttributeValue.fromString(
+          JsonPath.format(
+            "CONNECTION#{}",
+            JsonPath.stringAt("$.input.connection")
+          )
+        ),
+      },
+      updateExpression: "SET #sync = :sync",
+      expressionAttributeNames: {
+        "#sync": "sync",
+      },
+      expressionAttributeValues: {
+        ":sync": DynamoAttributeValue.fromMap({
+          status: DynamoAttributeValue.fromString(status),
+          checkpoint_at: DynamoAttributeValue.fromNumber(
+            JsonPath.numberAt("$.timestamp")
+          ),
+          ingested_at: DynamoAttributeValue.fromNumber(
+            status == "SUCCESS"
+              ? JsonPath.numberAt("$.timestamp")
+              : JsonPath.numberAt(
+                  "$.libraryConnectionItem.Item.sync.M.ingested_at.N"
+                )
+          ),
+        }),
+      },
+      resultPath: "$.updateResult",
+    });
+  };
+
+  getSyncSfn = (
+    stage: string,
+    table: ITable,
+    api: IRestApi,
+    jobDefinition: EcsJobDefinition,
+    queue: JobQueue
+  ): StateMachine => {
+    return new StateMachine(this, `${stage}-sync`, {
+      definition: new DynamoGetItem(this, "Get Connection State", {
+        table: table,
+        key: {
+          parent: DynamoAttributeValue.fromString(
+            JsonPath.format("LIBRARY#{}", JsonPath.stringAt("$.input.library"))
+          ),
+          child: DynamoAttributeValue.fromString(
+            JsonPath.format(
+              "CONNECTION#{}",
+              JsonPath.stringAt("$.input.connection")
+            )
+          ),
+        },
+        resultPath: "$.libraryConnectionItem",
+        consistentRead: true,
+      })
+        .next(
+          new Choice(this, "Is Lock Held")
+            .when(
+              Condition.isNotPresent("$.libraryConnectionItem.Item"),
+              new Fail(this, "Connection not found")
+            )
+            .when(
+              Condition.stringEquals(
+                "$.libraryConnectionItem.Item.sync.M.status.S",
+                "IN_PROGRESS"
+              ),
+              new Succeed(this, "Already running")
+            )
+            .otherwise(this.getUpdateStatus(table, "Hold Lock", "IN_PROGRESS"))
+        )
+        .toSingleState("Single State lock", {
+          outputPath: "$[0]",
+        })
+        .next(
+          new CallAwsService(this, "Find if Airbyte-Managed", {
+            service: "ssm",
+            action: "getParameter",
+            parameters: {
+              Name: JsonPath.format(
+                `/${stage}/integrations/{}/airbyte_id`,
+                JsonPath.stringAt("$.libraryConnectionItem.Item.integration.S")
+              ),
+            },
+            resultSelector: {
+              airbyte_id: JsonPath.stringAt("$.Parameter.Value"),
+            },
+            resultPath: "$.params",
+            iamResources: ["*"],
+          })
+        )
+        .next(
+          new Choice(this, "Airbyte or Batch?")
+            .when(
+              Condition.stringEquals("$.params.airbyte_id", "batch"),
+              new BatchSubmitJob(this, "Submit Batch Job", {
+                jobDefinitionArn: jobDefinition.jobDefinitionArn,
+                jobQueueArn: queue.jobQueueArn,
+                jobName: `${stage}-sync`,
+                payload: TaskInput.fromObject({
+                  library: JsonPath.stringAt("$.input.library"),
+                  connection: JsonPath.stringAt("$.input.connection"),
+                }),
+                resultPath: "$.batchResult",
+                resultSelector: {
+                  "exitCode.$": "$.Container.ExitCode",
+                },
+              }).next(
+                new Choice(this, "Batch Job Completed")
+                  .when(
+                    Condition.numberEquals("$.batchResult.exitCode", 200),
+                    new Pass(this, "Batch Job Succeeded", {
+                      result: Result.fromString("SUCCESS"),
+                      outputPath: "$.ingestionStatus",
+                    })
+                  )
+                  .otherwise(
+                    new Pass(this, "Batch Job Failed", {
+                      result: Result.fromString("FAILED"),
+                      outputPath: "$.ingestionStatus",
+                    })
+                  )
+              )
+            )
+            .otherwise(
+              new CallApiGatewayRestApiEndpoint(this, "Manual Airbyte Sync", {
+                api: api,
+                stageName: "prod",
+                method: HttpMethod.POST,
+                apiPath: "/airbyte/api/v1/connections/sync",
+                requestBody: TaskInput.fromObject({
+                  connectionId: JsonPath.stringAt("$.input.connection"),
+                }),
+                resultPath: "$.airbyteResult",
+              }).next(this.getWaitForAirbyte(api))
+            )
+        )
+        .toSingleState("Single State Ingest", {
+          outputPath: "$[0]",
+        })
+        .next(
+          this.getUpdateStatus(
+            table,
+            "Handle Lock",
+            JsonPath.stringAt("$.ingestionStatus")
+          )
+        ),
+      logs: {
+        destination: new LogGroup(this, `${stage}-sync-logs`),
+      },
+    });
+  };
+
+  getWaitForAirbyte = (api: IRestApi): IChainable => {
+    const checkAirbyte = new Wait(this, "Wait for Airbyte", {
+      time: WaitTime.duration(Duration.minutes(2)),
+    }).next(
+      new CallApiGatewayRestApiEndpoint(this, "Check Airbyte Job status", {
+        api: api,
+        stageName: "prod",
+        method: HttpMethod.POST,
+        apiPath: "/airbyte/api/v1/jobs/get_last_replication_job",
+        requestBody: TaskInput.fromObject({
+          connectionId: JsonPath.stringAt("$.input.connection"),
+        }),
+      })
+    );
+
+    return checkAirbyte.next(
+      new Choice(this, "Airbyte Job Exists?").when(
+        Condition.isNotNull("$.job"),
+        new Choice(this, "Airbyte Job Complete?")
+          .when(
+            Condition.or(
+              Condition.stringEquals("$.job.status", "pending"),
+              Condition.stringEquals("$.job.status", "running")
+            ),
+            checkAirbyte
+          )
+          .when(
+            Condition.stringEquals("$.job.status", "succeeded"),
+            new Pass(this, "Airbyte Job Succeeded", {
+              result: Result.fromString("SUCCESS"),
+              outputPath: "$.ingestionStatus",
+            })
+          )
+          .otherwise(
+            new Pass(this, "Airbyte Job Failed", {
+              result: Result.fromString("FAILED"),
+              outputPath: "$.ingestionStatus",
+            })
+          )
+      )
+    );
   };
 
   getDefinition = (stage: string): EcsJobDefinition => {
@@ -208,7 +452,7 @@ export class ConnectorStack extends Stack {
     });
   };
 
-  connectionPost = (stage: string): MethodConfig => {
+  connectionPost = (stage: string, airbyteApi: IRestApi): MethodConfig => {
     const handler = new PythonFunction(
       this,
       `${stage}-connector-create-lambda`,
@@ -221,7 +465,7 @@ export class ConnectorStack extends Stack {
         memorySize: 1024,
         environment: {
           STAGE: stage,
-          AIRBYTE_ENDPOINT: "https://api.mimo.team/airbyte/api",
+          AIRBYTE_ENDPOINT: `https://${airbyteApi.restApiId}.execute-api.${this.region}.amazonaws.com/prod/airbyte/api`,
         },
         retryAttempts: 0,
         bundling: {
@@ -347,7 +591,7 @@ export class ConnectorStack extends Stack {
     };
   };
 
-  connectionDelete = (stage: string): MethodConfig => {
+  connectionDelete = (stage: string, airbyteApi: IRestApi): MethodConfig => {
     const handler = new PythonFunction(
       this,
       `${stage}-connector-delete-lambda`,
@@ -360,7 +604,7 @@ export class ConnectorStack extends Stack {
         memorySize: 1024,
         environment: {
           STAGE: stage,
-          AIRBYTE_ENDPOINT: "https://api.mimo.team/airbyte/api",
+          AIRBYTE_ENDPOINT: `https://${airbyteApi.restApiId}.execute-api.${this.region}.amazonaws.com/prod/airbyte/api`,
         },
         retryAttempts: 0,
         bundling: {

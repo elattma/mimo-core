@@ -1,9 +1,4 @@
-import {
-  AuthType,
-  IntegrationConfig,
-  TokenDirectAuthStrategy,
-  TokenOAuth2AuthStrategy,
-} from "../model";
+import { AuthType, IntegrationConfig, TokenOAuth2AuthStrategy } from "../model";
 
 const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   type: AuthType.TOKEN_OAUTH2,
@@ -15,16 +10,12 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   enforce_secrets: ["client_secret"],
 };
 
-const tokenDirectStrategy: TokenDirectAuthStrategy = {
-  type: AuthType.TOKEN_DIRECT,
-};
-
 const intercomSupportIntegrationConfig: IntegrationConfig = {
   id: "intercom_support",
   name: "Intercom Customer Support",
   description: "Some description for Intercom Support",
   airbyte_id: "d8313939-3782-41b0-be29-b3ca20d8dd3a",
-  auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
+  auth_strategies: [tokenOAuth2Strategy],
 };
 
 export default intercomSupportIntegrationConfig;

@@ -2,12 +2,8 @@ import { Stack, StackProps } from "aws-cdk-lib";
 import {
   AccessLogFormat,
   ApiKeySourceType,
-  AuthorizationType,
   Authorizer,
-  ConnectionType,
   IResource,
-  Integration,
-  IntegrationType,
   LambdaIntegration,
   LogGroupLogDestination,
   MethodLoggingLevel,
@@ -15,13 +11,11 @@ import {
   RestApi,
   TokenAuthorizer,
   UsagePlan,
-  VpcLink,
 } from "aws-cdk-lib/aws-apigateway";
 import {
   Certificate,
   CertificateValidation,
 } from "aws-cdk-lib/aws-certificatemanager";
-import { NetworkLoadBalancer } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
@@ -84,7 +78,6 @@ export class ApiStack extends Stack {
     for (const routeConfig of props.routeConfigs) {
       this.getRoute(this.api, this.api.root, routeConfig, routeConfig.path);
     }
-    this.getAirbyte();
   }
 
   getRestApi = (stageId: string, tld: string): RestApi => {
@@ -310,42 +303,5 @@ export class ApiStack extends Stack {
         });
       }
     }
-  };
-
-  getAirbyte = () => {
-    const airbyteLB = NetworkLoadBalancer.fromNetworkLoadBalancerAttributes(
-      this,
-      "airbyte-load-balancer",
-      {
-        loadBalancerArn: process.env.AIRBYTE_LB_ARN!,
-        loadBalancerDnsName: process.env.AIRBYTE_LB_DNS_NAME!,
-      }
-    );
-    const vpcLink = new VpcLink(this, "airbyte-vpc-link", {
-      vpcLinkName: "vpc-link",
-      targets: [airbyteLB],
-    });
-    const integration = new Integration({
-      type: IntegrationType.HTTP_PROXY,
-      options: {
-        connectionType: ConnectionType.VPC_LINK,
-        vpcLink,
-        requestParameters: {
-          "integration.request.path.proxy": "method.request.path.proxy",
-        },
-      },
-      integrationHttpMethod: "ANY",
-      uri: `http://${airbyteLB.loadBalancerDnsName}:80/{proxy}`,
-    });
-    const airbyte = this.api.root.addResource("airbyte");
-    airbyte.addProxy({
-      defaultIntegration: integration,
-      defaultMethodOptions: {
-        authorizationType: AuthorizationType.IAM,
-        requestParameters: {
-          "method.request.path.proxy": true,
-        },
-      },
-    });
   };
 }

@@ -16,15 +16,14 @@ _airbyte: Airbyte = None
 _db: ParentChildDB = None
 _integrations_dict: Dict[str, Integration] = None
 
-_airbyte_endpoint = os.getenv('AIRBYTE_ENDPOINT')
-_stage = os.getenv('STAGE')
-_integrations_path = os.getenv('INTEGRATIONS_PATH')
-if not (_airbyte_endpoint and _stage and _integrations_path):
-    raise Exception('missing env vars!')
-
 def handler(event: dict, context):
     global _airbyte, _db, _integrations_dict
-    global _airbyte_endpoint, _stage, _integrations_path
+
+    airbyte_endpoint = os.getenv('AIRBYTE_ENDPOINT')
+    stage = os.getenv('STAGE')
+    integrations_path = os.getenv('INTEGRATIONS_PATH')
+    if not (airbyte_endpoint and stage and integrations_path):
+        raise Exception('missing env vars!')
 
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
@@ -44,7 +43,7 @@ def handler(event: dict, context):
     now_timestamp: int = int(time())
     if not _integrations_dict:
         _ssm = SSM()
-        integration_params = _ssm.load_params(_integrations_path)
+        integration_params = _ssm.load_params(integrations_path)
         _integrations_dict = {}
         for id, integration_params in integration_params.items():
             _integrations_dict[id] = Integration.from_dict(integration_params)
@@ -61,7 +60,7 @@ def handler(event: dict, context):
     connection_id = None
     if integration.airbyte_id:
         if not _airbyte:
-            _airbyte = Airbyte(_airbyte_endpoint)
+            _airbyte = Airbyte(airbyte_endpoint)
         connection_id = _airbyte.create(
             strategy=strategy,
             library=library,
@@ -84,7 +83,7 @@ def handler(event: dict, context):
     )
 
     if not _db: 
-        _db = ParentChildDB('mimo-{stage}-pc'.format(stage=_stage))
+        _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
     parent = f'{KeyNamespaces.LIBRARY.value}{library}'
     try:
         _db.write([LibraryConnectionItem(parent, connection)])

@@ -3,6 +3,7 @@ from typing import Dict
 import requests
 from airbyte.source_configs import source_definition_id_to_config
 from auth.base import AuthStrategy
+from shared.model import SyncStatus
 
 
 class Airbyte:
@@ -59,12 +60,12 @@ class Airbyte:
         print('[with_catalog] update_catalog succeeded')
         return True
 
-    def _create_connection(self, library: str, source_id: str, destination_id: str, name: str) -> str:
+    def _create_connection(self, library: str, source_id: str, destination_id: str) -> str:
         connection = self._call('connections/create', {
             'workspaceId': self._workspace_id,
             'sourceId': source_id,
             'destinationId': destination_id,
-            'name': name,
+            'name': library,
             'namespaceDefinition': 'customformat',
             'namespaceFormat': f'{library}/{source_id}',
             'scheduleType': 'manual',
@@ -96,7 +97,7 @@ class Airbyte:
         if not (source_id and self._check_connection(source_id)):
             return None
         
-        connection_id = self._create_connection(library, source_id, 'f23e7454-0fac-44f9-aa68-b4d7c3feb75a', name)
+        connection_id = self._create_connection(library, source_id, 'f23e7454-0fac-44f9-aa68-b4d7c3feb75a')
         if not connection_id:
             return None
         
@@ -110,3 +111,4 @@ class Airbyte:
         deleted = deleted.get('status', None) == 'succeeded' if deleted else False
         print('[delete] id:', id, ', deleted:', deleted)
         return deleted
+    

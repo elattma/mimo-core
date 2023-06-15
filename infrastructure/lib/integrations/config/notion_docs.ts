@@ -1,9 +1,4 @@
-import {
-  AuthType,
-  IntegrationConfig,
-  TokenDirectAuthStrategy,
-  TokenOAuth2AuthStrategy,
-} from "../model";
+import { AuthType, IntegrationConfig, TokenOAuth2AuthStrategy } from "../model";
 
 const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   type: AuthType.TOKEN_OAUTH2,
@@ -15,16 +10,12 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   enforce_secrets: ["client_secret"],
 };
 
-const tokenDirectStrategy: TokenDirectAuthStrategy = {
-  type: AuthType.TOKEN_DIRECT,
-};
-
 const notionDocsIntegrationConfig: IntegrationConfig = {
   id: "notion_docs",
   name: "Notion Docs",
   description: "Some description for Notion Docs",
   airbyte_id: "6e00b415-b02e-4160-bf02-58176a0ae687",
-  auth_strategies: [tokenOAuth2Strategy, tokenDirectStrategy],
+  auth_strategies: [tokenOAuth2Strategy],
 };
 
 export default notionDocsIntegrationConfig;

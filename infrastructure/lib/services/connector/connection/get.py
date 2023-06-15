@@ -7,8 +7,14 @@ from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
 
 _db: ParentChildDB = None
 
+
+
 def handler(event: dict, context):
     global _db
+
+    stage = os.getenv('STAGE')
+    if not (stage):
+        raise Exception('missing env vars!')
 
     request_context: dict = event.get('requestContext', None) if event else None
     authorizer: dict = request_context.get('authorizer', None) if request_context else None
@@ -17,9 +23,8 @@ def handler(event: dict, context):
     connection: str = path_parameters.get('connection', None) if path_parameters else None
     query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     library: str = query_string_parameters.get('library', None) if query_string_parameters else None
-    stage: str = os.getenv('STAGE')
 
-    if not (user and stage and library):
+    if not (user and library):
         return to_response_error(Errors.MISSING_PARAMS)
 
     if not _db:
@@ -39,6 +44,7 @@ def handler(event: dict, context):
             response_connections = [user_connection_item.connection]
         except Exception as e:
             return to_response_error(Errors.DB_READ_FAILED)
+
     return to_response_success({
         'connections': [{
             'id': connection.id,

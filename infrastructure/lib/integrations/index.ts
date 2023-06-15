@@ -5,6 +5,8 @@ import microsoftMail from "./config/microsoft_mail";
 import notionDocs from "./config/notion_docs";
 import salesforceCrm from "./config/salesforce_crm";
 import slackMessaging from "./config/slack_messaging";
+import uploadFile from "./config/upload_file";
+import webLink from "./config/web_link";
 import zendeskSupport from "./config/zendesk_support";
 import zohoCrm from "./config/zoho_crm";
 import { IntegrationConfig } from "./model";
@@ -19,4 +21,6 @@ export const INTEGRATION_CONFIGS: IntegrationConfig[] = [
   salesforceCrm,
   intercomSupport,
   microsoftMail,
+  uploadFile,
+  webLink,
 ];

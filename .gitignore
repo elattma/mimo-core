@@ -34,3 +34,4 @@ node_modules
 /frontend/next-env.d.ts
 **.venv**
 cdk.out*
+**cdk.context.json**
