@@ -34,11 +34,12 @@ def handler(event: dict, context):
     integration_id: str = body.get('integration', None) if body else None
     name: str = body.get('name', None) if body else None
     auth_strategy: Dict = body.get('auth_strategy', None) if body else None
+    config: Dict = body.get('config', None) if body else None
     type: str = auth_strategy.get('type', None) if auth_strategy else None
     type: AuthType = AuthType(type) if type else None
 
-    if not (user and library and name and integration_id and type):
-        return to_response_error(Errors.MISSING_PARAMS.value)
+    if not (user and library and name and integration_id):
+        return to_response_error(Errors.MISSING_PARAMS)
 
     now_timestamp: int = int(time())
     if not _integrations_dict:
@@ -48,36 +49,41 @@ def handler(event: dict, context):
         for id, integration_params in integration_params.items():
             _integrations_dict[id] = Integration.from_dict(integration_params)
     integration: Integration = _integrations_dict.get(integration_id) if _integrations_dict else None
-    strategy: AuthStrategy = integration.auth_strategies.get(type, None)
-    if not (integration and strategy):
-        return to_response_error(Errors.INVALID_AUTH.value)
-    
-    auth_strategy.pop('type', None)
-    auth: Auth = strategy.auth(**auth_strategy, grant_type='authorization_code')
-    if not auth:
-        return to_response_error(Errors.AUTH_FAILED)
-
     connection_id = None
-    if integration.airbyte_id:
-        if not _airbyte:
-            _airbyte = Airbyte(airbyte_endpoint)
-        connection_id = _airbyte.create(
-            strategy=strategy,
-            library=library,
-            name=name,
-            source_definition_id=integration.airbyte_id
-        )
-    else:
+    if not integration:
+        return to_response_error(Errors.INVALID_INTEGRATION)
+    auth: Auth = None
+    if type:
+        strategy: AuthStrategy = integration.auth_strategies.get(type, None)
+        if not strategy:
+            return to_response_error(Errors.INVALID_AUTH)
+        
+        auth_strategy.pop('type', None)
+        auth = strategy.auth(**auth_strategy, grant_type='authorization_code')
+        if not auth:
+            return to_response_error(Errors.AUTH_FAILED)
+
+        if integration.is_airbyte():
+            if not _airbyte:
+                _airbyte = Airbyte(airbyte_endpoint)
+            connection_id = _airbyte.create(
+                strategy=strategy,
+                library=library,
+                name=name,
+                source_definition_id=integration.airbyte_id
+            )
+            if not connection_id:
+                return to_response_error(Errors.CONNECTION_CREATION_FAILED)
+    if not connection_id:
         connection_id = ulid()
 
-    if not connection_id:
-        return to_response_error(Errors.CONNECTION_CREATION_FAILED)
-
+    print(config)
     connection = Connection(
         id=connection_id,
         name=name,
         integration=integration.id,
         auth=auth,
+        config=config,
         created_at=now_timestamp,
         sync=Sync(status=SyncStatus.UNSYNCED, checkpoint_at=0, ingested_at=0)
     )
@@ -97,6 +103,7 @@ def handler(event: dict, context):
             'name': connection.name,
             'integration': connection.integration,
             'auth': connection.auth.as_dict() if connection.auth else None,
+            'config': connection.config,
             'created_at': connection.created_at,
             'sync': connection.sync.as_dict() if connection.sync else None
         }

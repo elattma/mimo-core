@@ -110,6 +110,7 @@ class LibraryConnectionItem(ParentChildItem):
             'name': self.connection.name,
             'integration': self.connection.integration,
             'auth': self.connection.auth.as_dict() if self.connection.auth else None,
+            'config': self.connection.config,
             'sync': self.connection.sync.as_dict() if self.connection.sync else None,
             'created_at': self.connection.created_at,
         }
@@ -127,7 +128,8 @@ class LibraryConnectionItem(ParentChildItem):
         auth: dict = item.get('auth', None)
         auth_type = auth.get('type', None) if auth else None
         auth_type: AuthType = AuthType(auth_type) if auth_type else None
-        auth.pop('type', None)
+        auth.pop('type', None) if auth else None
+        config: dict = item.get('config', None)
         
         name = item.get('name', None)
         integration = item.get('integration', None)
@@ -138,6 +140,7 @@ class LibraryConnectionItem(ParentChildItem):
             name=name,
             integration=integration,
             auth=AuthStrategy.auth_from_params(auth_type, **auth) if auth and auth_type else None,
+            config=config,
             created_at=int(created_at) if created_at else None,
             sync=Sync.from_dict(sync) if sync else None,
         )

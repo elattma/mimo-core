@@ -14,6 +14,9 @@ class Integration:
     airbyte_id: str
     auth_strategies: Dict[AuthType, AuthStrategy]
 
+    def is_airbyte(self):
+        return self.airbyte_id != 'batch'
+
     @staticmethod
     def from_dict(params: Dict[str, Any]) -> 'Integration':
         id: str = params.get('id', None)
@@ -81,12 +84,12 @@ class Connection:
     name: str = None
     integration: str = None
     auth: Auth = None
+    config: Dict = None
     created_at: int = None
     sync: Sync = None
     
     def is_valid(self):
-        return self.id and self.name and self.integration and self.auth \
-            and self.auth.is_valid() and self.created_at
+        return self.id and self.name and self.integration and self.created_at
     
 @dataclass
 class Library:

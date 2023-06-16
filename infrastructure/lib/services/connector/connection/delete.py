@@ -42,6 +42,7 @@ def handler(event: dict, context):
             _integrations_dict[id] = Integration.from_dict(integration_params)
     parent_key = '{namespace}{library}'.format(namespace=KeyNamespaces.LIBRARY.value, library=library)
     child_key = '{namespace}{connection}'.format(namespace=KeyNamespaces.CONNECTION.value, connection=connection)
+    integration_id: str = None
     integration: Integration = None
     try:
         item: LibraryConnectionItem = _db.get(parent_key, child_key)
@@ -54,7 +55,7 @@ def handler(event: dict, context):
             return to_response_error(Errors.DB_READ_FAILED)
         integration = _integrations_dict.get(integration_id) if _integrations_dict else None
     
-    if integration.airbyte_id:
+    if integration.is_airbyte():
         if not _airbyte:
             _airbyte = Airbyte(airbyte_endpoint)
         succeeded = _airbyte.delete(connection)

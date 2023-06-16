@@ -29,6 +29,7 @@ import {
   BlockPublicAccess,
   Bucket,
   BucketEncryption,
+  IBucket,
 } from "aws-cdk-lib/aws-s3";
 import {
   Choice,
@@ -62,6 +63,7 @@ export interface ConnectorStackProps extends StackProps {
   readonly vpc: IVpc;
   readonly mimoTable: ITable;
   readonly airbyteApi: IRestApi;
+  readonly uploadBucket: IBucket;
 }
 
 export class ConnectorStack extends Stack {
@@ -71,6 +73,7 @@ export class ConnectorStack extends Stack {
   readonly layers: PythonLayerVersion[] = [];
   readonly definition: EcsJobDefinition;
   readonly syncMethod: MethodConfig;
+  readonly uploadMethod: MethodConfig;
 
   constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
@@ -139,6 +142,10 @@ export class ConnectorStack extends Stack {
       queue
     );
     this.syncMethod = this.sync(props.stageId, syncSfn);
+    this.uploadMethod = this.connectionUpload(
+      props.stageId,
+      props.uploadBucket
+    );
   }
 
   sync = (stage: string, syncSfn: StateMachine): MethodConfig => {
@@ -228,7 +235,7 @@ export class ConnectorStack extends Stack {
             JsonPath.numberAt("$.timestamp")
           ),
           ingested_at: DynamoAttributeValue.fromNumber(
-            status == "SUCCESS"
+            status === "SUCCESS"
               ? JsonPath.numberAt("$.timestamp")
               : JsonPath.numberAt(
                   "$.libraryConnectionItem.Item.sync.M.ingested_at.N"
@@ -321,13 +328,13 @@ export class ConnectorStack extends Stack {
                     Condition.numberEquals("$.batchResult.exitCode", 200),
                     new Pass(this, "Batch Job Succeeded", {
                       result: Result.fromString("SUCCESS"),
-                      outputPath: "$.ingestionStatus",
+                      resultPath: "$.ingestionStatus",
                     })
                   )
                   .otherwise(
                     new Pass(this, "Batch Job Failed", {
                       result: Result.fromString("FAILED"),
-                      outputPath: "$.ingestionStatus",
+                      resultPath: "$.ingestionStatus",
                     })
                   )
               )
@@ -349,11 +356,12 @@ export class ConnectorStack extends Stack {
           outputPath: "$[0]",
         })
         .next(
-          this.getUpdateStatus(
-            table,
-            "Handle Lock",
-            JsonPath.stringAt("$.ingestionStatus")
-          )
+          new Choice(this, "Update Status")
+            .when(
+              Condition.stringEquals("$.ingestionStatus", "SUCCESS"),
+              this.getUpdateStatus(table, "Release Lock", "SUCCESS")
+            )
+            .otherwise(this.getUpdateStatus(table, "Release Lock", "FAILED"))
         ),
       logs: {
         destination: new LogGroup(this, `${stage}-sync-logs`),
@@ -373,31 +381,41 @@ export class ConnectorStack extends Stack {
         requestBody: TaskInput.fromObject({
           connectionId: JsonPath.stringAt("$.input.connection"),
         }),
+        resultPath: "$.checkAirbyteResult",
       })
     );
 
     return checkAirbyte.next(
       new Choice(this, "Airbyte Job Exists?").when(
-        Condition.isNotNull("$.job"),
+        Condition.isNotNull("$.checkAirbyteResult.ResponseBody.job"),
         new Choice(this, "Airbyte Job Complete?")
           .when(
             Condition.or(
-              Condition.stringEquals("$.job.status", "pending"),
-              Condition.stringEquals("$.job.status", "running")
+              Condition.stringEquals(
+                "$.checkAirbyteResult.ResponseBody.job.status",
+                "pending"
+              ),
+              Condition.stringEquals(
+                "$.checkAirbyteResult.ResponseBody.job.status",
+                "running"
+              )
             ),
             checkAirbyte
           )
           .when(
-            Condition.stringEquals("$.job.status", "succeeded"),
+            Condition.stringEquals(
+              "$.checkAirbyteResult.ResponseBody.job.status",
+              "succeeded"
+            ),
             new Pass(this, "Airbyte Job Succeeded", {
               result: Result.fromString("SUCCESS"),
-              outputPath: "$.ingestionStatus",
+              resultPath: "$.ingestionStatus",
             })
           )
           .otherwise(
             new Pass(this, "Airbyte Job Failed", {
               result: Result.fromString("FAILED"),
-              outputPath: "$.ingestionStatus",
+              resultPath: "$.ingestionStatus",
             })
           )
       )
@@ -452,6 +470,55 @@ export class ConnectorStack extends Stack {
     });
   };
 
+  connectionUpload = (stage: string, uploadBucket: IBucket): MethodConfig => {
+    const handler = new PythonFunction(
+      this,
+      `${stage}-connector-upload-lambda`,
+      {
+        entry: path.join(__dirname, "connection"),
+        index: "upload.py",
+        runtime: Runtime.PYTHON_3_9,
+        handler: "handler",
+        timeout: Duration.seconds(30),
+        memorySize: 1024,
+        environment: {
+          STAGE: stage,
+          UPLOAD_BUCKET: uploadBucket.bucketName,
+        },
+        retryAttempts: 0,
+        bundling: {
+          assetExcludes: ["**.venv**", "**__pycache__**"],
+        },
+        layers: this.layers,
+      }
+    );
+
+    const methodResponseOptions: ModelOptions = {
+      contentType: "application/json",
+      modelName: "UploadResponse",
+      schema: {
+        title: "UploadResponse",
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          signed_url: {
+            type: JsonSchemaType.STRING,
+          },
+        },
+        required: ["signed_url"],
+      },
+    };
+
+    return {
+      name: "GET",
+      handler: handler,
+      requestParameters: {
+        "method.request.querystring.library": true,
+      },
+      responseModelOptions: methodResponseOptions,
+      authorizerType: AuthorizerType.APP_OAUTH,
+    };
+  };
+
   connectionPost = (stage: string, airbyteApi: IRestApi): MethodConfig => {
     const handler = new PythonFunction(
       this,
@@ -491,6 +558,9 @@ export class ConnectorStack extends Stack {
             type: JsonSchemaType.STRING,
           },
           auth_strategy: {
+            type: JsonSchemaType.OBJECT,
+          },
+          config: {
             type: JsonSchemaType.OBJECT,
           },
         },
@@ -557,6 +627,9 @@ export class ConnectorStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
+          library: {
+            type: JsonSchemaType.STRING,
+          },
           connections: {
             type: JsonSchemaType.ARRAY,
             items: {
@@ -579,6 +652,7 @@ export class ConnectorStack extends Stack {
             required: ["id", "name", "integration", "created_at"],
           },
         },
+        required: ["library", "connections"],
       },
     };
 

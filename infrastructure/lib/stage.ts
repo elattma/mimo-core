@@ -61,6 +61,7 @@ export class MimoStage extends Stage {
       airbyteApi: airbyteApi.api,
       mimoTable: dynamo.mimoTable,
       vpc: vpc.vpc,
+      uploadBucket: s3.uploadBucket,
     });
     const detectiveService = new DetectiveStack(this, "detective", {
       stageId: props.stageId,
@@ -88,6 +89,10 @@ export class MimoStage extends Stage {
         {
           path: "sync",
           methods: [connectorService.syncMethod],
+        },
+        {
+          path: "upload",
+          methods: [connectorService.uploadMethod],
         },
       ],
     });
@@ -153,6 +158,7 @@ export class MimoStage extends Stage {
         resources: ["*"],
       })
     );
+    s3.uploadBucket.grantReadWrite(connectorService.uploadMethod.handler);
 
     for (const method of connectorService.methods) {
       method.handler.addEnvironment("INTEGRATIONS_PATH", integrationsPath);

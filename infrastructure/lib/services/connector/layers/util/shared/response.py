@@ -27,6 +27,8 @@ class Errors(Enum):
     CONNECTION_CREATION_FAILED = 'connection creation failed'
     DELETE_FAILED = 'delete failed'
     SFN_FAILED = 'sfn failed'
+    S3_UPLOAD_FAILED = 's3 upload failed'
+    INVALID_INTEGRATION = 'invalid integration'
 
 def to_response_error(error_message: Errors):
     return {

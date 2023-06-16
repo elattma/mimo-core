@@ -3,10 +3,10 @@ from typing import List
 
 from shared.model import Connection
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import KeyNamespaces, LibraryConnectionItem, ParentChildDB
+from state.dynamo import (KeyNamespaces, LibraryConnectionItem, ParentChildDB,
+                          UserLibraryItem)
 
 _db: ParentChildDB = None
-
 
 
 def handler(event: dict, context):
@@ -24,11 +24,22 @@ def handler(event: dict, context):
     query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     library: str = query_string_parameters.get('library', None) if query_string_parameters else None
 
-    if not (user and library):
+    if not user:
+        return to_response_error(Errors.MISSING_PARAMS)
+
+    if connection and not library:
         return to_response_error(Errors.MISSING_PARAMS)
 
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
+
+    if not library:
+        parent_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user)
+        child_namespace = KeyNamespaces.LIBRARY.value
+        user_library_items: List[UserLibraryItem] = _db.query(parent_key, child_namespace=child_namespace, Limit=100)
+        if not user_library_items:
+            return to_response_error(Errors.DB_READ_FAILED)
+        library = user_library_items[0].library.id
     
     response_connections: List[Connection] = []
     if not connection:
@@ -44,13 +55,18 @@ def handler(event: dict, context):
             response_connections = [user_connection_item.connection]
         except Exception as e:
             return to_response_error(Errors.DB_READ_FAILED)
+    
+    if response_connections:
+        response_connections.sort(key=lambda connection: connection.created_at, reverse=True)
 
     return to_response_success({
+        'library': library,
         'connections': [{
             'id': connection.id,
             'name': connection.name,
             'integration': connection.integration,
             'auth': connection.auth.as_dict() if connection.auth else None,
+            'config': connection.config,
             'created_at': connection.created_at,
             'sync': connection.sync.as_dict() if connection.sync else None
         } for connection in response_connections],

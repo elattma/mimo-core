@@ -9,18 +9,24 @@ export interface S3StackProps extends StackProps {
 }
 
 export class S3Stack extends Stack {
-  readonly uploadItemBucket: IBucket;
+  readonly uploadBucket: IBucket;
   readonly assetsBucket: IBucket;
 
   constructor(scope: Construct, id: string, props: S3StackProps) {
     super(scope, id, props);
 
-    this.uploadItemBucket = new Bucket(this, "upload-item-bucket", {
-      bucketName: `mimo-${props.stageId}-upload-item`,
+    this.uploadBucket = new Bucket(this, "upload-bucket", {
+      bucketName: `mimo-${props.stageId}-upload`,
       // TODO: add? enforceSSL: true,
       cors: [
         {
-          allowedOrigins: ["*"],
+          allowedHeaders: ["*"],
+          allowedOrigins: [
+            "https://www.mimo.team",
+            "https://mimo.team",
+            "https://*.mimo.team",
+            "http://localhost:3000",
+          ],
           allowedMethods: [HttpMethods.PUT],
         },
       ], // TODO: fix to just mimo.team

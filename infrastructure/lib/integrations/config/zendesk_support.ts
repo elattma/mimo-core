@@ -3,7 +3,7 @@ import { AuthType, IntegrationConfig, TokenOAuth2AuthStrategy } from "../model";
 const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
   type: AuthType.TOKEN_OAUTH2,
   oauth2_link:
-    "https://d3v-mimo3158.zendesk.com/oauth/authorizations/new?response_type=code&client_id=zdg-mimo",
+    "https://d3v-mimo3158.zendesk.com/oauth/authorizations/new?response_type=code&client_id=zdg-mimo&scope=read",
   authorize_endpoint: "https://d3v-mimo3158.zendesk.com/oauth/tokens",
   refresh_endpoint: "https://d3v-mimo3158.zendesk.com/oauth/tokens",
   client_id: "zdg-mimo",

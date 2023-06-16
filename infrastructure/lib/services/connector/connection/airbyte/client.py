@@ -3,7 +3,6 @@ from typing import Dict
 import requests
 from airbyte.source_configs import source_definition_id_to_config
 from auth.base import AuthStrategy
-from shared.model import SyncStatus
 
 
 class Airbyte:
@@ -19,26 +18,25 @@ class Airbyte:
 
     def _call(self, route: str, json: Dict = None) -> Dict:
         url = f'{self._endpoint}/v1/{route}'
-        print('[call_airbyte] url:', url, ', with json:', json if json else 'None')
+        print('[call_airbyte] url:', url, ', with json:', json if json and route != 'web_backend/connections/update' else 'None')
         response = requests.post(url, json=json)
         print('[call_airbyte] response status:', response.status_code if response else 'None')
         try:
             response = response.json() if response else None
         except Exception as e:
-            print('[call_airbyte] error:'. str(e))
-            response = None
+            print('[call_airbyte] error:', str(e))
+            response = response.status_code if response else None
         return response
 
     def _check_connection(self, source_id: str, delete_if_invalid: bool = True) -> bool:
         check = self._call('sources/check_connection', { 'sourceId': source_id })
-        if check.get('status', None) == 'succeeded':
+        if check == 200 or check.get('status', None) == 'succeeded':
             print(f'[check_connection] source {source_id} succeeded')
             return True
         
         print(f'[check_connection] source {source_id} failed')
         if delete_if_invalid:
             deleted = self._call('sources/delete', { 'sourceId': source_id })
-            deleted = deleted.get('status', None) == 'succeeded' if deleted else False
             print(f'[check_connection] source {source_id} deleted:', deleted)
         
         return False
@@ -53,6 +51,8 @@ class Airbyte:
         streams = with_catalog.get('syncCatalog', {}).get('streams', [])
         for stream in streams:
             stream.get('config', {})['selected'] = True
+            stream.get('config', {})['destinationSyncMode'] = 'overwrite'
+
         update_catalog = self._call('web_backend/connections/update', with_catalog)
         if not update_catalog:
             print('[with_catalog] update_catalog failed')
@@ -69,7 +69,7 @@ class Airbyte:
             'namespaceDefinition': 'customformat',
             'namespaceFormat': f'{library}/{source_id}',
             'scheduleType': 'manual',
-            'status': 'inactive'
+            'status': 'active'
         })
         connection_id = connection.get('connectionId', None) if connection else None
         print('[create_connection] connection_id:', connection_id)
@@ -106,9 +106,20 @@ class Airbyte:
             return None
         return connection_id
     
-    def delete(self, id: str) -> bool:
-        deleted = self._call('sources/delete', { 'sourceId': id })
-        deleted = deleted.get('status', None) == 'succeeded' if deleted else False
-        print('[delete] id:', id, ', deleted:', deleted)
-        return deleted
+    def delete(self, connection_id: str) -> bool:
+        connection = self._call('connections/get', { 'connectionId': connection_id })
+        if not connection:
+            print('[delete] connection not found')
+            return False
+        
+        source_id = connection.get('sourceId', None) if connection else None
+        if not source_id:
+            print('[delete] source id not found')
+            return False
+
+        deleted = self._call('sources/delete', { 'sourceId': source_id })
+        print('[delete] connection_id:', connection_id, 'source_id:', source_id, 'deleted:', deleted)
+        if deleted != 204:
+            return False
+        return True
     
