@@ -2,32 +2,36 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Set
 
+from ulid import ulid
 
-@dataclass
+
 class Block:
-    label: str
-    last_updated_timestamp: int
-    properties: Dict[str, Any]
+    def __init__(self, label: str, properties: Dict[str, Any], last_updated_timestamp: int) -> None:
+        self._id = ulid()
+        self._label = label
+        self._properties = properties
+        self._last_updated_timestamp = last_updated_timestamp
 
     def __hash__(self) -> int:
-        return hash((self.last_updated_timestamp, self.label, self.properties))
+        return hash((self._label, str(self._properties), self._last_updated_timestamp))
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return NotImplemented
-        return self.last_updated_timestamp == other.last_updated_timestamp and \
-            self.label == other.label and \
-            self.properties == other.properties
+        return self._label == other._label and \
+            self._properties == other._properties and \
+            self._last_updated_timestamp == other._last_updated_timestamp 
 
     def as_dict(self) -> dict:
         return {
-            'last_updated_timestamp': self.last_updated_timestamp,
-            'label': self.label,
-            'properties': self.properties
+            'id': self._id,
+            'label': self._label,
+            'properties': self._properties,
+            'last_updated_timestamp': self._last_updated_timestamp,
         }
     
     def is_valid(self) -> bool:
-        return self.label and self.last_updated_timestamp and self.properties
+        return self._id and self._label and self._properties and self._last_updated_timestamp 
 
 
 @dataclass

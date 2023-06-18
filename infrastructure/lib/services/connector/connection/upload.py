@@ -18,9 +18,10 @@ def handler(event: dict, context):
     user: str = authorizer.get('principalId', None) if authorizer else None
     query_string_parameters: dict = event.get('queryStringParameters', None) if event else None
     library: str = query_string_parameters.get('library', None) if query_string_parameters else None
-    file_name: str = query_string_parameters.get('file_name', None) if query_string_parameters else None
+    name: str = query_string_parameters.get('name', None) if query_string_parameters else None
+    type: str = query_string_parameters.get('type', None) if query_string_parameters else None
 
-    if not (user and library and file_name):
+    if not (user and library and name and type):
         return to_response_error(Errors.MISSING_PARAMS)
 
     if not _s3:
@@ -30,7 +31,8 @@ def handler(event: dict, context):
         ClientMethod='put_object',
         Params={
             'Bucket': upload_bucket,
-            'Key': f'{library}/{file_name}',
+            'Key': f'{library}/{name}',
+            'ContentType': type
         },
         ExpiresIn=600
     )
@@ -39,4 +41,6 @@ def handler(event: dict, context):
 
     return to_response_success({
         'signed_url': signed_url,
+        's3_bucket': upload_bucket,
+        's3_key': f'{library}/{name}'
     })

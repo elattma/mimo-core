@@ -1,9 +1,9 @@
 from typing import Dict, Generator, List
 
 from auth.base import AuthType
-from dstruct.model import Block, Discovery
+from fetcher.model import get_timestamp_from_format
 
-from .base import Fetcher, get_timestamp_from_format
+from .base import Fetcher, StreamData
 
 GOOGLE_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 DISCOVERY_ENDPOINT = 'https://www.googleapis.com/drive/v3/files'
@@ -17,12 +17,13 @@ class GoogleDocs(Fetcher):
     def _get_supported_auth_types(self) -> List[AuthType]:
         return [AuthType.BASIC, AuthType.TOKEN_OAUTH2, AuthType.TOKEN_DIRECT]
     
-    def discover(self) -> Generator[Discovery, None, None]:
+    def discover(self) -> Generator[StreamData, None, None]:
         discover_filters = ['mimeType="application/vnd.google-apps.document"', 'trashed=false']
         params = {
             'q': ' and '.join(discover_filters)
         }
         next_token = None
+        limit = self._filter.limit if self._filter else None
         while True:
             if next_token:
                 params.update({
@@ -34,10 +35,16 @@ class GoogleDocs(Fetcher):
             files: List[Dict] = response.get('files', None) if response else None
             for file in files:
                 file_id = file.get('id', None) if file else None
-                yield Discovery(
-                    id=file_id,
-                    type='document'
+                if not file_id:
+                    continue
+                yield StreamData(
+                    name='document',
+                    id=file_id
                 )
+                if limit:
+                    limit -= 1
+                    if limit < 1:
+                        return []
 
             if not next_token:
                 break
@@ -83,9 +90,9 @@ class GoogleDocs(Fetcher):
     def _get_last_updated_timestamp(self, modifiedTime: str) -> int:
         return get_timestamp_from_format(modifiedTime, GOOGLE_TIME_FORMAT)
 
-    def fetch_document(self, discovery: Discovery) -> None:
+    def fetch_document(self, stream: StreamData) -> None:
         response = self.request(
-            GET_METADATA_ENDPOINT.format(id=discovery.id),
+            GET_METADATA_ENDPOINT.format(id=stream._id),
             params={
                 'fields': 'modifiedTime, owners'
             }
@@ -93,19 +100,14 @@ class GoogleDocs(Fetcher):
         last_updated_timestamp = self._get_last_updated_timestamp(response.get('modifiedTime', None)) if response else None
         owners = self._get_owners(response.get('owners', None) if response else None)
 
-        response = self.request(GET_DOCUMENT_ENDPOINT.format(id=discovery.id))
+        response = self.request(GET_DOCUMENT_ENDPOINT.format(id=stream._id))
         title = response.get('title', None)
         body = self._get_body(response.get('body', None))
-        discovery.add_blocks([Block(
-            last_updated_timestamp=last_updated_timestamp,
-            label='document',
-            properties={
-                'title': title,
-                'body': body,
-                'owners': owners
-            }
-        )])
+        stream.add_unstructured_data('title', title)
+        stream.add_unstructured_data('body', body)
+        stream.add_structured_data('owners', owners)
+        stream.add_structured_data('last_updated_timestamp', last_updated_timestamp)
 
-    def fetch(self, discovery: Discovery) -> None:
-        if discovery.type == 'document':
-            self.fetch_document(discovery)
+    def fetch(self, stream: StreamData) -> None:
+        if stream._name == 'document':
+            self.fetch_document(stream)

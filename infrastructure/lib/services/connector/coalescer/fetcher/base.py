@@ -1,35 +1,24 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from datetime import datetime
 from typing import Dict, Generator, List
 
 from auth.base import AuthStrategy, AuthType
-from dstruct.model import Discovery
+from fetcher.model import Filter, StreamData
 
 
-def get_timestamp_from_format(timestamp_str: str, format: str = None) -> int:
-    if not (timestamp_str and format):
-        return None
-    timestamp_datetime = datetime.strptime(timestamp_str, format)
-    return int(timestamp_datetime.timestamp())
-
-@dataclass
-class Filter:
-    start_timestamp: int = None
-    limit: int = None
-    
 class Fetcher(ABC):
     _INTEGRATION = 'base'
 
     subclasses = {}
     _filter: Filter = None
     _auth_strategy: AuthStrategy = None
+    _config: Dict = None
     _requester = None
 
     @classmethod
     def create(cls, 
                integration: str,
                auth_strategy: AuthStrategy,
+               config: Dict = None,
                last_ingested_at: int = None, 
                limit: int = None) -> 'Fetcher':    
         if not cls.subclasses:
@@ -42,13 +31,16 @@ class Fetcher(ABC):
             raise Exception(f'Fetcher.create() invalid integration.. {integration}')
 
         fetcher = subclass()
-        if not (auth_strategy and auth_strategy.get_type() in fetcher._get_supported_auth_types()):
-            raise Exception(f'Fetcher.create() invalid auth_strategy.. {auth_strategy}')
+        if fetcher._get_supported_auth_types():
+            if not (auth_strategy and auth_strategy.get_type() in fetcher._get_supported_auth_types()):
+                raise Exception(f'Fetcher.create() invalid auth_strategy.. {auth_strategy}')
         fetcher._auth_strategy = auth_strategy
+        fetcher._config = config
         fetcher._filter = Filter(
             start_timestamp=last_ingested_at,
             limit=limit
         )
+        print(f'Fetcher.create() {fetcher._INTEGRATION} {fetcher._config} {fetcher._filter}')
         return fetcher
     
     def request(self, url: str, method: str = 'get', **kwargs) -> Dict:
@@ -89,9 +81,9 @@ class Fetcher(ABC):
         raise NotImplementedError('_get_supported_auth_types not implemented')
     
     @abstractmethod
-    def discover(self) -> Generator[Discovery, None, None]:
+    def discover(self) -> Generator[StreamData, None, None]:
         raise NotImplementedError('discover not implemented')
 
     @abstractmethod
-    def fetch(self, discovery: Discovery) -> None:
+    def fetch(self, stream: StreamData) -> None:
         raise NotImplementedError("fetch not implemented")

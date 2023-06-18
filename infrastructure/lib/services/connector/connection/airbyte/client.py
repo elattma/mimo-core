@@ -21,11 +21,13 @@ class Airbyte:
         print('[call_airbyte] url:', url, ', with json:', json if json and route != 'web_backend/connections/update' else 'None')
         response = requests.post(url, json=json)
         print('[call_airbyte] response status:', response.status_code if response else 'None')
+        if not response:
+            return None
         try:
-            response = response.json() if response else None
+            response = response.json()
         except Exception as e:
             print('[call_airbyte] error:', str(e))
-            response = response.status_code if response else None
+            response = response.status_code
         return response
 
     def _check_connection(self, source_id: str, delete_if_invalid: bool = True) -> bool:
@@ -35,10 +37,6 @@ class Airbyte:
             return True
         
         print(f'[check_connection] source {source_id} failed')
-        if delete_if_invalid:
-            deleted = self._call('sources/delete', { 'sourceId': source_id })
-            print(f'[check_connection] source {source_id} deleted:', deleted)
-        
         return False
 
     def _with_catalog(self, library: str, connection_id: str) -> bool:
@@ -46,6 +44,9 @@ class Airbyte:
             'connectionId': connection_id,
             'withRefreshedCatalog': True
         })
+        if not with_catalog:
+            print('[with_catalog] with_catalog failed')
+            return False
 
         with_catalog['namespaceFormat'] = f'{library}/{connection_id}'
         streams = with_catalog.get('syncCatalog', {}).get('streams', [])
@@ -87,6 +88,11 @@ class Airbyte:
         source_id = source.get('sourceId', None) if source else None
         print('[create_source] source_id:', source_id)
         return source_id
+    
+    def _delete_source(self, source_id: str) -> bool:
+        deleted = self._call('sources/delete', { 'sourceId': source_id })
+        print('[delete_source] source_id:', source_id, 'deleted:', deleted)
+        return deleted == 204
 
     def create(self,
                strategy: AuthStrategy,
@@ -99,11 +105,14 @@ class Airbyte:
         
         connection_id = self._create_connection(library, source_id, 'f23e7454-0fac-44f9-aa68-b4d7c3feb75a')
         if not connection_id:
+            self._delete_source(source_id)
             return None
         
         added_catalog = self._with_catalog(library, connection_id)
         if not added_catalog:
+            self._delete_source(source_id)
             return None
+        
         return connection_id
     
     def delete(self, connection_id: str) -> bool:

@@ -2,8 +2,7 @@ import base64
 from typing import Dict, Generator, List
 
 from auth.base import AuthType
-from dstruct.model import Block, Discovery
-from fetcher.base import Fetcher
+from fetcher.base import Fetcher, StreamData
 
 DISCOVERY_ENDPOINT = 'https://www.googleapis.com/gmail/v1/users/me/threads'
 GET_THREADS_ENDPOINT = 'https://www.googleapis.com/gmail/v1/users/me/threads/{id}'
@@ -14,9 +13,10 @@ class GoogleMail(Fetcher):
     def _get_supported_auth_types(self) -> List[AuthType]:
         return [AuthType.TOKEN_OAUTH2, AuthType.TOKEN_DIRECT, AuthType.BASIC]
     
-    def discover(self) -> Generator[Discovery, None, None]:
+    def discover(self) -> Generator[StreamData, None, None]:
         next_token = None
         params = {}
+        limit = self._filter.limit if self._filter else None
         while True:
             if next_token:
                 params.update({
@@ -29,10 +29,16 @@ class GoogleMail(Fetcher):
 
             for thread in threads:
                 thread_id = thread.get('id', None) if thread else None
-                yield Discovery(
+                if not thread_id:
+                    continue
+                yield StreamData(
+                    name='thread',
                     id=thread_id,
-                    type='thread'
                 )
+                if limit:
+                    limit -= 1
+                    if limit < 1:
+                        return []
 
             if not next_token:
                 break
@@ -60,12 +66,11 @@ class GoogleMail(Fetcher):
                 recipients.append(header.get('value'))
         return recipients
     
-    def _get_body(self, message: Dict) -> str:
-        message_parts = [message.get('payload', None)] if message else None
+    def _get_body(self, message_parts: List[Dict]) -> str:
         if not message_parts:
             return None
 
-        body: List[str] = []
+        body_list: List[str] = []
         while len(message_parts) > 0:
             part: Dict = message_parts.pop(0)
             if not part:
@@ -78,43 +83,38 @@ class GoogleMail(Fetcher):
             if text:
                 mime_type = part.get('mimeType', None) if part else None
                 if mime_type and mime_type.startswith('text/plain'):
-                    body.append(text)
+                    body_list.append(text)
 
             parts = part.get('parts', None)
             if parts:
                 message_parts[0:0] = parts
         
-        return '\n'.join(body)
+        return '\n\n'.join(body_list)
 
-    def fetch_thread(self, discovery: Discovery) -> None:
-        response = self.request(GET_THREADS_ENDPOINT.format(id=discovery.id))
+    def fetch_thread(self, stream: StreamData) -> None:
+        response = self.request(GET_THREADS_ENDPOINT.format(id=stream._id))
         messages: List[Dict] = response.get('messages', None) if response else None
         if not messages:
             return
 
         thread_id = response.get('id', None) if response else None
         for message in messages:
-            part = message.get('payload', None) if message else None
-            headers = part.get('headers', []) if part else []
+            payload = message.get('payload', None) if message else None
+            headers = payload.get('headers', []) if payload else []
             last_updated_timestamp = message.get('internalDate', None) if message else None
 
             author = self._get_author(headers)
             title = self._get_title(headers)
             recipients = self._get_recipients(headers)
-            body = self._get_body(part)
-            block = Block(
-                label='email',
-                last_updated_timestamp=last_updated_timestamp,
-                properties={
-                    'author': author,
-                    'title': title,
-                    'recipients': recipients,
-                    'body': body,
-                    'thread_id': thread_id
-                }
-            )
-            discovery.add_blocks([block])
+            body = self._get_body(payload.get('parts', None) if payload else None)
 
-    def fetch(self, discovery: Discovery) -> None:
-        if discovery.type == 'thread':
-            self.fetch_thread(discovery)
+            stream.add_structured_data_as_list('author', author)
+            stream.add_unstructured_data('title', title)
+            stream.add_structured_data_as_list('recipients', recipients)
+            stream.add_unstructured_data('body', body)
+        stream.add_structured_data('thread_id', thread_id)
+        stream.add_structured_data('last_updated_timestamp', last_updated_timestamp)
+
+    def fetch(self, stream: StreamData) -> None:
+        if stream._name == 'thread':
+            self.fetch_thread(stream)

@@ -52,3 +52,23 @@ class OpenAI:
         message = choices[0].get('message', None) if choices and len(choices) > 0 else None
         content = message.get('content', None) if message else None
         return content
+
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
+    def summarize(self, text: str):
+        if not (self._api_key and text):
+            return None
+        
+        summary_response = ChatCompletion.create(
+            api_key=self._api_key,
+            model='gpt-3.5-turbo',
+            messages=[
+                { 'role': 'system', 'content': 'Imagine you are a Data Genius who is able to classify and understand any JSON data. Summarize the provided JSON using simple sentences. Preserve all important keywords, nouns, proper nouns, dates, concepts. Do not use pronouns. Write as much as you need to preserve all important information!' },
+                { 'role': 'user', 'content': text },
+            ],
+            temperature=0
+        )
+        summary_choices = summary_response.get('choices', None) if summary_response else None
+        message = summary_choices[0].get('message', None) if summary_choices and len(summary_choices) > 0 else None
+        summary = message.get('content', None) if message else None
+        return summary
+    

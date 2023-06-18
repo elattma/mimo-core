@@ -322,22 +322,32 @@ export class ConnectorStack extends Stack {
                 resultSelector: {
                   "exitCode.$": "$.Container.ExitCode",
                 },
-              }).next(
-                new Choice(this, "Batch Job Completed")
-                  .when(
-                    Condition.numberEquals("$.batchResult.exitCode", 200),
-                    new Pass(this, "Batch Job Succeeded", {
-                      result: Result.fromString("SUCCESS"),
-                      resultPath: "$.ingestionStatus",
-                    })
-                  )
-                  .otherwise(
-                    new Pass(this, "Batch Job Failed", {
-                      result: Result.fromString("FAILED"),
-                      resultPath: "$.ingestionStatus",
-                    })
-                  )
-              )
+              })
+                .addCatch(
+                  new Pass(this, "Batch Job Error", {
+                    result: Result.fromString("FAILED"),
+                    resultPath: "$.ingestionStatus",
+                  }),
+                  {
+                    resultPath: "$.batchResult",
+                  }
+                )
+                .next(
+                  new Choice(this, "Batch Job Completed")
+                    .when(
+                      Condition.numberEquals("$.batchResult.exitCode", 0),
+                      new Pass(this, "Batch Job Succeeded", {
+                        result: Result.fromString("SUCCESS"),
+                        resultPath: "$.ingestionStatus",
+                      })
+                    )
+                    .otherwise(
+                      new Pass(this, "Batch Job Failed", {
+                        result: Result.fromString("FAILED"),
+                        resultPath: "$.ingestionStatus",
+                      })
+                    )
+                )
             )
             .otherwise(
               new CallApiGatewayRestApiEndpoint(this, "Manual Airbyte Sync", {
@@ -513,6 +523,8 @@ export class ConnectorStack extends Stack {
       handler: handler,
       requestParameters: {
         "method.request.querystring.library": true,
+        "method.request.querystring.file_name": true,
+        "method.request.querystring.file_type": true,
       },
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,
