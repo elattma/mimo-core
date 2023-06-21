@@ -15,16 +15,16 @@ class FlushResult:
 
 class S3Lake:
     _bucket_name: str
-    _connection: str
+    _prefix: str
     _batch_size: int
 
     _stream_data: List[StreamData]
     _failures: int
 
-    def __init__(self, bucket_name: str, connection: str, batch_size: int = 100) -> None:
+    def __init__(self, bucket_name: str, prefix: str, batch_size: int = 100) -> None:
         self._s3_client = boto3.client('s3')
         self._bucket_name = bucket_name
-        self._connection = connection
+        self._prefix = prefix
         self._batch_size = batch_size
 
         self._stream_data = []
@@ -37,14 +37,14 @@ class S3Lake:
             self.flush()
 
     def _flush(self, stream: StreamData) -> FlushResult:
-        print('[_flush] name: ', stream._name, 'id: ', stream._id, 'into bucket: ', self._bucket_name, 'connection: ', self._connection)
+        print('[_flush] name: ', stream._name, 'id: ', stream._id, 'into bucket: ', self._bucket_name, 'prefix: ', self._prefix)
         csv = StringIO()
         csv_writer = writer(csv)
         csv_writer.writerow(stream._data.keys())
         csv_writer.writerow(stream._data.values())
         response = self._s3_client.put_object(
             Bucket=self._bucket_name,
-            Key=f'{self._connection}/{stream._name}/{stream._id}',
+            Key=f'{self._prefix}/{stream._name}/{stream._id}',
             Body=csv.getvalue(),
             ContentType='text/csv'
         )

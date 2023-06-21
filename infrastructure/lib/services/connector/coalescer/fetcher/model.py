@@ -26,19 +26,12 @@ class StreamData:
         if not (key and value):
             print(f'[add_unstructured_data] kv missing..')
             return
-        if key not in self._data:
-            self._data[key] = []
-        unstructured_chunks = self._data[key]
-        if type(unstructured_chunks) != list:
-            print(f'[add_unstructured_data] error unstructured_chunks is not a list..')
-            return
-        last_chunk = unstructured_chunks.pop() if unstructured_chunks else ""
-        last_chunk = last_chunk + value
-        if len(last_chunk) > MAX_UNSTRUCTURED_SIZE:
-            for i in range(0, len(last_chunk), MAX_UNSTRUCTURED_SIZE):
-                unstructured_chunks.append(last_chunk[i:i+MAX_UNSTRUCTURED_SIZE])
-
-        unstructured_chunks.append(value)
+        
+        if key in self._data:
+            self._data[key] += f'\n\n{value}'
+        else:
+            self._data[key] = value
+        
 
     def add_structured_data(self, key: str, value: Any):
         if not (key and value):

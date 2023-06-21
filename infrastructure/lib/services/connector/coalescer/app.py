@@ -54,11 +54,12 @@ def main():
     )
     s3_lake = S3Lake(
         bucket_name=lake_bucket_name,
-        connection=connection
+        prefix=f'{library}/{connection}'
     )
 
     for stream in fetcher.discover():
         fetcher.fetch(stream)
+        stream._name = f'{fetcher._INTEGRATION}-{stream._name}'
         s3_lake.add(stream)
 
     s3_lake.flush()
