@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 from context_agent.model import Request
 from context_agent.weaver import Weaver
@@ -23,43 +23,52 @@ class ContextAgent:
     def _with_embedding(self, block_query: BlockQuery, raw_query: str) -> None:
         if block_query.search_method != 'relevant':
             return
-        text = raw_query
-        if block_query.concepts:
-            text = ' '.join(block_query.concepts)
-        block_query.embedding = self._llm.embed(text)
+        block_query.embedding = self._llm.embed(block_query.concepts if block_query.concepts else raw_query)
     
     def fetch(self, request: Request) -> List[Block]:
         print('[ContextAgent.fetch] Generating context...')
 
-        # TODO: overrides and only if they're not enough do we formulate a query
-        # TODO: make sure overrides are respected and only prompt for what more we need to know
-        self._with_llm_reasoning(request)
+        if request.end and request.end.search_method:
+            print(f'[ContextAgent.fetch] search method specified {request.end.search_method}. skipping llm reasoning...')
+        else:
+            self._with_llm_reasoning(request)
 
-        # if request:
-        #     self._with_embedding(request.start_node, request.raw)
-        # self._with_embedding(request.end_node, request.raw)
+
+        if request:
+            self._with_embedding(request.start, request.raw)
+        self._with_embedding(request.end, request.raw)
 
         # # first we try the raw query and see if that yields any results
-        # blocks: List[Block] = self._dstruct.query(request.end_node, request.start_node, with_embeddings=True, with_data=True)
+        blocks: List[Block] = self._dstruct.query(request.end, request.start, with_embeddings=True, with_data=True)
 
         # if not blocks:
-        #     print(f'[ContextAgent.fetch] No results for raw query {request.end_node} -> {request.start_node}')
+        #     print(f'[ContextAgent.fetch] No results for raw query {request.end} -> {request.start}')
         #     print(f'[ContextAgent.fetch] Trying to formulate a broader query... FIXME: not implemented yet')
         #     # TODO: if that doesn't work, we try to formulate a broader query based on our own reasoning of the request and knowledge of our data structure
         #     return None
         
-        # return self._weaver.minify(request.end_node.embedding, blocks, request.token_limit, num_blocks=request.end_node.limit if request.end_node.limit else None)
-    
-    def _with_llm_reasoning(self, request: Request) -> None:
-        print(f'[ContextAgent._with_llm_reasoning] Decorating with language reasoning for request: {request}')
-        block_descriptions = str(SUPPORTED_BLOCK_LABELS) # TODO: fill this in somehow, dynamically or statically from config
+        # return self._weaver.minify(request.end.embedding, blocks, request.token_limit, num_blocks=request.end.limit if request.end.limit else None)
 
-        block_query_schema = BlockQuery.schema()
-        block_query_schema.get('properties', {}).pop('ids')
-        block_query_schema.get('properties', {}).pop('integrations')
-        block_query_schema.get('properties', {}).pop('embedding')
-        block_query_schema['properties']['labels']['description'] += block_descriptions
-        print(block_query_schema)
+    def _with_llm_reasoning(self, request: Request) -> None:
+        print(f'[ContextAgent._with_llm_reasoning] decorating with language reasoning for request: {request}')
+
+        block_query_properties: Dict[str, Dict] = BlockQuery.schema().get('properties')
+        block_query_properties.pop('ids')
+        block_query_properties.pop('integrations')
+        block_query_properties.pop('embedding')
+        block_query_properties['labels']['items']['enum'] = list(SUPPORTED_BLOCK_LABELS) # TODO: fill this in somehow, dynamically or statically from config
+        print(f'[ContextAgent._with_llm_reasoning] block_query_properties = {block_query_properties}')
+
+        specified_end_properties: Dict[str, Dict] = {}
+        if request.end:
+            for key, value in request.end.dict().items():
+                if value:
+                    specified_end_properties[key] = block_query_properties[key]
+        print(f'[ContextAgent._with_llm_reasoning] specified_end_properties = {specified_end_properties}')
+        specified_end_properties_description = (
+            'Properties that you already know about the end block that the user is searching for: '
+            f'{str(specified_end_properties)}'
+        ) if specified_end_properties else ""
 
         response = self._llm.function_call(
             messages=[{
@@ -68,7 +77,8 @@ class ContextAgent:
                     'Pretend you are a context agent for a large company. '
                     'Your job is to take a query and break it down using '
                     'language reasoning so that you can find the right data '
-                    'in the company\'s database. ' #TODO: do all prompting here and just give simple descriptions under each field. Few-shot examples.
+                    'in the company\'s database. '
+                    # TODO: add few shots and perhaps more context here
                 )
             }, {
                 'role': 'user',
@@ -80,19 +90,45 @@ class ContextAgent:
                 'parameters': {
                     'type': 'object',
                     'properties': {
-                        'end_block': block_query_schema,
-                        'start_block': block_query_schema
+                        'end': {
+                            'title': 'End Block',
+                            'type': 'object',
+                            'description': (
+                                'The block that the user is searching for. This is the block that you need to find in the database. '
+                                f'{specified_end_properties_description}'
+                            ),
+                            'properties': block_query_properties,
+                        },
+                        'start': {
+                            'title': 'Start Block',
+                            'type': 'object',
+                            'description': 'The block that the user is starting from which is connected to the end block that the user is searching for.',
+                            'properties': block_query_properties,
+                        }
                     },
-                    'required': ['end_block']
+                    'required': ['end']
                 }
             }],
             function_call={'name': 'interpret_and_formulate_request'}
         )
+        start_json = response.get('start', None)
+        if start_json:
+            request.start = BlockQuery(**start_json)
+        if not request.end:
+            request.end = BlockQuery(**response.get('end', {}))
+        else: 
+            for key, value in response.get('end', {}).items():
+                is_specified = specified_end_properties.get(key, None)
+                if is_specified:
+                    print(f'[ContextAgent._with_llm_reasoning] skipping {key} because it is already specified')
+                    continue
+                setattr(request.end, key, value)
+
         print(response)
         for key, value in response.items():
             if hasattr(Request, key):
                 setattr(request, key, BlockQuery(**value))
             else:
-                print(f'[ContextAgent._with_llm_reasoning] Warning: unknown key: {key}, value: {value}')
-        print(f'[ContextAgent._with_llm_reasoning] Decorated with language reasoning for request: {request}')
+                print(f'[ContextAgent._with_llm_reasoning] warning: unknown key: {key}, value: {value}')
+        print(f'[ContextAgent._with_llm_reasoning] decorated with language reasoning for request: {request}')
     

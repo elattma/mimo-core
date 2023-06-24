@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Set
 
 from dstruct.model import BlockQuery
@@ -88,7 +89,7 @@ class GraphDB:
         if not (end and library):
             raise ValueError(f'[GraphDB.query_blocks] end {end} and library {library} must not be empty')
 
-        return self._db.read(self._query_blocks_cypher(end, start), library)
+        return self._db.read(query=self._query_blocks_cypher(end, start), library=library)
     
     def query_by_ids(self, ids: List[str], library: str) -> List[Node]:
         if not (ids and library):
@@ -136,29 +137,28 @@ class GraphDB:
             where_filters.append(f'{name}.id IN {block_query.ids}')
         if block_query.integrations:
             where_filters.append(f'{name}.integration IN {block_query.integrations}')
-        if block_query.absolute_time:
-            start_timestamp = int(block_query.absolute_time[0].timestamp()) if block_query.absolute_time[0] else None
-            if start_timestamp:
-                where_filters.append(f'{name}.last_updated_timestamp >= {start_timestamp}')
-            end_timestamp = int(block_query.absolute_time[1].timestamp()) if block_query.absolute_time[1] else None
-            if end_timestamp:
-                where_filters.append(f'{name}.last_updated_timestamp <= {end_timestamp}')
+        if block_query.absolute_time_start:
+            start_timestamp = int(datetime.strptime(block_query.absolute_time_start, '%Y-%m-%d').timestamp())
+            where_filters.append(f'{name}.last_updated_timestamp >= {start_timestamp}')
+        if block_query.absolute_time_end:
+            end_timestamp = int(datetime.strptime(block_query.absolute_time_end, '%Y-%m-%d').timestamp())
+            where_filters.append(f'{name}.last_updated_timestamp <= {end_timestamp}')
         if block_query.labels:
             where_filters.append(f'{name}.label IN {block_query.labels}')
         if block_query.entities:
             contains_value = []
             for entity in block_query.entities:
-                contains_value.append(f'toLower(entity.value) CONTAINS "{entity[0].lower()}"')
+                contains_value.append(f'toLower(entity.value) CONTAINS "{entity.lower()}"')
             where_filters.append(f'({" OR ".join(contains_value)})')
         return where_filters
     
     def _post_filters(self, block_query: BlockQuery, name: str) -> List[str]:
         post_filters = []
-        if block_query.relative_time_ascending:
-            post_filters += f'ORDER BY {name}.last_updated_timestamp {"ASC" if block_query.relative_time_ascending else "DESC"}'
+        if block_query.relative_time:
+            post_filters.append(f'ORDER BY {name}.last_updated_timestamp {block_query.relative_time.upper()}')
         if block_query.offset:
-            post_filters += f'SKIP {block_query.offset}'
-        post_filters += f'LIMIT {block_query.limit if block_query.limit else 10}'
+            post_filters.append(f'SKIP {block_query.offset}')
+        post_filters.append(f'LIMIT {block_query.limit if block_query.limit else 10}')
 
         return post_filters
 
@@ -171,18 +171,19 @@ class GraphDB:
                 'MATCH (entity: Entity)-[:Mentioned]->(start: Block) '
                 f'WHERE {" AND ".join(start_where)} '
                 'WITH DISTINCT start '
-                f'{" ".join(start_post)}'
+                f'{" ".join(start_post)} '
                 'WITH start '
             )
 
         end_where = self._where_filters(end, 'end')
         end_post = self._post_filters(end, 'end')
+        start_end_match = ', start MATCH (start)-[:Has*]->(end) WITH DISTINCT end' if start else ''
+
         end_query = (
             'MATCH (entity: Entity)-[:Mentioned]->(end: Block) '
             f'WHERE {" AND ".join(end_where)} '
-            'WITH DISTINCT end '
-            # where there is a path through blocks :Has from start to end
-            'MATCH (start)-[:Has*]->(end) WITH DISTINCT end ' if start else ''
+            'WITH DISTINCT end'
+            f'{start_end_match} '
             'RETURN end '
             f'{" ".join(end_post)}'
         )

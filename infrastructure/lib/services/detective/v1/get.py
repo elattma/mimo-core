@@ -1,12 +1,13 @@
 import json
 import os
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from context_agent.agent import ContextAgent
-from context_agent.model import Request
+from context_agent.model import ContextQuery, Request
 from dstruct.base import DStruct
 from dstruct.graphdb import GraphDB
-from dstruct.model import Block, StructuredProperty, UnstructuredProperty
+from dstruct.model import (Block, BlockQuery, StructuredProperty,
+                           UnstructuredProperty)
 from dstruct.vectordb import VectorDB
 from external.neo4j_ import Neo4j
 from external.openai_ import OpenAI
@@ -26,15 +27,23 @@ def handler(event: dict, context):
 
     body: str = event.get('body', None) if event else None
     body: Dict = json.loads(body) if body else None
-    raw_query: str = body.get('query', None) if body else None
-    token_limit: int = body.get('token_limit', None) if body else None
-    token_limit = int(token_limit) if token_limit else 1600
+    context_query: str = body.get('query', None) if body else None
+    token_limit: str = body.get('token_limit', None) if body else None
+    token_limit: int = int(token_limit) if token_limit else None
     library: str = body.get('library', 'google-oauth2|108573573074253667565') if body else None
     next_token: str = body.get('next_token', None) if body else None
-    overrides: Dict[str, Any] = body.get('overrides') if body else None
 
-    if not (raw_query and token_limit and library):
+    if not (context_query and library):
         return to_response_error(Errors.MISSING_PARAMS)
+    
+    try:
+        context_query: ContextQuery = ContextQuery.parse_obj(context_query)
+    except Exception as e:
+        print(e)
+        return to_response_error(Errors.INVALID_QUERY_PARAMS)
+
+    if not context_query.lingua and not context_query.search_method:
+        return to_response_error(Errors.INVALID_QUERY_PARAMS)
     
     secrets = SSM().load_params(app_secrets_path)
     openai_api_key = secrets.get('openai_api_key', None)
@@ -50,23 +59,24 @@ def handler(event: dict, context):
     dstruct = DStruct(graphdb=graphdb, vectordb=vectordb, library=library)
     openai = OpenAI(api_key=openai_api_key)
     context_agent = ContextAgent(dstruct=dstruct, openai=openai)
-    request = Request(
-        raw=raw_query,
-        token_limit=token_limit,
-        next_token=next_token
-    )
 
-    if overrides:
-        # TODO: first validate overrides in a set of allowed overrides with allowed values
-        for key, value in overrides.items():
-            if hasattr(request, key):
-                request.__setattr__(key, value)
-            else:
-                print(f'[Query] Invalid override key: {key}, value: {value}')
-    blocks: List[Block] = context_agent.fetch(request)
-    response = {
-        'next_token': None,
-    }
+    blocks: List[Block] = context_agent.fetch(Request(
+        raw=context_query.lingua,
+        token_limit=token_limit,
+        next_token=next_token,
+        end=BlockQuery(
+            search_method=context_query.search_method,
+            concepts=';'.join(context_query.concepts),
+            entities=context_query.entities,
+            absolute_time_start=context_query.time_start,
+            absolute_time_end=context_query.time_end,
+            relative_time=context_query.time_sort,
+            limit=context_query.limit,
+            offset=context_query.offset,
+            integrations=context_query.integrations,
+        )
+    ))
+    response = { 'next_token': None }
     response_blocks: List[Dict] = []
     if blocks:
         for block in blocks:
@@ -74,6 +84,7 @@ def handler(event: dict, context):
                 'id': block.id,
                 'label': block.label,
                 'integration': block.integration,
+                'connection': block.connection,
                 'last_updated_ts': block.last_updated_timestamp,
             }
             properties: List[Dict] = []
@@ -99,6 +110,8 @@ def handler(event: dict, context):
             block_dict['properties'] = properties
             response_blocks.append(block_dict)
     response['blocks'] = response_blocks
+    
+    neo4j.close()
 
     return to_response_success(response)
 

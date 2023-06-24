@@ -72,6 +72,7 @@ class DStructDao:
             id=node.id,
             label=node.data.get('label'),
             integration=node.data.get('integration'),
+            connection=node.data.get('connection'),
             properties=self._listed_dict_as_properties(node.data.get('properties')),
             last_updated_timestamp=node.data.get('last_updated_timestamp'),
             embedding=None
@@ -106,6 +107,8 @@ class DStructDao:
         return Block(
             id=row.id,
             label=row.label,
+            integration=None,
+            connection=None,
             properties=None,
             last_updated_timestamp=None,
             embedding=row.embedding

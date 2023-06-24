@@ -80,6 +80,7 @@ def main():
                     id=block_id,
                     label=label,
                     integration=integration,
+                    connection=connection,
                     properties=None,
                     last_updated_timestamp=last_updated_timestamp,
                     embedding=None

@@ -93,14 +93,11 @@ class DStruct:
                 blocks = [self._dao.node_to_block(node) for node in nodes]
             elif start.search_method == 'exact':
                 print(f'[DStruct.query] exact then relevant query {start} -> {end}')
-                end_limit = end.limit
-                end.limit = 1000
-                end.relative_time_ascending = False
                 nodes = self._graphdb.query_blocks(end=end, library=self._library, start=start)
                 if not nodes:
                     return None
                 blocks = [self._dao.node_to_block(node) for node in nodes]
-                end.limit = end_limit
+                # TODO: rerank with cohere ai?
             elif start.search_method == 'relevant':
                 print(f'[DStruct.query] relevant then relevant query {start} -> {end}')
                 rows: Dict[str, List[float]] = self._vectordb.query(
@@ -120,6 +117,7 @@ class DStruct:
                     return None
                 blocks = [self._dao.node_to_block(node) for node in nodes]
                 end.limit = end_limit
+                # TODO: rerank with cohere ai?
 
         if blocks:
             if with_data and not blocks[0].properties:
