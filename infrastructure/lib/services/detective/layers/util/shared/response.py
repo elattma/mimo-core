@@ -10,6 +10,7 @@ HEADERS = {
 
 class Errors(Enum):
     INVALID_USER = 'invalid user'
+    MISSING_ENV = 'missing env'
     MISSING_PARAMS = 'missing params'
     MISSING_SECRETS = 'missing secrets'
     AUTH_FAILED = 'auth failed'

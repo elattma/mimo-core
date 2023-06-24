@@ -1,11 +1,11 @@
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from dstruct.model import Block, Entity
 
 
 class EntityExtractor:
-    def find_entities(self, raw_dict: Dict) -> List[Entity]:
-        # Grab entities from structured fields
+    def find_entities(self, dictionary: Dict[str, Any]) -> List[Entity]:
+        # TODO: implement by grabbing entities from structured fields
         pass
 
     def find_inferrable_entities(self, block: Block) -> List[str]:

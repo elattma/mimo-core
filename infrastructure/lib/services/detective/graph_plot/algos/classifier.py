@@ -1,16 +1,19 @@
 from typing import Any, Dict
 
-from lake.label_config import SOURCE_NORMALIZED_BLOCK_MAP
+from lake.label_config import LABEL_NORMALIZE_MAP
 from store.block_state import SUPPORTED_BLOCK_LABELS
 
 
 class Classifier:
+    def __init__(self) -> None:
+        pass
+
     def get_normalized_label(self, label: str):
         if not label:
             raise Exception(f'[S3Lake.get_normalized_label] invalid label: {label}')
 
-        if label in SOURCE_NORMALIZED_BLOCK_MAP:
-            return SOURCE_NORMALIZED_BLOCK_MAP[label]
+        if label in LABEL_NORMALIZE_MAP:
+            return LABEL_NORMALIZE_MAP.get(label)
 
         for supported_label in SUPPORTED_BLOCK_LABELS:
             if supported_label in label:
@@ -23,9 +26,9 @@ class Classifier:
             return False
         
         if isinstance(id, str):
-            return False
+            return True
         
-        return True
+        return False
 
     def find_id(self, raw_dict: Dict) -> str:
         if not raw_dict:

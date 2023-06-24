@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List
 
 import pinecone
 
@@ -47,3 +47,15 @@ class Pinecone:
 
         fetch_response = self._index.fetch(ids)
         return fetch_response.get('vectors', None) if fetch_response else None
+    
+    def query(self, embedding: List[float], filter: Dict[str, Any], top_k: int, include_metadata: bool = True, include_values: bool = True):
+        print(f'[Pinecone.query] filter {filter}, top_k {top_k}, include_metadata {include_metadata}, include_values {include_values}')
+        query_response = self._index.query(
+            vector=embedding,
+            top_k=top_k,
+            filter=filter,
+            include_metadata=include_metadata,
+            include_values=include_values
+        )
+
+        return query_response.get('matches', None) if query_response else None

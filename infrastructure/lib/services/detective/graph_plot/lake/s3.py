@@ -28,8 +28,9 @@ class S3Lake:
         )
 
         listed_tables = [common_prefix['Prefix'].split('/')[-2] for common_prefix in response.get('CommonPrefixes', [])]
+        print(f'[S3Lake.get_tables] listed_tables: {listed_tables}')
         for table in listed_tables:
-            Classifier.get_normalized_label(table)
+            self._classifier.get_normalized_label(table)
 
         return listed_tables
         
@@ -37,12 +38,16 @@ class S3Lake:
         print(f'[S3Lake.block_iterator] bucket_name: {self._bucket_name}, prefix: {self._prefix}, table: {table}')
         next_token = None
         while True:
+            extra_args = {
+                'ContinuationToken': next_token,
+            } if next_token else {}
+
             response = self._s3_client.list_objects_v2(
                 Bucket=self._bucket_name,
-                Prefix=f'{self._prefix}/{table}/',
-                Delimiter='/',
-                ContinuationToken=next_token
+                Prefix=f'{self._prefix}{table}/',
+                **extra_args
             )
+            print(f'[S3Lake.block_iterator] response: {response}')
             next_token = response.get('NextContinuationToken', None)
             for content in response.get('Contents', []):
                 yield content['Key']

@@ -1,8 +1,9 @@
 from datetime import datetime
-from typing import List, Set
+from typing import Any, Dict, List, Set
 
 from dstruct.graphdb import Node, Relationship
-from dstruct.model import Block, Chunk, Entity
+from dstruct.model import (Block, Chunk, Entity, Property, StructuredProperty,
+                           UnstructuredProperty)
 from dstruct.vectordb import Row
 
 
@@ -10,13 +11,53 @@ class DStructDao:
     def __init__(self, library: str):
         self._library = library
 
+    def _properties_as_listed_dict(self, properties: Set[Property]) -> List[Dict[str, Any]]:
+        dictionary_properties = []
+        for property in properties:
+            dictionary = {
+                'key': property.key
+            }
+            if isinstance(property, StructuredProperty):
+                dictionary['value'] = property.value
+            elif isinstance(property, UnstructuredProperty):
+                dictionary['chunks'] = [{
+                    'ref_id': chunk.ref_id,
+                    'order': chunk.order,
+                    'text': chunk.text,
+                } for chunk in property.chunks]
+            else:
+                raise ValueError(f'Unknown property type: {type(property)}')
+            dictionary_properties.append(dictionary)
+                
+        return dictionary_properties
+    
+    def _listed_dict_as_properties(self, listed_dict: List[Dict[str, Any]]) -> Set[Property]:
+        properties = set()
+        for dictionary_property in listed_dict:
+            if dictionary_property.get('value'):
+                properties.add(StructuredProperty(
+                    key=dictionary_property.get('key'),
+                    value=dictionary_property.get('value'),
+                ))
+            elif dictionary_property.get('chunks'):
+                properties.add(UnstructuredProperty(
+                    key=dictionary_property.get('key'),
+                    chunks=[Chunk(
+                        ref_id=chunk.get('ref_id'),
+                        order=chunk.get('order'),
+                        text=chunk.get('text'),
+                    ) for chunk in dictionary_property.get('chunks')],
+                ))
+        return properties
+
     def block_to_node(self, block: Block, has_block_ids: Set[str] = None) -> Node:
         return Node(
             library=self._library,
             id=block.id,
             data={
                 'label': block.label,
-                'properties': str(list(block.properties)),
+                'integration': block.integration,
+                'properties': self._properties_as_listed_dict(block.properties),
                 'last_updated_timestamp': block.last_updated_timestamp,
             },
             relationships=[Relationship(
@@ -30,7 +71,8 @@ class DStructDao:
         return Block(
             id=node.id,
             label=node.data.get('label'),
-            properties=set(node.data.get('properties')),
+            integration=node.data.get('integration'),
+            properties=self._listed_dict_as_properties(node.data.get('properties')),
             last_updated_timestamp=node.data.get('last_updated_timestamp'),
             embedding=None
         )
@@ -79,21 +121,37 @@ class DStructDao:
             text=None,
             embedding=row.embedding
         )
+    
+    def _ts_to_date_day(self, timestamp: int) -> str:
+        if not timestamp:
+            return '1'
+        return datetime.fromtimestamp(timestamp).strftime('%Y%m%d')
+    
+    def _date_day_to_ts(self, date_day: str) -> int:
+        if date_day == '1':
+            return None
+        return int(datetime.strptime(date_day, '%Y%m%d').timestamp())
 
     def block_to_row(self, block: Block) -> Row:
         return Row(
             id=block.id,
             embedding=block.embedding,
             library=self._library,
-            date_day=datetime.fromtimestamp(block.last_updated_timestamp).strftime('%Y%m%d') if block.last_updated_timestamp else None,
+            date_day=self._ts_to_date_day(block.last_updated_timestamp),
             type='block',
             label=block.label
         )
 
     def block_chunks_to_rows(self, block: Block) -> List[Row]:
+        unstructured_properties = block.get_unstructured_properties()
+        if not unstructured_properties:
+            return []
+        
         rows = []
-        date_day = datetime.fromtimestamp(block.last_updated_timestamp).strftime('%Y%m%d') if block.last_updated_timestamp else None
-        for unstructured in block.get_unstructured_properties():
+        date_day = self._ts_to_date_day(block.last_updated_timestamp)
+        for unstructured in unstructured_properties:
+            if len(unstructured.chunks) == 1:
+                continue
             rows.extend([Row(
                 id=chunk.ref_id,
                 embedding=chunk.embedding,
@@ -102,5 +160,4 @@ class DStructDao:
                 type='chunk',
                 label=block.label
             ) for chunk in unstructured.chunks])
-
         return rows

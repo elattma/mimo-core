@@ -19,6 +19,7 @@ from lake.s3 import S3Lake
 from store.params import SSM
 
 _arg_parser: ArgumentParser = ArgumentParser()
+_arg_parser.add_argument('--integration', type=str, required=True)
 _arg_parser.add_argument('--connection', type=str, required=True)
 _arg_parser.add_argument('--library', type=str, required=True)
 
@@ -27,14 +28,15 @@ def main():
     app_secrets_path = os.getenv('APP_SECRETS_PATH')
     neo4j_uri = os.getenv('NEO4J_URI')
     if not (lake_bucket_name and app_secrets_path and neo4j_uri):
-        raise Exception('missing env vars!')
+        raise Exception(f'[main] missing env vars! lake_bucket_name: {lake_bucket_name}, app_secrets_path: {app_secrets_path}, neo4j_uri: {neo4j_uri}')
     
     args = _arg_parser.parse_args()
     args = vars(args)
+    integration = args.get('integration', None)
     connection = args.get('connection', None)
     library = args.get('library', None)
-    if not (connection and library):
-        raise Exception('[main] missing args!')
+    if not (integration and connection and library):
+        raise Exception(f'[main] missing args! integration: {integration}, connection: {connection}, library: {library}')
     
     secrets = SSM().load_params(app_secrets_path)
     openai_api_key = secrets.get('openai_api_key', None)
@@ -48,7 +50,7 @@ def main():
     graphdb = GraphDB(db=neo4j)
     pinecone = Pinecone(api_key=pinecone_api_key, environment='us-east1-gcp', index_name='beta')
     vectordb = VectorDB(db=pinecone)
-    dstruct = DStruct(graphdb=graphdb, vectordb=vectordb)
+    dstruct = DStruct(graphdb=graphdb, vectordb=vectordb, library=library)
 
     llm = OpenAI(openai_api_key)
     classifier = Classifier()
@@ -57,7 +59,8 @@ def main():
     relation_extractor = RelationExtractor()
     embedder = Embedder(llm)
     
-    lake = S3Lake(lake_bucket_name, prefix=f'{library}/{connection}')
+    # TODO: remove test prefix
+    lake = S3Lake(lake_bucket_name, prefix=f'test/{library}/{connection}/')
     tables = lake.get_tables()
 
     for table in tables:
@@ -72,15 +75,18 @@ def main():
                     continue
                 print(f'[main] block_id: {block_id}')
                 normalizer.sanitize(block_dict)
-                properties = normalizer.to_properties(block_dict)
                 last_updated_timestamp = normalizer.find_last_updated_timestamp(block_dict)
                 dstruct_block = Block(
                     id=block_id,
                     label=label,
-                    properties=properties,
+                    integration=integration,
+                    properties=None,
                     last_updated_timestamp=last_updated_timestamp,
                     embedding=None
                 )
+                normalizer.with_properties(dstruct_block, block_dict)
+                print(f'[main] block: {dstruct_block}')
+                print(f'[main] block_dict: {block_dict}')
                 embedder.block_with_embeddings(dstruct_block)
                 entities = entity_extractor.find_entities(block_dict)
                 inferrable_entities = entity_extractor.find_inferrable_entities(block_dict)
@@ -93,7 +99,10 @@ def main():
                     inferrable_entity_values=inferrable_entities
                 )
                 print(f'[main] merge succeeded: {succeeded}')
-
+                if not succeeded:
+                    raise Exception('failed to merge block', block_dict)
+                neo4j.close()
+                return
 
     # TODO: for each root block, find all adjacent blocks
     # for each cluster of data

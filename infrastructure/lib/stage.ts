@@ -10,7 +10,7 @@ import { S3Stack } from "./s3";
 import { SecretsStack } from "./secrets";
 import { ApplicantStack } from "./services/applicant/lambda";
 import { ConnectorStack } from "./services/connector/stack";
-import { DetectiveStack } from "./services/detective/lambda";
+import { DetectiveStack } from "./services/detective/stack";
 import { UsageMonitorStack } from "./services/usage_monitor/lambda";
 import { SsmStack } from "./ssm";
 import { VpcStack } from "./vpc";
@@ -65,6 +65,7 @@ export class MimoStage extends Stage {
     });
     const detectiveService = new DetectiveStack(this, "detective", {
       stageId: props.stageId,
+      vpc: vpc.vpc,
     });
     const usageMonitorService = new UsageMonitorStack(this, "usage-monitor", {
       stageId: props.stageId,

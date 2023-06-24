@@ -366,6 +366,7 @@ class DataAgent:
         query = Query.from_string_and_request(llm_response, request)
         print('[DataAgent] Generated query!')
         return query
+    
     def _get_page_ids_from_results(self, results: List[Document]) -> Set[str]:
         page_ids = [document.id for document in results]
         return set(page_ids)

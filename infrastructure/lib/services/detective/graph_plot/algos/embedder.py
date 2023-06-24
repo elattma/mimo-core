@@ -1,6 +1,6 @@
 from typing import List
 
-from dstruct.model import Block, Chunk, UnstructuredProperty
+from dstruct.model import Block, Chunk
 from external.openai_ import OpenAI
 
 
@@ -25,16 +25,20 @@ class Embedder:
         return chunk_strings[0]
 
     def block_with_embeddings(self, block: Block) -> None:
-        chunks = []
         unstructured_properties = block.get_unstructured_properties()
-        if unstructured_properties:
-            for property in unstructured_properties:
-                if not property.chunks:
-                    continue
-                chunks.extend(property.chunks)
-                for chunk in property.chunks:
-                    chunk.embedding = self._llm.embed(chunk.text)
-            condensed_chunk_string = self._embeddable(chunks)
-            block.embedding = self._llm.embed(condensed_chunk_string)
-        else:
+        if not unstructured_properties:
             block.embedding = self._llm.embed(str(block.properties))
+            return
+
+        chunks = []
+        for property in unstructured_properties:
+            chunks.extend(property.chunks)
+        condensed_chunk_string = self._embeddable(chunks)
+        block.embedding = self._llm.embed(condensed_chunk_string)
+
+        for property in unstructured_properties:
+            if len(property.chunks) == 1:
+                property.chunks[0].embedding = block.embedding
+                continue
+            for chunk in property.chunks:
+                chunk.embedding = self._llm.embed(chunk.text)
