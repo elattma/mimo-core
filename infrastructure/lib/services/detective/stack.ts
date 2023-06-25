@@ -75,7 +75,7 @@ export class DetectiveStack extends Stack {
       `${stage}-detective-context-lambda`,
       {
         entry: path.join(__dirname, "v1"),
-        index: "context.py",
+        index: "get.py",
         runtime: Runtime.PYTHON_3_9,
         handler: "handler",
         timeout: Duration.minutes(15),
@@ -99,19 +99,60 @@ export class DetectiveStack extends Stack {
         type: JsonSchemaType.OBJECT,
         properties: {
           query: {
-            type: JsonSchemaType.STRING,
-          },
-          max_tokens: {
-            type: JsonSchemaType.NUMBER,
+            type: JsonSchemaType.OBJECT,
+            properties: {
+              lingua: {
+                type: JsonSchemaType.STRING,
+              },
+              integrations: {
+                type: JsonSchemaType.ARRAY,
+                items: {
+                  type: JsonSchemaType.STRING,
+                },
+              },
+              concepts: {
+                type: JsonSchemaType.ARRAY,
+                items: {
+                  type: JsonSchemaType.STRING,
+                },
+              },
+              entities: {
+                type: JsonSchemaType.ARRAY,
+                items: {
+                  type: JsonSchemaType.STRING,
+                },
+              },
+              time_start: {
+                type: JsonSchemaType.INTEGER,
+              },
+              time_end: {
+                type: JsonSchemaType.INTEGER,
+              },
+              time_sort: {
+                type: JsonSchemaType.STRING,
+                enum: ["asc", "desc"],
+              },
+              limit: {
+                type: JsonSchemaType.INTEGER,
+              },
+              offset: {
+                type: JsonSchemaType.INTEGER,
+              },
+              search_method: {
+                type: JsonSchemaType.STRING,
+                enum: ["exact", "relevant"],
+              },
+            },
+            required: ["lingua"],
           },
           library: {
             type: JsonSchemaType.STRING,
           },
+          token_limit: {
+            type: JsonSchemaType.INTEGER,
+          },
           next_token: {
             type: JsonSchemaType.STRING,
-          },
-          overrides: {
-            type: JsonSchemaType.OBJECT,
           },
         },
         required: ["query"],
@@ -124,41 +165,66 @@ export class DetectiveStack extends Stack {
       schema: {
         type: JsonSchemaType.OBJECT,
         properties: {
-          contexts: {
+          blocks: {
             type: JsonSchemaType.ARRAY,
             items: {
               type: JsonSchemaType.OBJECT,
               properties: {
-                blocks: {
+                id: {
+                  type: JsonSchemaType.STRING,
+                },
+                label: {
+                  type: JsonSchemaType.STRING,
+                },
+                integration: {
+                  type: JsonSchemaType.STRING,
+                },
+                connection: {
+                  type: JsonSchemaType.STRING,
+                },
+                last_updated_ts: {
+                  type: JsonSchemaType.INTEGER,
+                },
+                properties: {
                   type: JsonSchemaType.ARRAY,
                   items: {
                     type: JsonSchemaType.OBJECT,
-                  },
-                },
-                score: {
-                  type: JsonSchemaType.NUMBER,
-                },
-                source: {
-                  type: JsonSchemaType.OBJECT,
-                  properties: {
-                    connection: {
-                      type: JsonSchemaType.STRING,
+                    properties: {
+                      type: {
+                        type: JsonSchemaType.STRING,
+                        enum: ["structured", "unstructured"],
+                      },
+                      key: {
+                        type: JsonSchemaType.STRING,
+                      },
+                      value: {
+                        type: JsonSchemaType.STRING,
+                      },
+                      chunks: {
+                        type: JsonSchemaType.ARRAY,
+                        items: {
+                          type: JsonSchemaType.OBJECT,
+                          properties: {
+                            order: {
+                              type: JsonSchemaType.INTEGER,
+                            },
+                            text: {
+                              type: JsonSchemaType.STRING,
+                            },
+                          },
+                        },
+                      },
                     },
-                    id: {
-                      type: JsonSchemaType.STRING,
-                    },
                   },
-                  required: ["connection", "id"],
                 },
               },
-              required: ["blocks", "score", "source"],
             },
           },
           next_token: {
             type: JsonSchemaType.STRING,
           },
         },
-        required: ["contexts"],
+        required: ["blocks"],
       },
     };
 
@@ -271,6 +337,8 @@ export class DetectiveStack extends Stack {
         command: [
           "python",
           "app.py",
+          "--integration",
+          "Ref::integration",
           "--connection",
           "Ref::connection",
           "--library",

@@ -13,7 +13,6 @@ class Errors(Enum):
     MISSING_ENV = 'missing env'
     MISSING_PARAMS = 'missing params'
     INVALID_QUERY_PARAMS = 'invalid query params'
-    INVALID_LINGUA_OR_SEARCH_METHOD = 'one of lingua or search_method must be provided'
     MISSING_SECRETS = 'missing secrets'
     AUTH_FAILED = 'auth failed'
     DB_WRITE_FAILED = 'db write failed'

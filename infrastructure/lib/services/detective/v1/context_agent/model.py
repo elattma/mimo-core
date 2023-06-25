@@ -14,7 +14,7 @@ class Request:
     end: BlockQuery = None
 
 class ContextQuery(BaseModel):
-    lingua: Optional[str]
+    lingua: str
     integrations: Optional[List[str]]
     concepts: Optional[List[str]]
     entities: Optional[List[str]]

@@ -41,9 +41,6 @@ def handler(event: dict, context):
     except Exception as e:
         print(e)
         return to_response_error(Errors.INVALID_QUERY_PARAMS)
-
-    if not context_query.lingua and not context_query.search_method:
-        return to_response_error(Errors.INVALID_QUERY_PARAMS)
     
     secrets = SSM().load_params(app_secrets_path)
     openai_api_key = secrets.get('openai_api_key', None)
@@ -66,7 +63,7 @@ def handler(event: dict, context):
         next_token=next_token,
         end=BlockQuery(
             search_method=context_query.search_method,
-            concepts=';'.join(context_query.concepts),
+            concepts=';'.join(context_query.concepts) if context_query.concepts else None,
             entities=context_query.entities,
             absolute_time_start=context_query.time_start,
             absolute_time_end=context_query.time_end,

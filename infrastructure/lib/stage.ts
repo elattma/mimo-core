@@ -56,16 +56,18 @@ export class MimoStage extends Stage {
       stageId: props.stageId,
     });
 
+    const detectiveService = new DetectiveStack(this, "detective", {
+      stageId: props.stageId,
+      vpc: vpc.vpc,
+    });
     const connectorService = new ConnectorStack(this, "connector", {
       stageId: props.stageId,
       airbyteApi: airbyteApi.api,
       mimoTable: dynamo.mimoTable,
       vpc: vpc.vpc,
       uploadBucket: s3.uploadBucket,
-    });
-    const detectiveService = new DetectiveStack(this, "detective", {
-      stageId: props.stageId,
-      vpc: vpc.vpc,
+      graphPlotDefinition: detectiveService.graphPlotDefinition,
+      graphPlotQueue: detectiveService.graphPlotQueue,
     });
     const usageMonitorService = new UsageMonitorStack(this, "usage-monitor", {
       stageId: props.stageId,

@@ -34,7 +34,7 @@ class ContextAgent:
             self._with_llm_reasoning(request)
 
 
-        if request:
+        if request.start:
             self._with_embedding(request.start, request.raw)
         self._with_embedding(request.end, request.raw)
 
@@ -123,12 +123,5 @@ class ContextAgent:
                     print(f'[ContextAgent._with_llm_reasoning] skipping {key} because it is already specified')
                     continue
                 setattr(request.end, key, value)
-
-        print(response)
-        for key, value in response.items():
-            if hasattr(Request, key):
-                setattr(request, key, BlockQuery(**value))
-            else:
-                print(f'[ContextAgent._with_llm_reasoning] warning: unknown key: {key}, value: {value}')
         print(f'[ContextAgent._with_llm_reasoning] decorated with language reasoning for request: {request}')
     

@@ -64,6 +64,8 @@ export interface ConnectorStackProps extends StackProps {
   readonly mimoTable: ITable;
   readonly airbyteApi: IRestApi;
   readonly uploadBucket: IBucket;
+  readonly graphPlotQueue: JobQueue;
+  readonly graphPlotDefinition: EcsJobDefinition;
 }
 
 export class ConnectorStack extends Stack {
@@ -139,7 +141,9 @@ export class ConnectorStack extends Stack {
       props.mimoTable,
       props.airbyteApi,
       this.definition,
-      queue
+      queue,
+      props.graphPlotDefinition,
+      props.graphPlotQueue
     );
     this.syncMethod = this.sync(props.stageId, syncSfn);
     this.uploadMethod = this.connectionUpload(
@@ -251,8 +255,10 @@ export class ConnectorStack extends Stack {
     stage: string,
     table: ITable,
     api: IRestApi,
-    jobDefinition: EcsJobDefinition,
-    queue: JobQueue
+    syncJobDefinition: EcsJobDefinition,
+    syncQueue: JobQueue,
+    graphPlotJobDefinition: EcsJobDefinition,
+    graphPlotQueue: JobQueue
   ): StateMachine => {
     return new StateMachine(this, `${stage}-sync`, {
       definition: new DynamoGetItem(this, "Get Connection State", {
@@ -310,9 +316,9 @@ export class ConnectorStack extends Stack {
           new Choice(this, "Airbyte or Batch?")
             .when(
               Condition.stringEquals("$.params.airbyte_id", "batch"),
-              new BatchSubmitJob(this, "Submit Batch Job", {
-                jobDefinitionArn: jobDefinition.jobDefinitionArn,
-                jobQueueArn: queue.jobQueueArn,
+              new BatchSubmitJob(this, "Sync Job", {
+                jobDefinitionArn: syncJobDefinition.jobDefinitionArn,
+                jobQueueArn: syncQueue.jobQueueArn,
                 jobName: `${stage}-sync`,
                 payload: TaskInput.fromObject({
                   library: JsonPath.stringAt("$.input.library"),
@@ -366,12 +372,54 @@ export class ConnectorStack extends Stack {
           outputPath: "$[0]",
         })
         .next(
-          new Choice(this, "Update Status")
+          new Choice(this, "Sync Succeeded?")
             .when(
               Condition.stringEquals("$.ingestionStatus", "SUCCESS"),
-              this.getUpdateStatus(table, "Release Lock", "SUCCESS")
+              new BatchSubmitJob(this, "Graph Plot Job", {
+                jobDefinitionArn: graphPlotJobDefinition.jobDefinitionArn,
+                jobQueueArn: graphPlotQueue.jobQueueArn,
+                jobName: `${stage}-graph-plot`,
+                payload: TaskInput.fromObject({
+                  integration: JsonPath.stringAt("$.input.integration"),
+                  library: JsonPath.stringAt("$.input.library"),
+                  connection: JsonPath.stringAt("$.input.connection"),
+                }),
+                resultPath: "$.graphPlotResult",
+                resultSelector: {
+                  "exitCode.$": "$.Container.ExitCode",
+                },
+              })
+                .addCatch(
+                  new Pass(this, "Graph Plot Error", {
+                    result: Result.fromString("FAILED"),
+                    resultPath: "$.graphPlotStatus",
+                  }),
+                  {
+                    resultPath: "$.graphPlotResult",
+                  }
+                )
+                .next(
+                  new Choice(this, "Graph Plot Completed")
+                    .when(
+                      Condition.numberEquals("$.graphPlotResult.exitCode", 0),
+                      this.getUpdateStatus(
+                        table,
+                        "graph-plot-release-lock",
+                        "SUCCESS"
+                      )
+                    )
+                    .otherwise(
+                      this.getUpdateStatus(
+                        table,
+                        "graph-plot-release-lock",
+                        "FAILED"
+                      )
+                    )
+                )
             )
-            .otherwise(this.getUpdateStatus(table, "Release Lock", "FAILED"))
+            .otherwise(
+              this.getUpdateStatus(table, "ingest-release-lock", "FAILED")
+            )
         ),
       logs: {
         destination: new LogGroup(this, `${stage}-sync-logs`),
