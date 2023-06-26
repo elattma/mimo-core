@@ -8,16 +8,37 @@ class Embedder:
     def __init__(self, llm: OpenAI) -> None:
         self._llm = llm
 
+    def _summarize(self, text: str) -> str:
+        return self._llm.chat_completion(
+            messages=[{
+                'role': 'system',
+                'content': (
+                    'Imagine you are a Data Genius who is able '
+                    'to classify and understand any JSON data. '
+                    'Summarize the provided JSON using simple sentences. '
+                    'Preserve all important keywords, nouns, proper nouns, dates, concepts. '
+                    'Do not use pronouns. Write as much as you need to preserve all important information!'
+                )
+            }, {
+                'role': 'user',
+                'content': text
+            }]
+        )
+
     def _embeddable(self, chunks: List[Chunk]) -> str:
-        chunk_strings = [chunk.text for chunk in chunks]
-        
+        chunk_strings: List[str] = ['']
+        for chunk in chunks:
+            if len(chunk_strings[-1]) + len(chunk.text) > 2000:
+                chunk_strings.append('')
+            chunk_strings[-1] += chunk.text
+
         MAX_TREE_BLOCKS_CHILDREN = 10
         while len(chunk_strings) > 1:
             chunk_strings_len = len(chunk_strings)
             temp_chunk_strings = []
             for i in range(0, chunk_strings_len, MAX_TREE_BLOCKS_CHILDREN):
                 chunk_strings_input = '\n\n'.join(chunk_strings[i : min(i + MAX_TREE_BLOCKS_CHILDREN, chunk_strings_len)])
-                stringified_block = self._llm.summarize(chunk_strings_input)
+                stringified_block = self._summarize(chunk_strings_input)
                 temp_chunk_strings.append(stringified_block)
             chunk_strings = temp_chunk_strings
         if len(chunk_strings) != 1:
@@ -25,6 +46,7 @@ class Embedder:
         return chunk_strings[0]
 
     def block_with_embeddings(self, block: Block) -> None:
+        print(f'[Embedder.block_with_embeddings] starting with block length: {len(block.properties)}')
         unstructured_properties = block.get_unstructured_properties()
         if not unstructured_properties:
             block.embedding = self._llm.embed(str(block.properties))

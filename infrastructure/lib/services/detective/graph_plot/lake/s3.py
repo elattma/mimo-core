@@ -61,7 +61,7 @@ class S3Lake:
             Bucket=self._bucket_name,
             Key=block_key
         )
-        return response['Body'].read().decode('utf-8')
+        return response['Body'].read().decode('utf-8')  
     
     def get_block_csv(self, block_key: str) -> List[Dict]:
         print(f'[S3Lake.get_block_csv] bucket_name: {self._bucket_name}, block_key: {block_key}')

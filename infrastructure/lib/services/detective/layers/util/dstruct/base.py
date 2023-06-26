@@ -3,7 +3,7 @@ from typing import Dict, List, Set
 from dstruct.dao import DStructDao
 from dstruct.graphdb import GraphDB
 from dstruct.model import Block, BlockQuery, Entity
-from dstruct.vectordb import Row, VectorDB
+from dstruct.vectordb import VectorDB
 
 
 class DStruct:
@@ -13,23 +13,19 @@ class DStruct:
         self._library = library
         self._dao = DStructDao(library=library)
 
-    def merge(self,
-              block: Block,
-              entities: Set[Entity] = None,
-              adjacent_block_ids: Set[str] = None,
-              inferrable_entity_values: Set[str] = None) -> bool:
+    def merge(self, block: Block, entities: List[Entity] = None, adjacent_block_ids: Set[str] = None) -> None:
         graph_node = self._dao.block_to_node(block, adjacent_block_ids)
         block_row = self._dao.block_to_row(block)
         block_chunk_rows = self._dao.block_chunks_to_rows(block)
-        entity_nodes = []
+        entity_nodes = [self._dao.entity_to_node(entity, [block.id]) for entity in entities] if entities else []
 
         self._graphdb.add_blocks([graph_node])
         self._vectordb.upsert([block_row] + block_chunk_rows if block_chunk_rows else [block_row])
-        if entities:
-            entity_nodes = [self._dao.entity_to_node(entity, [block.id]) for entity in entities]
+        if entity_nodes:
             self._graphdb.add_entities(entity_nodes)
-
-        return True
+    
+    def clean_adjacent_blocks(self, connection: str) -> None:
+        self._graphdb.clean_adjacent_blocks(self._library, connection)
     
     def _blocks_with_embeddings(self, blocks: List[Block]) -> None:
         id_to_block: Dict[str, Block] = {}

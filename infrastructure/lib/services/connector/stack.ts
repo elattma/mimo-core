@@ -181,6 +181,9 @@ export class ConnectorStack extends Stack {
           connection: {
             type: JsonSchemaType.STRING,
           },
+          integration: {
+            type: JsonSchemaType.STRING,
+          },
           library: {
             type: JsonSchemaType.STRING,
           },

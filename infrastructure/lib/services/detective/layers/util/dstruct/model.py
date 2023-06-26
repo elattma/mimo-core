@@ -19,22 +19,21 @@ class Property(ABC):
 
 class StructuredProperty(Property):
     def __init__(self, key: str, value: Any) -> None:
-        if not (key and value):
+        if key is None or value is None:
             raise ValueError('key and value are required')
         self.key = key
         self.value = value
 
 @dataclass
 class Chunk:
-    ref_id: str
     order: int
     text: str
     embedding: List[float]
 
 class UnstructuredProperty(Property):
     def __init__(self, key: str, chunks: Optional[List[Chunk]]) -> None:
-        if not (key and chunks):
-            raise ValueError('key is required')
+        if key is None or chunks is None or len(chunks) == 0:
+            raise ValueError('key and chunks are required')
         self.key = key
         self.chunks = chunks
 
@@ -47,14 +46,6 @@ class Block:
     properties: Set[Property]
     last_updated_timestamp: int
     embedding: List[float]
-
-    def __hash__(self) -> int:
-        return hash((self.id, self.label))
-    
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return NotImplemented
-        return self.id == other.id and self.label == other.label
     
     def get_unstructured_properties(self) -> List[UnstructuredProperty]:
         return [property for property in self.properties if isinstance(property, UnstructuredProperty)]
@@ -64,17 +55,8 @@ class Block:
     
 @dataclass
 class Entity:
-    id: str
     identifiables: Set[str]
-    value: str
-
-    def __hash__(self) -> int:
-        return hash((self.value))
-    
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return NotImplemented
-        return self.value == other.value
+    name: str
     
 SearchMethod = Literal['exact', 'relevant']
 RelativeTime = Literal['asc', 'desc']

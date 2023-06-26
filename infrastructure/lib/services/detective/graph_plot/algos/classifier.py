@@ -34,10 +34,12 @@ class Classifier:
         if not raw_dict:
             return None
         
-        id = raw_dict.get('id', None)
+        id = raw_dict.pop("id", None)
         # TODO: add other validations
         # TODO: fuzzy match on other fields if applicable, maybe make this configurable
         if self._is_valid_id(id):
             return id
+        
+        
         
         return None

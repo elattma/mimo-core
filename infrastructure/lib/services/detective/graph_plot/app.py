@@ -2,15 +2,15 @@ import os
 import sys
 import traceback
 from argparse import ArgumentParser
+from typing import List, Set
 
 from algos.classifier import Classifier
 from algos.embedder import Embedder
 from algos.entity_extractor import EntityExtractor
 from algos.normalizer import Normalizer
-from algos.relation_extractor import RelationExtractor
 from dstruct.base import DStruct
 from dstruct.graphdb import GraphDB
-from dstruct.model import Block
+from dstruct.model import Block, Entity
 from dstruct.vectordb import VectorDB
 from external.neo4j_ import Neo4j
 from external.openai_ import OpenAI
@@ -55,8 +55,7 @@ def main():
     llm = OpenAI(openai_api_key)
     classifier = Classifier()
     normalizer = Normalizer()
-    entity_extractor = EntityExtractor()
-    relation_extractor = RelationExtractor()
+    entity_extractor = EntityExtractor(llm=llm)
     embedder = Embedder(llm)
     
     # TODO: remove test prefix
@@ -75,7 +74,7 @@ def main():
                     continue
                 print(f'[main] block_id: {block_id}')
                 normalizer.sanitize(block_dict)
-                last_updated_timestamp = normalizer.find_last_updated_timestamp(block_dict)
+                last_updated_timestamp = normalizer.find_last_updated_ts(block_dict)
                 dstruct_block = Block(
                     id=block_id,
                     label=label,
@@ -89,25 +88,28 @@ def main():
                 print(f'[main] block: {dstruct_block}')
                 print(f'[main] block_dict: {block_dict}')
                 embedder.block_with_embeddings(dstruct_block)
-                entities = entity_extractor.find_entities(block_dict)
-                inferrable_entities = entity_extractor.find_inferrable_entities(block_dict)
-                adjacent_block_ids = relation_extractor.find_adjacent_blocks(block_dict)
+                entities: List[Entity] = []
+                entity_extractor.with_defined_entities(dictionary=block_dict, entities=entities)
+                entity_extractor.with_llm_reasoned_entities(block=dstruct_block, entities=entities)
+                entity_extractor.deduplicate(entities)
 
-                succeeded = dstruct.merge(
-                    block=dstruct_block,
-                    entities=entities,
-                    adjacent_block_ids=adjacent_block_ids,
-                    inferrable_entity_values=inferrable_entities
-                )
-                print(f'[main] merge succeeded: {succeeded}')
-                if not succeeded:
-                    raise Exception('failed to merge block', block_dict)
+                adjacent_block_ids: Set[str] = set()
+                for entity in entities:
+                    # hacky way to find adjacent blocks, but it works generally.
+                    # perhaps associate identifiables with their field?
+                    # TODO: find a better way to do this..
+                    if entity.identifiables and len(entity.identifiables) == 1:
+                        adjacent_block_ids.add(entity.identifiables.pop())
+
+                print(f'[main] entities: {entities}')
+                dstruct.merge(block=dstruct_block, entities=entities, adjacent_block_ids=adjacent_block_ids)
+                dstruct.clean_adjacent_blocks(connection=connection)
                 neo4j.close()
                 return
 
-    # TODO: for each root block, find all adjacent blocks
-    # for each cluster of data
-        # summarize and embed into the vector db
+    # TODO: for each root block, find all adjacent blocks. for each cluster of data summarize and embed into the vector db
+    dstruct.clean_adjacent_blocks()
+    neo4j.close()
 
 
 if __name__ == '__main__':

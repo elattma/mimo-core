@@ -1,5 +1,3 @@
-from typing import List
-
 from neo4j import GraphDatabase
 
 
@@ -11,12 +9,8 @@ class Neo4j:
             self.driver.verify_connectivity()
         print(f'[Neo4j.__init__] completed')
 
-    def write(self, query: str, nodes: List, **kwargs):
-        if not nodes:
-            raise ValueError('nodes must not be empty')
-
+    def write(self, query: str, **kwargs):
         with self.driver.session(database='neo4j') as session:
-            kwargs['nodes'] = nodes
             result = session.execute_write(self._call, query, **kwargs)
             return result
         
@@ -27,11 +21,13 @@ class Neo4j:
 
     @staticmethod
     def _call(tx, query, **kwargs):
-        print('[Neo4j._call] query:', query)
+        print(f'[Neo4j._call] query: {query}, kwargs: {kwargs}')
         if not query:
             raise ValueError('query must not be empty')
 
-        return list(tx.run(query, **kwargs))
+        result = tx.run(query, **kwargs)
+        print(f'[Neo4j._call] result: {str(result)}')
+        return list(result)
 
     def close(self):
         print('[Neo4j.close] closing driver')

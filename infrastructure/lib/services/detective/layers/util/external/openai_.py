@@ -10,7 +10,7 @@ class OpenAI:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
         
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=15, jitter=full_jitter)
     def embed(self, text: str) -> List[float]:
         if not (self._api_key and text):
             return None
@@ -25,7 +25,7 @@ class OpenAI:
         embedding = first.get('embedding', None) if first else None
         return embedding
     
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=15, jitter=full_jitter)
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -53,7 +53,7 @@ class OpenAI:
         message: Dict = choices[0].get('message', None) if choices and len(choices) > 0 else None
         return message.get('content', None) if message else None
     
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=5, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=15, jitter=full_jitter)
     def function_call(
         self,
         messages: List[Dict[str, str]],
@@ -85,37 +85,3 @@ class OpenAI:
         choices: List[Dict] = response.get('choices', None) if response else None
         arguments: str = choices[0].get('message', {}).get('function_call', {}).get('arguments', None) if choices else None
         return json.loads(arguments) if arguments else None
-
-    def summarize(self, text: str):
-        return self.chat_completion(
-            messages=[{
-                'role': 'system',
-                'content': (
-                    'Imagine you are a Data Genius who is able '
-                    'to classify and understand any JSON data. '
-                    'Summarize the provided JSON using simple sentences. '
-                    'Preserve all important keywords, nouns, proper nouns, dates, concepts. '
-                    'Do not use pronouns. Write as much as you need to preserve all important information!'
-                )
-            }, {
-                'role': 'user',
-                'content': text
-            }]
-        )
-    
-    def inferrable_entities(self, text: str):
-        return self.function_call(
-            messages=[{
-                'role': 'system',
-                'content': (
-                    'Imagine you are a Data Genius who is able '
-                    'to classify and understand any JSON data. '
-                    'List all entities that can be inferred from the provided JSON data. '
-                    'For example, if the JSON data contains a field "name", '
-                    'then the entity "name" can be inferred from the JSON data.'
-                )
-            }, {
-                'role': 'user',
-                'content': text
-            }]
-        )

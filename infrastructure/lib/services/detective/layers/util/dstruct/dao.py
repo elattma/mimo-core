@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Set
 
@@ -21,19 +22,19 @@ class DStructDao:
                 dictionary['value'] = property.value
             elif isinstance(property, UnstructuredProperty):
                 dictionary['chunks'] = [{
-                    'ref_id': chunk.ref_id,
                     'order': chunk.order,
                     'text': chunk.text,
                 } for chunk in property.chunks]
             else:
                 raise ValueError(f'Unknown property type: {type(property)}')
-            dictionary_properties.append(dictionary)
+            dictionary_properties.append(str(dictionary))
                 
         return dictionary_properties
     
-    def _listed_dict_as_properties(self, listed_dict: List[Dict[str, Any]]) -> Set[Property]:
+    def _listed_dict_as_properties(self, listed_dict: List[str]) -> Set[Property]:
         properties = set()
-        for dictionary_property in listed_dict:
+        for dictionary_property_str in listed_dict:
+            dictionary_property = json.loads(dictionary_property_str)
             if dictionary_property.get('value'):
                 properties.add(StructuredProperty(
                     key=dictionary_property.get('key'),
@@ -43,7 +44,6 @@ class DStructDao:
                 properties.add(UnstructuredProperty(
                     key=dictionary_property.get('key'),
                     chunks=[Chunk(
-                        ref_id=chunk.get('ref_id'),
                         order=chunk.get('order'),
                         text=chunk.get('text'),
                     ) for chunk in dictionary_property.get('chunks')],
@@ -57,6 +57,7 @@ class DStructDao:
             data={
                 'label': block.label,
                 'integration': block.integration,
+                'connection': block.connection,
                 'properties': self._properties_as_listed_dict(block.properties),
                 'last_updated_timestamp': block.last_updated_timestamp,
             },
@@ -81,10 +82,9 @@ class DStructDao:
     def entity_to_node(self, entity: Entity, mentioned_block_ids: Set[str] = None) -> Node:
         return Node(
             library=self._library,
-            id=entity.id,
+            id=entity.name,
             data={
-                'value': entity.value,
-                'identifiables': str(list(entity.identifiables)),
+                'identifiables': list(entity.identifiables) if entity.identifiables else [],
             },
             relationships=[Relationship(
                 library=self._library,
@@ -95,9 +95,8 @@ class DStructDao:
 
     def node_to_entity(self, node: Node) -> Entity:
         return Entity(
-            id=node.id,
-            identifiables=set(node.data.get('identifiables')),
-            value=node.data.get('value'),
+            name=node.id,
+            identifiables=set(node.data.get('identifiables'))
         )
 
     def row_to_block(self, row: Row) -> Block:
@@ -119,7 +118,6 @@ class DStructDao:
             raise ValueError('Row is not a chunk')
         
         return Chunk(
-            ref_id=row.id,
             order=None,
             text=None,
             embedding=row.embedding
@@ -156,7 +154,6 @@ class DStructDao:
             if len(unstructured.chunks) == 1:
                 continue
             rows.extend([Row(
-                id=chunk.ref_id,
                 embedding=chunk.embedding,
                 library=self._library,
                 date_day=date_day,

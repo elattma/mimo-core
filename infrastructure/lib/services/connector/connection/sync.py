@@ -19,9 +19,10 @@ def handler(event: dict, context):
     body: str = event.get('body', None) if event else None
     body: Dict = json.loads(body) if body else None
     connection: str = body.get('connection', None) if body else None
+    integration: str = body.get('integration', None) if body else None
     library: str = body.get('library', None) if body else None
 
-    if not (user and connection and library):
+    if not (user and connection and integration and library):
         return to_response_error(Errors.MISSING_PARAMS)
 
     step_functions = boto3.client('stepfunctions')
@@ -31,6 +32,7 @@ def handler(event: dict, context):
             'input': {
                 'connection': connection,
                 'library': library,
+                'integration': integration
             },
             'timestamp': str(int(time()))
         })

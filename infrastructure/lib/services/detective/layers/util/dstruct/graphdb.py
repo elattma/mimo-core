@@ -55,7 +55,7 @@ class GraphDB:
     
     @property
     def _block_data_keys(self) -> Set[str]:
-        return set('label', 'integration', 'properties', 'last_updated_timestamp')
+        return set(['label', 'connection', 'integration', 'properties', 'last_updated_timestamp'])
     
     def add_blocks(self, blocks: List[Node]):
         if not blocks:
@@ -67,11 +67,14 @@ class GraphDB:
             if self._block_data_keys.difference(block.data.keys()):
                 raise ValueError(f'[GraphDB.add_blocks] block data must have {self._block_data_keys} but only has {block.data.keys()}')
 
-        return self._db.write(self._add_blocks_cypher(self._block_data_keys), [self._node_to_dict(block) for block in blocks])
+        return self._db.write(self._add_blocks_cypher(self._block_data_keys), blocks=[self._node_to_dict(block) for block in blocks])
+    
+    def clean_adjacent_blocks(self, library: str, connection: str):
+        return self._db.write(self._clean_adjacent_blocks_cypher(), library=library, connection=connection)
 
     @property
     def _entity_data_keys(self) -> Set[str]:
-        return set('value', 'identifiables')
+        return set(['identifiables'])
 
     def add_entities(self, entities: List[Node]):
         if not entities:
@@ -83,7 +86,7 @@ class GraphDB:
             if self._entity_data_keys.difference(entity.data.keys()):
                 raise ValueError(f'[GraphDB.add_entities] block data must have {self._block_data_keys} but only has {entity.data.keys()}')
 
-        return self._db.write(self._add_entities_cypher(self._entity_data_keys), [self._node_to_dict(entity) for entity in entities])
+        return self._db.write(self._add_entities_cypher(), entities=[self._node_to_dict(entity) for entity in entities])
     
     def query_blocks(self, end: BlockQuery, library: str, start: BlockQuery = None) -> List[Node]:
         if not (end and library):
@@ -101,33 +104,44 @@ class GraphDB:
         return ', '.join([f'{key}: {name}.{key}' for key in Node.get_index_keys()])
 
     def _add_blocks_cypher(self, property_keys: Set[str]) -> str:
-        set_object = ', '.join([f'b.{key} = block.{key}' for key in property_keys])
+        set_object = ', '.join([f'b.{key} = CASE WHEN block.{key} IS NOT NULL THEN block.{key} ELSE b.{key} END' for key in property_keys])
         return (
-            'UNWIND $nodes as block '
+            'UNWIND $blocks as block '
             f'MERGE (b: Block {{{self._node_index_match("block")}}}) '
-            'ON CREATE '
-            f'SET {set_object} '
-            'ON MATCH '
-            f'SET {set_object} '
+            f'ON CREATE SET {set_object} '
+            f'ON MATCH SET {set_object} '
             'WITH b, block '
             'UNWIND block.relationships as adjacent_block '
-            f'MERGE (ab: Block {{{self._node_index_match("adjacent_block")}}}) '
+            f'MERGE (ab: Block {{{self._node_index_match("adjacent_block")}, connection: block.connection }}) '
             'WITH b, ab '
             'MERGE (b)-[:Has]->(ab) '
         )
-
-    def _add_entities_cypher(self, property_keys: Set[str]) -> str:
-        set_object = ', '.join([f'e.{key} = entity.{key}' for key in property_keys])
+    
+    def _clean_adjacent_blocks_cypher(self) -> str:
         return (
-            'UNWIND $nodes as entity '
-            f'MERGE (e: Entity {{{self._node_index_match("entity")}}}) '
-            'ON CREATE '
-            f'SET {set_object} '
-            'WITH e, entity '
-            'UNWIND entity.relationships as block '
+            'MATCH (block: Block {library: $library, connection: $connection}) '
+            'WHERE block.label IS NULL OR block.properties IS NULL OR block.last_updated_timestamp IS NULL '
+            'DETACH DELETE block '
+        )
+
+    def _add_entities_cypher(self) -> str:
+        return (
+            'UNWIND $entities as entity '
+            'OPTIONAL MATCH (e: Entity) '
+            'WHERE toLower(e.id) CONTAINS toLower(entity.id) OR toLower(entity.id) CONTAINS toLower(e.id) '
+            'OR ANY(iden IN entity.identifiables WHERE iden IN e.identifiables) '
+            'WITH entity, e '
+            'CALL apoc.do.when(size(entity.identifiables) > 0 AND e IS NULL, '
+            f'"MERGE (merged_e:Entity {{{self._node_index_match("entity")}, identifiables: entity.identifiables}}) RETURN merged_e", "", {{entity:entity}}) YIELD value ' 
+            'WITH entity, e, value.merged_e as merged_e '
+            'FOREACH(ignore_me IN CASE WHEN size(entity.identifiables) > 0 AND e IS NOT NULL THEN [1] ELSE [] END | '
+            'SET e.identifiables = apoc.coll.toSet(e.identifiables + entity.identifiables)'
+            ') '
+            'WITH entity, CASE WHEN e IS NULL THEN merged_e ELSE e END AS merged_e, CASE WHEN merged_e IS NOT NULL OR e IS NOT NULL THEN entity.relationships ELSE [] END AS relationships '
+            'UNWIND relationships AS block '
             f'MATCH (b: Block {{{self._node_index_match("block")}}}) '
-            'WITH e, b '
-            'MERGE (e)-[:Mentioned]->(b) '
+            'WITH merged_e, b '
+            'MERGE (merged_e)-[:Mentioned]->(b) '
         )
     
     # TODO: optimize by putting integrations, time, entities, and any params as injectable parameters in the driver
