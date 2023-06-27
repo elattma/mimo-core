@@ -35,8 +35,6 @@ class ContextAgent:
             _logger.debug(f'[fetch] search method specified {request.end.search_method}. skipping llm reasoning...')
         else:
             self._with_llm_reasoning(request)
-
-
         if request.start:
             self._with_embedding(request.start, request.raw)
         self._with_embedding(request.end, request.raw)
@@ -46,8 +44,25 @@ class ContextAgent:
 
         if not blocks:
             _logger.debug(f'[fetch] No results for raw query {request.end} -> {request.start}')
-            _logger.debug(f'[fetch] Trying to formulate a broader query... FIXME: not implemented yet')
-            # TODO: if that doesn't work, we try to formulate a broader query based on our own reasoning of the request and knowledge of our data structure
+            _logger.debug(f'[fetch] Trying to formulate a broader query... naive fallback')
+
+            fallback_query = BlockQuery(
+                search_method='relevant',
+                concepts=request.end.concepts if request.end.concepts else request.raw,
+                entities=None,
+                absolute_time_start=None,
+                absolute_time_end=None,
+                relative_time=None,
+                limit=request.end.limit if request.end.limit else 5,
+                offset=request.end.offset if request.end.offset else 0,
+                labels=request.end.labels if request.end.labels else None,
+                ids=request.end.ids if request.end.ids else None,
+                integrations=request.end.integrations,
+                embedding=request.end.embedding,
+            )
+
+            blocks = self._dstruct.query(fallback_query)
+            _logger.debug(f'[fetch] Fallback query {fallback_query} yielded {len(blocks)} results')
             return None
         
         self._reranker.minify(request, blocks, 'euclidean_distance', 'cl100k_base')

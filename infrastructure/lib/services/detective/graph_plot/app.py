@@ -68,8 +68,7 @@ def main():
     entity_extractor = EntityExtractor(llm=llm, log_level=log_level)
     embedder = Embedder(llm=llm, log_level=log_level)
     
-    # TODO: remove test prefix
-    lake = S3Lake(lake_bucket_name, prefix=f'test/{library}/{connection}/', log_level=log_level)
+    lake = S3Lake(lake_bucket_name, prefix=f'{library}/{connection}/', log_level=log_level)
     tables = lake.get_tables()
 
     for table in tables:

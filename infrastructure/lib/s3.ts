@@ -11,6 +11,7 @@ export interface S3StackProps extends StackProps {
 export class S3Stack extends Stack {
   readonly uploadBucket: IBucket;
   readonly assetsBucket: IBucket;
+  readonly dataLake: IBucket;
 
   constructor(scope: Construct, id: string, props: S3StackProps) {
     super(scope, id, props);
@@ -35,6 +36,12 @@ export class S3Stack extends Stack {
     this.assetsBucket = new Bucket(this, "assets-bucket", {
       bucketName: `mimo-${props.stageId}-assets`,
     });
+
+    this.dataLake = Bucket.fromBucketName(
+      this,
+      "data-lake",
+      `mimo-${props.stageId}-data-lake`
+    );
 
     new BucketDeployment(this, "icons-deployment", {
       sources: [Source.asset(path.join(__dirname, "./integrations/icons"))],

@@ -1,23 +1,10 @@
 import {
-  EcsFargateContainerDefinition,
-  EcsJobDefinition,
-  FargateComputeEnvironment,
-  JobQueue,
-} from "@aws-cdk/aws-batch-alpha";
-import {
   PythonFunction,
   PythonLayerVersion,
 } from "@aws-cdk/aws-lambda-python-alpha";
-import { Duration, Size, Stack, StackProps } from "aws-cdk-lib";
+import { Duration, Stack, StackProps } from "aws-cdk-lib";
 import { JsonSchemaType, ModelOptions } from "aws-cdk-lib/aws-apigateway";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
-import { ContainerImage, LogDriver } from "aws-cdk-lib/aws-ecs";
-import {
-  ManagedPolicy,
-  PolicyStatement,
-  Role,
-  ServicePrincipal,
-} from "aws-cdk-lib/aws-iam";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
 import { AuthorizerType, MethodConfig } from "../../model";
@@ -32,8 +19,6 @@ export class DetectiveStack extends Stack {
   readonly methods: MethodConfig[] = [];
   readonly indexLambda: PythonFunction;
   readonly v0GetContextMethod: MethodConfig;
-  readonly graphPlotDefinition: EcsJobDefinition;
-  readonly graphPlotQueue: JobQueue;
 
   constructor(scope: Construct, id: string, props: DetectiveStackProps) {
     super(scope, id, props);
@@ -42,28 +27,6 @@ export class DetectiveStack extends Stack {
     const contextMethod = this.contextMethod(props.stageId, layers);
     this.methods.push(contextMethod);
     this.v0GetContextMethod = this.getV0GetContextMethod(props.stageId, layers);
-
-    const batch = new FargateComputeEnvironment(this, "graph_plot-batch", {
-      vpc: props.vpc,
-      spot: true,
-      vpcSubnets: {
-        subnets: props.vpc.publicSubnets,
-      },
-    });
-    this.graphPlotQueue = new JobQueue(this, "graph_plot-queue", {
-      priority: 1,
-    });
-    this.graphPlotQueue.addComputeEnvironment(batch, 1);
-    this.graphPlotDefinition = this.getDefinition(props.stageId);
-    if (!this.graphPlotDefinition.container.jobRole) {
-      throw new Error("Job role is required");
-    }
-    this.graphPlotDefinition.container.jobRole.addToPrincipalPolicy(
-      new PolicyStatement({
-        actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
-        resources: ["*"],
-      })
-    );
   }
 
   contextMethod = (
@@ -315,47 +278,5 @@ export class DetectiveStack extends Stack {
       authorizerType: AuthorizerType.API_KEY,
       responseModelOptions: methodResponseOptions,
     };
-  };
-
-  getDefinition = (stage: string): EcsJobDefinition => {
-    const container = new EcsFargateContainerDefinition(
-      this,
-      "graph_plot-container",
-      {
-        image: ContainerImage.fromAsset(path.join(__dirname)),
-        memory: Size.gibibytes(4),
-        cpu: 2,
-        environment: {
-          LAKE_BUCKET_NAME: `mimo-${stage}-lake`,
-          APP_SECRETS_PATH: `/${stage}/app_secrets`,
-          NEO4J_URI: "neo4j+s://67eff9a1.databases.neo4j.io",
-        },
-        logging: LogDriver.awsLogs({
-          streamPrefix: `batch-graph_plot-logs`,
-        }),
-        assignPublicIp: true,
-        command: [
-          "python",
-          "app.py",
-          "--integration",
-          "Ref::integration",
-          "--connection",
-          "Ref::connection",
-          "--library",
-          "Ref::library",
-        ],
-        jobRole: new Role(this, `graph_plot-role`, {
-          assumedBy: new ServicePrincipal("ecs-tasks.amazonaws.com"),
-          managedPolicies: [
-            ManagedPolicy.fromAwsManagedPolicyName(
-              "service-role/AmazonECSTaskExecutionRolePolicy"
-            ),
-          ],
-        }),
-      }
-    );
-    return new EcsJobDefinition(this, `graph_plot-job`, {
-      container: container,
-    });
   };
 }

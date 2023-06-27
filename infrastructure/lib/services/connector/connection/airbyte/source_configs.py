@@ -37,6 +37,7 @@ def salesforce_config(auth_strategy: AuthStrategy) -> Dict:
 def slack_config(auth_strategy: AuthStrategy) -> Dict:
     config = {
         'join_channels': True,
+        'channel_filter': []
     }
     credentials = None
     if auth_strategy.get_type() == AuthType.TOKEN_OAUTH2:
@@ -64,9 +65,8 @@ def slack_config(auth_strategy: AuthStrategy) -> Dict:
     
     if not credentials:
         return None
-
-    config['start_date'] = '2000-01-01T00:00:00Z'
-    config['lookback_window'] = 10000
+    config['start_date'] = '2015-04-06T00:00:00Z'
+    config['lookback_window'] = 100
     config['credentials'] = credentials
     return config
 

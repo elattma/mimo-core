@@ -16,6 +16,9 @@ openai = "^0.27.8"
 neo4j = "^5.9.0"
 pinecone-client = "^2.2.2"
 python-dateutil = "^2.8.2"
+pydantic = "^1.10.9"
+backoff = "^2.2.1"
+cohere = "^4.11.2"
 
 [build-system]
 requires = ["poetry-core"]

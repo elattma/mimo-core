@@ -1,18 +1,19 @@
 import logging
 from math import sqrt
-from typing import Dict, List, Literal
+from typing import Dict, List
 
 import tiktoken
 from context_agent.model import Request
 from dstruct.model import (Block, Chunk, StructuredProperty,
                            UnstructuredProperty)
+from external.cohere_ import Cohere
 
 _logger = logging.getLogger('Reranker')
 
-MeasurementMethod = Literal['euclidean_distance', 'cosine_similarity', 'cohere_ai_ranker']
 
 class Reranker:
-    def __init__(self, log_level: int) -> None:
+    def __init__(self, cohere: Cohere, log_level: int) -> None:
+        self._cohere = cohere
         _logger.setLevel(log_level)
 
     def _count_tokens(self, string: str, encoding_name: str) -> int:
@@ -36,34 +37,49 @@ class Reranker:
     def _euclidean_distance(self, x, y):
         # TODO: remove once we start embedding chunks
         if not x and not y:
-            return 1
+            return 1.
 
         return sqrt(sum([(x[i] - y[i]) ** 2 for i in range(len(x))]))
 
-    def _sort(self, focal_embedding: List[float], blocks: List[Block]) -> None:
+    def _rank_blocks(self, focal_embedding: List[float], blocks: List[Block]) -> Dict[str, float]:
+        block_to_rank_map: Dict[str, float] = {}
         for block in blocks:
-            for property in block.properties:
-                if not (isinstance(property, UnstructuredProperty) and len(property.chunks) > 1):
-                    continue
-                
-                property.chunks.sort(key=lambda chunk: self._euclidean_distance(focal_embedding, chunk.embedding))
+            block_to_rank_map[block.id] = self._euclidean_distance(block.embedding, focal_embedding)
+        return block_to_rank_map
+
+    def _rank_chunks(self, raw_request: str, blocks: List[Block]) -> Dict[str, float]:
+        _logger.debug(f'[rank] ranking {len(blocks)} blocks')
+        chunks: List[Chunk] = []
+        for block in blocks:
+            unstructured_properties = block.get_unstructured_properties()
+            if unstructured_properties:
+                for unstructured_property in unstructured_properties:
+                    for chunk in unstructured_property.chunks:
+                        chunks.append(chunk)
+        if not chunks:
+            _logger.error(f'[rank] no chunks found')
+            return {}
         
-        blocks.sort(key=lambda block: self._euclidean_distance(block.embedding, focal_embedding))
+        _logger.debug(f'[rank] ranking {len(chunks)} chunks')
+        ranks = self._cohere.rank(raw_request, [chunk.text for chunk in chunks])
+        if not ranks:
+            _logger.error(f'[rank] no ranks returned from cohere')
+            return {}
 
-    def _rank(self, request: Request, blocks: List[Block]) -> List[int]:
-        pass
+        chunk_to_rank_map: Dict[str, float] = {}
+        for chunk, rank in zip(chunks, ranks):
+            chunk_to_rank_map[chunk.text] = rank
+        
+        return chunk_to_rank_map
 
-    def minify(self, request: Request, blocks: List[Block], measurement_method: MeasurementMethod, encoding_name: str) -> None:
+    def minify(self, request: Request, blocks: List[Block], encoding_name: str) -> None:
         _logger.debug(f'[minify] {len(blocks)} blocks with token_limit {request.token_limit} and block_limit {request.end.limit}')
-        if not (request and blocks and measurement_method and encoding_name):
-            _logger.error(f'[minify] missing required arguments (request: {request}, blocks: {blocks}, measurement_method: {measurement_method}, encoding_name: {encoding_name})')
+        if not (request and blocks and encoding_name):
+            _logger.error(f'[minify] missing required arguments (request: {request}, blocks: {blocks}, encoding_name: {encoding_name})')
             return
 
-        # sort blocks and chunks
-        if measurement_method == 'cohere_ai_ranker':
-            self._rank(request, blocks)
-        else:
-            self._sort(request.end.embedding, blocks)
+        blocks_to_rank_map: Dict[str, float] = self._rank_blocks(request.end.embedding, blocks)
+        blocks = sorted(blocks, key=lambda block: blocks_to_rank_map[block.id])
 
         if request.end.limit:
             blocks = blocks[:request.end.limit]
@@ -71,7 +87,7 @@ class Reranker:
         if not request.token_limit:
             blocks = blocks[:10]
             return
-
+        
         # count tokens
         block_to_tokens_map: Dict[str, int] = {}
         total_token_count = 0
@@ -94,9 +110,10 @@ class Reranker:
             total_token_count -= last_block_token_count
             blocks.pop()
 
+
         # pop chunks and even properties from last block until total token count is below limit
         if total_token_count > request.token_limit:
-            last_block = blocks[-1]
+            chunks_to_rank_map: Dict[str, float] = self._rank_chunks(request.raw, blocks[-1:])
 
             # first pop least relevant chunks from properties with #chunks > 1
             all_chunks: List[Chunk] = []
@@ -112,7 +129,7 @@ class Reranker:
                 property_to_chunks_count[property] = len(property.chunks)
                 chunk_to_tokens[chunk.text] = self._count_tokens_chunk(chunk, encoding_name)
 
-            all_chunks.sort(key=lambda chunk: self._euclidean_distance(chunk.embedding, last_block.embedding))
+            all_chunks.sort(key=lambda chunk: chunks_to_rank_map[chunk.text])
             while all_chunks:
                 chunk = all_chunks.pop()
                 property = chunk_to_property[chunk.text]

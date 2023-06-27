@@ -66,8 +66,6 @@ export class MimoStage extends Stage {
       mimoTable: dynamo.mimoTable,
       vpc: vpc.vpc,
       uploadBucket: s3.uploadBucket,
-      graphPlotDefinition: detectiveService.graphPlotDefinition,
-      graphPlotQueue: detectiveService.graphPlotQueue,
     });
     const usageMonitorService = new UsageMonitorStack(this, "usage-monitor", {
       stageId: props.stageId,
@@ -75,6 +73,20 @@ export class MimoStage extends Stage {
     const applicantService = new ApplicantStack(this, "applicant", {
       stageId: props.stageId,
     });
+    if (
+      !(
+        connectorService.definition.container.jobRole &&
+        connectorService.graphPlotDefinition.container.jobRole
+      )
+    ) {
+      throw new Error("jobRole is required");
+    }
+    s3.dataLake.grantReadWrite(connectorService.definition.container.jobRole);
+    s3.dataLake.grantReadWrite(
+      connectorService.graphPlotDefinition.container.jobRole
+    );
+    s3.uploadBucket.grantRead(connectorService.definition.container.jobRole);
+
     routeConfigs.push({
       path: "connection",
       methods: connectorService.methods,

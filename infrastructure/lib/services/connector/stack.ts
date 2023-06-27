@@ -25,12 +25,7 @@ import {
 } from "aws-cdk-lib/aws-iam";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
-import {
-  BlockPublicAccess,
-  Bucket,
-  BucketEncryption,
-  IBucket,
-} from "aws-cdk-lib/aws-s3";
+import { IBucket } from "aws-cdk-lib/aws-s3";
 import {
   Choice,
   Condition,
@@ -64,8 +59,6 @@ export interface ConnectorStackProps extends StackProps {
   readonly mimoTable: ITable;
   readonly airbyteApi: IRestApi;
   readonly uploadBucket: IBucket;
-  readonly graphPlotQueue: JobQueue;
-  readonly graphPlotDefinition: EcsJobDefinition;
 }
 
 export class ConnectorStack extends Stack {
@@ -74,12 +67,13 @@ export class ConnectorStack extends Stack {
   readonly libraryMethods: MethodConfig[] = [];
   readonly layers: PythonLayerVersion[] = [];
   readonly definition: EcsJobDefinition;
+  readonly graphPlotDefinition: EcsJobDefinition;
   readonly syncMethod: MethodConfig;
   readonly uploadMethod: MethodConfig;
 
   constructor(scope: Construct, id: string, props: ConnectorStackProps) {
     super(scope, id, props);
-    const batch = new FargateComputeEnvironment(this, "coalesce-batch", {
+    const batch = new FargateComputeEnvironment(this, "sync-batch", {
       vpc: props.vpc,
       spot: true,
       vpcSubnets: {
@@ -87,7 +81,7 @@ export class ConnectorStack extends Stack {
       },
     });
 
-    const queue = new JobQueue(this, "coalesce-queue", {
+    const queue = new JobQueue(this, "sync-queue", {
       priority: 1,
     });
     queue.addComputeEnvironment(batch, 1);
@@ -136,14 +130,22 @@ export class ConnectorStack extends Stack {
     const libraryMethod = this.libraryGet(props.stageId);
     this.libraryMethods.push(libraryMethod);
 
+    this.graphPlotDefinition = this.getGraphPlotDefinition(props.stageId);
+    if (!this.graphPlotDefinition.container.jobRole) {
+      throw new Error("Job role is required");
+    }
+    this.graphPlotDefinition.container.jobRole.addToPrincipalPolicy(
+      new PolicyStatement({
+        actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+        resources: ["*"],
+      })
+    );
+
     const syncSfn = this.getSyncSfn(
       props.stageId,
       props.mimoTable,
       props.airbyteApi,
-      this.definition,
-      queue,
-      props.graphPlotDefinition,
-      props.graphPlotQueue
+      queue
     );
     this.syncMethod = this.sync(props.stageId, syncSfn);
     this.uploadMethod = this.connectionUpload(
@@ -217,7 +219,7 @@ export class ConnectorStack extends Stack {
     table: ITable,
     name: string,
     status: "IN_PROGRESS" | "SUCCESS" | "FAILED" | string
-  ): IChainable => {
+  ): DynamoUpdateItem => {
     return new DynamoUpdateItem(this, `${name}-${status}`, {
       table: table,
       key: {
@@ -258,10 +260,7 @@ export class ConnectorStack extends Stack {
     stage: string,
     table: ITable,
     api: IRestApi,
-    syncJobDefinition: EcsJobDefinition,
-    syncQueue: JobQueue,
-    graphPlotJobDefinition: EcsJobDefinition,
-    graphPlotQueue: JobQueue
+    syncQueue: JobQueue
   ): StateMachine => {
     return new StateMachine(this, `${stage}-sync`, {
       definition: new DynamoGetItem(this, "Get Connection State", {
@@ -320,7 +319,7 @@ export class ConnectorStack extends Stack {
             .when(
               Condition.stringEquals("$.params.airbyte_id", "batch"),
               new BatchSubmitJob(this, "Sync Job", {
-                jobDefinitionArn: syncJobDefinition.jobDefinitionArn,
+                jobDefinitionArn: this.definition.jobDefinitionArn,
                 jobQueueArn: syncQueue.jobQueueArn,
                 jobName: `${stage}-sync`,
                 payload: TaskInput.fromObject({
@@ -331,32 +330,16 @@ export class ConnectorStack extends Stack {
                 resultSelector: {
                   "exitCode.$": "$.Container.ExitCode",
                 },
-              })
-                .addCatch(
-                  new Pass(this, "Batch Job Error", {
-                    result: Result.fromString("FAILED"),
-                    resultPath: "$.ingestionStatus",
-                  }),
-                  {
-                    resultPath: "$.batchResult",
-                  }
-                )
-                .next(
-                  new Choice(this, "Batch Job Completed")
-                    .when(
-                      Condition.numberEquals("$.batchResult.exitCode", 0),
-                      new Pass(this, "Batch Job Succeeded", {
-                        result: Result.fromString("SUCCESS"),
-                        resultPath: "$.ingestionStatus",
-                      })
-                    )
-                    .otherwise(
-                      new Pass(this, "Batch Job Failed", {
-                        result: Result.fromString("FAILED"),
-                        resultPath: "$.ingestionStatus",
-                      })
-                    )
-                )
+              }).addCatch(
+                this.getUpdateStatus(
+                  table,
+                  "coalescer-release-lock",
+                  "FAILED"
+                ).next(new Fail(this, "Coalescer Failed")),
+                {
+                  resultPath: "$.batchResult",
+                }
+              )
             )
             .otherwise(
               new CallApiGatewayRestApiEndpoint(this, "Manual Airbyte Sync", {
@@ -368,60 +351,43 @@ export class ConnectorStack extends Stack {
                   connectionId: JsonPath.stringAt("$.input.connection"),
                 }),
                 resultPath: "$.airbyteResult",
-              }).next(this.getWaitForAirbyte(api))
+              }).next(this.getWaitForAirbyte(api, table))
             )
         )
         .toSingleState("Single State Ingest", {
           outputPath: "$[0]",
         })
         .next(
-          new Choice(this, "Sync Succeeded?")
-            .when(
-              Condition.stringEquals("$.ingestionStatus", "SUCCESS"),
-              new BatchSubmitJob(this, "Graph Plot Job", {
-                jobDefinitionArn: graphPlotJobDefinition.jobDefinitionArn,
-                jobQueueArn: graphPlotQueue.jobQueueArn,
-                jobName: `${stage}-graph-plot`,
-                payload: TaskInput.fromObject({
-                  integration: JsonPath.stringAt("$.input.integration"),
-                  library: JsonPath.stringAt("$.input.library"),
-                  connection: JsonPath.stringAt("$.input.connection"),
-                }),
-                resultPath: "$.graphPlotResult",
-                resultSelector: {
-                  "exitCode.$": "$.Container.ExitCode",
-                },
-              })
-                .addCatch(
-                  new Pass(this, "Graph Plot Error", {
-                    result: Result.fromString("FAILED"),
-                    resultPath: "$.graphPlotStatus",
-                  }),
-                  {
-                    resultPath: "$.graphPlotResult",
-                  }
-                )
-                .next(
-                  new Choice(this, "Graph Plot Completed")
-                    .when(
-                      Condition.numberEquals("$.graphPlotResult.exitCode", 0),
-                      this.getUpdateStatus(
-                        table,
-                        "graph-plot-release-lock",
-                        "SUCCESS"
-                      )
-                    )
-                    .otherwise(
-                      this.getUpdateStatus(
-                        table,
-                        "graph-plot-release-lock",
-                        "FAILED"
-                      )
-                    )
-                )
+          new BatchSubmitJob(this, "Graph Plot Job", {
+            jobDefinitionArn: this.graphPlotDefinition.jobDefinitionArn,
+            jobQueueArn: syncQueue.jobQueueArn,
+            jobName: `${stage}-graph-plot`,
+            payload: TaskInput.fromObject({
+              integration: JsonPath.stringAt("$.input.integration"),
+              library: JsonPath.stringAt("$.input.library"),
+              connection: JsonPath.stringAt("$.input.connection"),
+            }),
+            resultPath: "$.graphPlotResult",
+            resultSelector: {
+              "exitCode.$": "$.Container.ExitCode",
+            },
+          })
+            .addCatch(
+              this.getUpdateStatus(
+                table,
+                "graph-plot-release-lock",
+                "FAILED"
+              ).next(new Fail(this, "Graph Plot Failed")),
+              {
+                resultPath: "$.batchResult",
+              }
             )
-            .otherwise(
-              this.getUpdateStatus(table, "ingest-release-lock", "FAILED")
+            .next(
+              this.getUpdateStatus(
+                table,
+                "graph-plot-release-lock",
+                "SUCCESS"
+              ).next(new Succeed(this, "Graph Plot Succeeded"))
             )
         ),
       logs: {
@@ -430,7 +396,7 @@ export class ConnectorStack extends Stack {
     });
   };
 
-  getWaitForAirbyte = (api: IRestApi): IChainable => {
+  getWaitForAirbyte = (api: IRestApi, table: ITable): IChainable => {
     const checkAirbyte = new Wait(this, "Wait for Airbyte", {
       time: WaitTime.duration(Duration.minutes(2)),
     }).next(
@@ -474,10 +440,11 @@ export class ConnectorStack extends Stack {
             })
           )
           .otherwise(
-            new Pass(this, "Airbyte Job Failed", {
-              result: Result.fromString("FAILED"),
-              resultPath: "$.ingestionStatus",
-            })
+            this.getUpdateStatus(
+              table,
+              "coalescer-airbyte-release-lock",
+              "FAILED"
+            ).next(new Fail(this, "Airbyte Job Failed"))
           )
       )
     );
@@ -494,7 +461,7 @@ export class ConnectorStack extends Stack {
         environment: {
           PARENT_CHILD_TABLE: `mimo-${stage}-pc`,
           INTEGRATIONS_PATH: `/${stage}/integrations`,
-          APP_SECRETS_PATH: `/${stage}/app_secrets`,
+          LAKE_BUCKET_NAME: `mimo-${stage}-data-lake`,
         },
         logging: LogDriver.awsLogs({
           streamPrefix: `batch-coalescer-logs`,
@@ -523,11 +490,45 @@ export class ConnectorStack extends Stack {
     });
   };
 
-  getLake = (stageId: string) => {
-    return new Bucket(this, "data-lake", {
-      bucketName: `mimo-${stageId}-data-lake`,
-      encryption: BucketEncryption.S3_MANAGED,
-      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+  getGraphPlotDefinition = (stage: string): EcsJobDefinition => {
+    const container = new EcsFargateContainerDefinition(
+      this,
+      "graph_plot-container",
+      {
+        image: ContainerImage.fromAsset(path.join(__dirname, "../detective")),
+        memory: Size.gibibytes(4),
+        cpu: 2,
+        environment: {
+          LAKE_BUCKET_NAME: `mimo-${stage}-data-lake`,
+          APP_SECRETS_PATH: `/${stage}/app_secrets`,
+          NEO4J_URI: "neo4j+s://67eff9a1.databases.neo4j.io",
+        },
+        logging: LogDriver.awsLogs({
+          streamPrefix: `batch-graph_plot-logs`,
+        }),
+        assignPublicIp: true,
+        command: [
+          "python",
+          "app.py",
+          "--integration",
+          "Ref::integration",
+          "--connection",
+          "Ref::connection",
+          "--library",
+          "Ref::library",
+        ],
+        jobRole: new Role(this, `graph_plot-role`, {
+          assumedBy: new ServicePrincipal("ecs-tasks.amazonaws.com"),
+          managedPolicies: [
+            ManagedPolicy.fromAwsManagedPolicyName(
+              "service-role/AmazonECSTaskExecutionRolePolicy"
+            ),
+          ],
+        }),
+      }
+    );
+    return new EcsJobDefinition(this, `graph_plot-job`, {
+      container: container,
     });
   };
 

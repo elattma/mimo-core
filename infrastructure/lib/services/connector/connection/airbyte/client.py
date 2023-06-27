@@ -100,7 +100,12 @@ class Airbyte:
                name: str,
                source_definition_id: str) -> str:
         source_id = self._create_source(source_definition_id, strategy, name)
-        if not (source_id and self._check_connection(source_id)):
+        if not source_id:
+            return None
+        
+        is_valid = self._check_connection(source_id)
+        if not is_valid:
+            self._delete_source(source_id)
             return None
         
         connection_id = self._create_connection(library, source_id, 'f23e7454-0fac-44f9-aa68-b4d7c3feb75a')

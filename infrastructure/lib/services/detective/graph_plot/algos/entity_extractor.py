@@ -66,15 +66,12 @@ class EntityExtractor:
                 'role': 'system',
                 'content': (
                     'You are an entity extractor. Given any text, you can extract entities from it. '
-                    'Only extract people\'s names or organizational names like an account name, a company name, a deal name, etc. '
+                    'An entity is a person\'s name or organizational name like an account, company, deal. '
+                    'An entity is not an honorific, a title, a number, a random string, a date, a time, an address. '
                     'For example, when given the text "John Smith lives in New York", '
                     'you can extract the entities "John Smith" and "New York". '
-                    'You can also extract and associate those entities with identifiables if appropriate. '
-                    'For example, if "John Smith" has a unique ID of "123" or a username of "jsmith" '
-                    'or an email of "john_smith@gmail.com", you can associate those with "John Smith". '
-                    'You must only find names! Ignore meaningless numbers, strings or addresses! '
                     'For example, "412 Gold St, Brooklyn, NY 11201" is not a name. For example, "123456789" is not a name. '
-                    'Be very conservative! Only extract names and only if you\'re certain!! '
+                    'Be very conservative! Only extract names and only if you\'re certain! '
                 ),                
             }, {
                 'role': 'user',
@@ -97,7 +94,7 @@ class EntityExtractor:
                         'identifiable_entities': {
                             'title': 'Identifiable Entities',
                             'type': 'array',
-                            'description': 'Entities that can be linked to an id, email, phone, address, etc.',
+                            'description': 'Entities explicitly identified by an id, email, phone, address in the provided user text.',
                             'items': {
                                 'title': 'Identifiable Entity',
                                 'type': 'object',
