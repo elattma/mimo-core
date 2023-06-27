@@ -88,17 +88,33 @@ class GraphDB:
 
         return self._db.write(self._add_entities_cypher(), entities=[self._node_to_dict(entity) for entity in entities])
     
+    def _record_to_node(self, record) -> Node:
+        record_block = record['block']
+        return Node(
+            library=record_block['library'],
+            id=record_block['id'],
+            data={
+                'label': record_block['label'],
+                'connection': record_block['connection'],
+                'integration': record_block['integration'],
+                'properties': record_block['properties'],
+                'last_updated_timestamp': record_block['last_updated_timestamp'],
+            }
+        )
+
     def query_blocks(self, end: BlockQuery, library: str, start: BlockQuery = None) -> List[Node]:
         if not (end and library):
             raise ValueError(f'[GraphDB.query_blocks] end {end} and library {library} must not be empty')
 
-        return self._db.read(query=self._query_blocks_cypher(end, start), library=library)
+        records = self._db.read(query=self._query_blocks_cypher(end, start), library=library)
+        return [self._record_to_node(record) for record in records] if records else []
     
     def query_by_ids(self, ids: List[str], library: str) -> List[Node]:
         if not (ids and library):
             raise ValueError(f'[GraphDB.query_by_ids] ids {ids} and library {library} must not be empty')
 
-        return self._db.read(self._query_ids_cypher(), ids, library)
+        records = self._db.read(query=self._query_ids_cypher(), ids=ids, library=library)
+        return [self._record_to_node(record) for record in records] if records else []
     
     def _node_index_match(self, name: str):
         return ', '.join([f'{key}: {name}.{key}' for key in Node.get_index_keys()])
@@ -124,24 +140,34 @@ class GraphDB:
             'DETACH DELETE block '
         )
 
+    # TODO: merge entities on identifiables like this:
+    # 'UNWIND $entities as entity '
+    # 'OPTIONAL MATCH (e: Entity) '
+    # 'WHERE toLower(e.id) CONTAINS toLower(entity.id) OR toLower(entity.id) CONTAINS toLower(e.id) '
+    # 'OR ANY(iden IN entity.identifiables WHERE iden IN e.identifiables) '
+    # 'WITH entity, e '
+    # 'CALL apoc.do.when(size(entity.identifiables) > 0 AND e IS NULL, '
+    # f'"MERGE (merged_e:Entity {{{self._node_index_match("entity")}, identifiables: entity.identifiables}}) RETURN merged_e", "", {{entity:entity}}) YIELD value ' 
+    # 'WITH entity, e, value.merged_e as merged_e '
+    # 'FOREACH(ignore_me IN CASE WHEN size(entity.identifiables) > 0 AND e IS NOT NULL THEN [1] ELSE [] END | '
+    # 'SET e.identifiables = apoc.coll.toSet(e.identifiables + entity.identifiables)'
+    # ') '
+    # 'WITH entity, CASE WHEN e IS NULL THEN merged_e ELSE e END AS merged_e, CASE WHEN merged_e IS NOT NULL OR e IS NOT NULL THEN entity.relationships ELSE [] END AS relationships '
+    # 'UNWIND relationships AS block '
+    # f'MATCH (b: Block {{{self._node_index_match("block")}}}) '
+    # 'WITH merged_e, b '
+    # 'MERGE (merged_e)-[:Mentioned]->(b) '
     def _add_entities_cypher(self) -> str:
         return (
             'UNWIND $entities as entity '
-            'OPTIONAL MATCH (e: Entity) '
-            'WHERE toLower(e.id) CONTAINS toLower(entity.id) OR toLower(entity.id) CONTAINS toLower(e.id) '
-            'OR ANY(iden IN entity.identifiables WHERE iden IN e.identifiables) '
-            'WITH entity, e '
-            'CALL apoc.do.when(size(entity.identifiables) > 0 AND e IS NULL, '
-            f'"MERGE (merged_e:Entity {{{self._node_index_match("entity")}, identifiables: entity.identifiables}}) RETURN merged_e", "", {{entity:entity}}) YIELD value ' 
-            'WITH entity, e, value.merged_e as merged_e '
-            'FOREACH(ignore_me IN CASE WHEN size(entity.identifiables) > 0 AND e IS NOT NULL THEN [1] ELSE [] END | '
-            'SET e.identifiables = apoc.coll.toSet(e.identifiables + entity.identifiables)'
-            ') '
-            'WITH entity, CASE WHEN e IS NULL THEN merged_e ELSE e END AS merged_e, CASE WHEN merged_e IS NOT NULL OR e IS NOT NULL THEN entity.relationships ELSE [] END AS relationships '
-            'UNWIND relationships AS block '
+            f'MERGE (e: Entity {{{self._node_index_match("entity")}}}) '
+            'ON MATCH SET e.identifiables = apoc.coll.toSet(e.identifiables + entity.identifiables) '
+            'ON CREATE SET e.identifiables = entity.identifiables '
+            'WITH e, entity '
+            'UNWIND entity.relationships as block '
             f'MATCH (b: Block {{{self._node_index_match("block")}}}) '
-            'WITH merged_e, b '
-            'MERGE (merged_e)-[:Mentioned]->(b) '
+            'WITH e, b '
+            'MERGE (e)-[:Mentioned]->(b)'
         )
     
     # TODO: optimize by putting integrations, time, entities, and any params as injectable parameters in the driver
@@ -198,7 +224,7 @@ class GraphDB:
             f'WHERE {" AND ".join(end_where)} '
             'WITH DISTINCT end'
             f'{start_end_match} '
-            'RETURN end '
+            'RETURN end AS block '
             f'{" ".join(end_post)}'
         )
         return start_query + end_query

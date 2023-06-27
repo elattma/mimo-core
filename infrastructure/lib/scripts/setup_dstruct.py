@@ -8,7 +8,7 @@ dotenv.load_dotenv('./secrets.env')
 
 def setup_pinecone(index_name: str, environment: str, metadata_keys: List[str], dimension: int = 1536):
     import pinecone
-    pinecone.init(api_key=os.environ['PINECONE_API_KEY'], environment=environment)
+    pinecone.init(api_key=os.environ['/beta/app_secrets/pinecone_api_key'], environment=environment)
     indexes = pinecone.list_indexes()
     if index_name in indexes:
         return
@@ -30,9 +30,9 @@ def _get_constraints() -> List[str]:
 
 def setup_neo4j():
     from neo4j import GraphDatabase
-    uri = os.environ['NEO4J_URI']
-    user = os.environ['NEO4J_USER']
-    password = os.environ['NEO4J_PASSWORD']
+    uri = 'neo4j+s://67eff9a1.databases.neo4j.io'
+    user = os.environ['/beta/app_secrets/neo4j_user']
+    password = os.environ['/beta/app_secrets/neo4j_password']
     driver = GraphDatabase.driver(uri, auth=(user, password))
     with driver.session(database='neo4j') as session:
         for constraint in _get_constraints():
@@ -42,5 +42,5 @@ def setup_neo4j():
 
 if __name__ == '__main__':
     # setup_neo4j()
-    # setup_pinecone('beta', 'us-east1-gcp', ['library', 'date_day', 'block_label', 'page_type'])
+    setup_pinecone('beta', 'us-east1-gcp', ['library', 'date_day', 'label', 'type'])
     pass

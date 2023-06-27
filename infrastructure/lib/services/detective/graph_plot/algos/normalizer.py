@@ -1,18 +1,22 @@
 import json
 from datetime import datetime
+from logging import getLogger
 from typing import Any, Dict, List
 
 from dateutil import parser
 from dstruct.model import (Block, Chunk, StructuredProperty,
                            UnstructuredProperty)
 
+_logger = getLogger('Normalizer')
 
 # TODO: experiment with using LLMs to normalize text or determine whether a property is structured
 # TODO: normalize any timestamp or datetime object formats
 class Normalizer:
-    def __init__(self, max_chunk_len: int = 1000, chunk_overlap: int = 100) -> None:
+    def __init__(self, max_chunk_len: int, chunk_overlap: int, log_level: int) -> None:
         self._max_chunk_len = max_chunk_len
         self._chunk_overlap = chunk_overlap
+        
+        _logger.setLevel(log_level)
 
     def _get_flattened(self, raw_dict: Dict[str, Any], accumulate_key: str = '') -> str:
         flattened = ''
@@ -87,13 +91,13 @@ class Normalizer:
             return True
 
     def _to_structured_property(self, key: str, value: Any) -> StructuredProperty:
-        print(f'[Normalizer._to_structured_property] key: {key}, value: {value}')
+        _logger.debug(f'[_to_structured_property] key: {key}, value: {value}')
         return StructuredProperty(key=key, value=value)
 
     def _to_unstructured_property(self, key: str, value: str) -> UnstructuredProperty:
         value_len = len(value)
         if value_len <= self._max_chunk_len:
-            print(f'[Normalizer._to_unstructured_property] key: {key}, chunks: {value}')
+            _logger.debug(f'[_to_unstructured_property] key: {key}, value: {value}')
             return UnstructuredProperty(key=key, chunks=[Chunk(
                 order=0,
                 text=value,
@@ -110,11 +114,11 @@ class Normalizer:
                 text=value[start:end],
                 embedding=None
             ))
-        print(f'[Normalizer._to_unstructured_property] key: {key}, chunks: {chunks}')
+        _logger.debug(f'[_to_unstructured_property] key: {key}, value: {chunks}')
         return UnstructuredProperty(key=key, chunks=chunks)
 
     def sanitize(self, dictionary: Dict[str, Any]) -> None:
-        print(f'[Normalizer.sanitize] dictionary: {dictionary}')
+        _logger.debug(f'[sanitize] dictionary: {dictionary}')
         for key in list(dictionary):
             if key.startswith('_'):
                 del dictionary[key]
@@ -125,7 +129,7 @@ class Normalizer:
                 self.sanitize(value)
             if not self._is_valid_value(value):
                 dictionary.pop(key, None)
-        print(f'[Normalizer.sanitize] sanitized dictionary: {dictionary}')
+        _logger.debug(f'[sanitize] sanitized dictionary: {dictionary}')
 
     def with_properties(self, block: Block, dictionary: Dict[str, Any]) -> None:
         properties = set()
@@ -143,7 +147,7 @@ class Normalizer:
                 property = self._to_unstructured_property(key=key, value=value)
             
             if not property:
-                print(f'Unknown type: {type(value)} for value: {value}')
+                _logger.debug(f'Unknown type: {type(value)} for value: {value}')
                 continue
             properties.add(property)
 
@@ -154,8 +158,10 @@ class Normalizer:
 
         potential_keys: List[str] = []
         for key in dictionary_keys:
-            if 'last' in key and 'time' in key and isinstance(dictionary[key], datetime):
-                potential_keys.append(key)
+            key_normal = key.lower()
+            if isinstance(dictionary[key], datetime):
+                if 'time' in key_normal and ('last' in key_normal or 'modified' in key_normal):
+                    potential_keys.append(key)
 
         if potential_keys:
             for potential_key in potential_keys:
@@ -164,8 +170,9 @@ class Normalizer:
                     timestamp: int = int(dictionary_value.timestamp())
                     return timestamp
                 except Exception as e:
-                    print(f'[Normalizer.find_last_updated_timestamp] Error parsing date: {e}')
+                    _logger.debug(f'[find_last_updated_timestamp] Error parsing date: {e}')
                     continue
 
         # TODO: fallback with LLM call on keys
+        _logger.error('[find_last_updated_timestamp] No last updated timestamp found')
         return 0

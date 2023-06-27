@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Dict, List
 
@@ -15,15 +16,22 @@ from external.pinecone_ import Pinecone
 from shared.response import Errors, to_response_error, to_response_success
 from store.params import SSM
 
+_logger = logging.getLogger('DetectiveContextRetriever')
+logging.basicConfig(level=logging.INFO)
 
 def handler(event: dict, context):
-    global dstruct
+    global dstruct, _logger
 
     stage: str = os.getenv('STAGE')
     neo4j_uri: str = os.getenv('NEO4J_URI')
     app_secrets_path: str = os.getenv('APP_SECRETS_PATH')
-    if not (stage and neo4j_uri and app_secrets_path):
+    log_level = os.getenv('LOG_LEVEL')
+    log_level = logging.getLevelName(log_level) if log_level else logging.DEBUG
+    if not (stage and neo4j_uri and app_secrets_path and log_level):
+        _logger.exception(Errors.MISSING_ENV.value)
         return to_response_error(Errors.MISSING_ENV)
+
+    _logger.setLevel(log_level)
 
     body: str = event.get('body', None) if event else None
     body: Dict = json.loads(body) if body else None
@@ -34,12 +42,13 @@ def handler(event: dict, context):
     next_token: str = body.get('next_token', None) if body else None
 
     if not (context_query and library):
+        _logger.exception(Errors.MISSING_PARAMS.value)
         return to_response_error(Errors.MISSING_PARAMS)
     
     try:
         context_query: ContextQuery = ContextQuery.parse_obj(context_query)
     except Exception as e:
-        print(e)
+        _logger.exception(e)
         return to_response_error(Errors.INVALID_QUERY_PARAMS)
     
     secrets = SSM().load_params(app_secrets_path)
@@ -48,14 +57,15 @@ def handler(event: dict, context):
     neo4j_password = secrets.get('neo4j_password', None)
     pinecone_api_key = secrets.get('pinecone_api_key', None)
     if not (openai_api_key and neo4j_user and neo4j_password and pinecone_api_key):
-        return to_response_error(Errors.MISSING_SECRETS.value)
-    pinecone = Pinecone(api_key=pinecone_api_key, environment='us-east1-gcp')
+        _logger.exception(Errors.MISSING_SECRETS.value)
+        return to_response_error(Errors.MISSING_SECRETS)
+    pinecone = Pinecone(api_key=pinecone_api_key, environment='us-east1-gcp', index_name='beta', log_level=log_level)
     vectordb = VectorDB(db=pinecone)
-    neo4j = Neo4j(uri=neo4j_uri, user=neo4j_user, password=neo4j_password)
+    neo4j = Neo4j(uri=neo4j_uri, user=neo4j_user, password=neo4j_password, log_level=log_level)
     graphdb = GraphDB(db=neo4j)
-    dstruct = DStruct(graphdb=graphdb, vectordb=vectordb, library=library)
-    openai = OpenAI(api_key=openai_api_key)
-    context_agent = ContextAgent(dstruct=dstruct, openai=openai)
+    dstruct = DStruct(graphdb=graphdb, vectordb=vectordb, library=library, log_level=log_level)
+    openai = OpenAI(api_key=openai_api_key, log_level=log_level)
+    context_agent = ContextAgent(dstruct=dstruct, openai=openai, log_level=log_level)
 
     blocks: List[Block] = context_agent.fetch(Request(
         raw=context_query.lingua,
@@ -73,6 +83,7 @@ def handler(event: dict, context):
             integrations=context_query.integrations,
         )
     ))
+    _logger.debug(f'blocks: {blocks}')
     response = { 'next_token': None }
     response_blocks: List[Dict] = []
     if blocks:

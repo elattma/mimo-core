@@ -23,6 +23,9 @@ class VectorDB:
     def _keyed_id(self, id: str, library: str):
         return f'{library}#{id}'
     
+    def _unkeyed_id(self, id: str):
+        return id.split('#')[1]
+    
     def delete(self, ids: List[str], library: str) -> bool:
         return self._db.delete([self._keyed_id(id, library) for id in ids])
 
@@ -45,19 +48,27 @@ class VectorDB:
         
         return self._db.upsert(vectors=vectors)
 
-    def fetch(self, ids: List[str], library: str) -> Dict[str, List[float]]:
+    def fetch(self, ids: List[str], library: str) -> List[Row]:
         fetch_response = self._db.fetch([self._keyed_id(id, library) for id in ids])
-        map: Dict[str, List[float]] = {}
+        rows: List[Row] = []
         for id, vector in fetch_response.items():
-            map[id] = vector.get('values', None)
-        return map
+            metadata = vector.get('metadata', {})
+            rows.append(Row(
+                id=self._unkeyed_id(id),
+                library=library,
+                embedding=vector.get('values', None),
+                date_day=metadata.get('date_day', None),
+                type=metadata.get('type', None),
+                label=metadata.get('label', None)
+            ))
+        return rows
     
     def query(self,
               block_query: BlockQuery,
               library: str,
               top_k: int = 5,
               include_values: bool = False,
-              type: RowType = None) -> Dict[str, List[float]]:
+              type: RowType = None) -> List[Row]:
         if not (block_query and block_query.embedding and library):
             return None
         
@@ -70,15 +81,14 @@ class VectorDB:
             }
 
         if block_query:
-            if block_query.absolute_time:
-                date_day_filter = {}
-                if block_query.absolute_time[0]:
-                    date_day = block_query.absolute_time[0].strftime('%Y-%m-%d')
-                    date_day_filter['$gte'] = date_day
-                if block_query.absolute_time[1]:
-                    date_day = block_query.absolute_time[1].strftime('%Y-%m-%d')
-                    date_day_filter['$lte'] = date_day
-                filter['date_day'] = date_day_filter
+            if block_query.absolute_time_end:
+                filter['date_day'] = {
+                    '$lte': block_query.absolute_time_end
+                }
+            if block_query.absolute_time_start:
+                date_day = filter.get('date_day', {})
+                date_day['$gte'] = block_query.absolute_time_start
+                filter['date_day'] = date_day
             if block_query.labels:
                 filter['id'] = {
                     '$in': block_query.labels
@@ -88,11 +98,19 @@ class VectorDB:
             embedding=block_query.embedding,
             filter=filter,
             top_k=top_k,
-            include_metadata=False,
+            include_metadata=True,
             include_values=include_values
         )
-        map: Dict[str, List[float]] = {}
+        rows: List[Row] = []
         for raw_row in query_response:
-            map[raw_row.get('id')] = raw_row.get('values', None)
-        return map
+            metadata = raw_row.get('metadata', {})
+            rows.append(Row(
+                id=self._unkeyed_id(raw_row['id']),
+                library=library,
+                embedding=raw_row.get('values', None),
+                date_day=metadata.get('date_day', None),
+                type=metadata.get('type', None),
+                label=metadata.get('label', None)
+            ))
+        return rows
     

@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from logging import getLogger
 from typing import Any, Dict, List, Set
 
 from dstruct.graphdb import Node, Relationship
@@ -7,10 +8,13 @@ from dstruct.model import (Block, Chunk, Entity, Property, StructuredProperty,
                            UnstructuredProperty)
 from dstruct.vectordb import Row
 
+_logger = getLogger('DStructDao')
 
 class DStructDao:
-    def __init__(self, library: str):
+    def __init__(self, library: str, log_level: int):
         self._library = library
+
+        _logger.setLevel(log_level)
 
     def _properties_as_listed_dict(self, properties: Set[Property]) -> List[Dict[str, Any]]:
         dictionary_properties = []
@@ -27,14 +31,17 @@ class DStructDao:
                 } for chunk in property.chunks]
             else:
                 raise ValueError(f'Unknown property type: {type(property)}')
-            dictionary_properties.append(str(dictionary))
+            dictionary_properties.append(json.dumps(dictionary))
                 
         return dictionary_properties
     
     def _listed_dict_as_properties(self, listed_dict: List[str]) -> Set[Property]:
         properties = set()
         for dictionary_property_str in listed_dict:
-            dictionary_property = json.loads(dictionary_property_str)
+            try:
+                dictionary_property = json.loads(dictionary_property_str.replace('\'', '"'))
+            except Exception as e:
+                _logger.error(f'[_listed_dict_as_properties] Failed to parse {dictionary_property_str} as JSON: {e}')
             if dictionary_property.get('value'):
                 properties.add(StructuredProperty(
                     key=dictionary_property.get('key'),
@@ -46,6 +53,7 @@ class DStructDao:
                     chunks=[Chunk(
                         order=chunk.get('order'),
                         text=chunk.get('text'),
+                        embedding=None
                     ) for chunk in dictionary_property.get('chunks')],
                 ))
         return properties

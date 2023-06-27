@@ -1,3 +1,4 @@
+from logging import getLogger
 from typing import List
 
 from dstruct.model import Block, Chunk
@@ -5,8 +6,11 @@ from external.openai_ import OpenAI
 
 
 class Embedder:
-    def __init__(self, llm: OpenAI) -> None:
+    def __init__(self, llm: OpenAI, log_level: int) -> None:
         self._llm = llm
+
+        self._logger = getLogger('Embedder')
+        self._logger.setLevel(log_level)
 
     def _summarize(self, text: str) -> str:
         return self._llm.chat_completion(
@@ -42,14 +46,14 @@ class Embedder:
                 temp_chunk_strings.append(stringified_block)
             chunk_strings = temp_chunk_strings
         if len(chunk_strings) != 1:
-            raise Exception("[Embedder._embeddable]: len(chunk_strings) != 1")
+            raise Exception("[_embeddable]: len(chunk_strings) != 1")
         return chunk_strings[0]
 
     def block_with_embeddings(self, block: Block) -> None:
-        print(f'[Embedder.block_with_embeddings] starting with block length: {len(block.properties)}')
         unstructured_properties = block.get_unstructured_properties()
         if not unstructured_properties:
             block.embedding = self._llm.embed(str(block.properties))
+            self._logger.debug(f'[block_with_embeddings] embedded structured block for {block.id}')
             return
 
         chunks = []
@@ -64,3 +68,4 @@ class Embedder:
                 continue
             for chunk in property.chunks:
                 chunk.embedding = self._llm.embed(chunk.text)
+        self._logger.debug(f'[block_with_embeddings] embedded unstructured block for {block.id}')

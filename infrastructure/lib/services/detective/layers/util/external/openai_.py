@@ -1,16 +1,20 @@
 import json
+from logging import getLogger
 from typing import Dict, List, Optional, Union
 
 from backoff import expo, full_jitter, on_exception
 from openai import ChatCompletion, Embedding
 from openai.error import APIConnectionError, RateLimitError
 
+_logger = getLogger('OpenAI')
 
 class OpenAI:
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, log_level: int) -> None:
         self._api_key = api_key
+
+        _logger.setLevel(log_level)
         
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=15, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=15, jitter=full_jitter)
     def embed(self, text: str) -> List[float]:
         if not (self._api_key and text):
             return None
@@ -25,7 +29,7 @@ class OpenAI:
         embedding = first.get('embedding', None) if first else None
         return embedding
     
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=15, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=15, jitter=full_jitter)
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -53,7 +57,7 @@ class OpenAI:
         message: Dict = choices[0].get('message', None) if choices and len(choices) > 0 else None
         return message.get('content', None) if message else None
     
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_tries=15, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=15, jitter=full_jitter)
     def function_call(
         self,
         messages: List[Dict[str, str]],
@@ -84,4 +88,9 @@ class OpenAI:
 
         choices: List[Dict] = response.get('choices', None) if response else None
         arguments: str = choices[0].get('message', {}).get('function_call', {}).get('arguments', None) if choices else None
-        return json.loads(arguments) if arguments else None
+        try:
+            arguments_json: Dict = json.loads(arguments)
+            return arguments_json
+        except json.JSONDecodeError:
+            _logger.error(f'JSONDecodeError: {arguments}')
+            return None

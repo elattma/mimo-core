@@ -1,3 +1,4 @@
+from logging import getLogger
 from typing import Any, Dict, List, Literal, Set, get_args
 
 from dstruct.model import (Block, Entity, StructuredProperty,
@@ -9,14 +10,17 @@ IdentifiableKey = Literal['id', 'email', 'phone', 'address', 'url', 'username']
 class EntityExtractor:
     _possible_identifiables: Set[IdentifiableKey] = set(list(get_args(IdentifiableKey)))
 
-    def __init__(self, llm: OpenAI):
+    def __init__(self, llm: OpenAI, log_level: int):
         self._llm = llm
 
+        self._logger = getLogger('EntityExtractor')
+        self._logger.setLevel(log_level)
+
     def with_defined_entities(self, dictionary: Dict[str, Any], entities: List[Entity]) -> None:
-        print(f'[EntityExtractor.with_defined_entities] starting with dictionary length: {len(dictionary)} and entities length: {len(entities)}')
+        self._logger.debug(f'[with_defined_entities] starting with dictionary length: {len(dictionary)} and entities length: {len(entities)}')
         dictionary_keys = dictionary.keys()
-        print(f'[EntityExtractor.with_defined_entities] dictionary_keys: {dictionary_keys}')
-        print(f'[EntityExtractor.with_defined_entities] possible_identifiables: {self._possible_identifiables}')
+        self._logger.debug(f'[with_defined_entities] dictionary_keys: {dictionary_keys}')
+        self._logger.debug(f'[with_defined_entities] possible_identifiables: {self._possible_identifiables}')
         if not self._possible_identifiables.isdisjoint(dictionary_keys) and 'name' in dictionary_keys:
             identifiables = set()
             for key in self._possible_identifiables:
@@ -26,31 +30,51 @@ class EntityExtractor:
             entities.append(Entity(identifiables=identifiables, name=dictionary.get('name')))
 
         for key, value in dictionary.items():
-            print(f'[EntityExtractor.with_defined_entities] key: {key}, value: {value}, type {type(value)}')
+            self._logger.debug(f'[with_defined_entities] key: {key}, value: {value}, type {type(value)}')
             if isinstance(value, dict):
                 self.with_defined_entities(value, entities)
                 continue
             if key.endswith('_id'):
                 entities.append(Entity(identifiables=set([value]), name=None))
         
-        print(f'[EntityExtractor.with_defined_entities] ending with entities length: {len(entities)}')
+        self._logger.debug(f'[with_defined_entities] ending with entities length: {len(entities)}')
+    
+    def _is_valid_entity_name(self, entity_name: str):
+        if not entity_name:
+            return False
+
+        if entity_name.startswith('http'):
+            return False
+        try:
+            float(entity_name)
+            return False
+        except ValueError:
+            pass
+
+        # starts with a number
+        if entity_name[0].isdigit():
+            return False
+
+        return True
 
     def _llm_find_entities(self, text: str) -> List[Entity]:
-        print(f'[EntityExtractor._llm_find_entities] starting with text length: {len(text)}')
+        self._logger.debug(f'[_llm_find_entities] starting with text length: {len(text)}')
 
         # TODO: fix this prompt and give some few shot examples
         response = self._llm.function_call(
             messages=[{
                 'role': 'system',
                 'content': (
-                    'You are NER-GPT. Given any text, you can extract entities from it. '
-                    'An entity is a person or organization\'s name like an account, a company, a deal, etc. that is mentioned in the text. '
-                    'For example, if I give you the text "John Smith lives in New York", '
+                    'You are an entity extractor. Given any text, you can extract entities from it. '
+                    'Only extract people\'s names or organizational names like an account name, a company name, a deal name, etc. '
+                    'For example, when given the text "John Smith lives in New York", '
                     'you can extract the entities "John Smith" and "New York". '
                     'You can also extract and associate those entities with identifiables if appropriate. '
                     'For example, if "John Smith" has a unique ID of "123" or a username of "jsmith" '
                     'or an email of "john_smith@gmail.com", you can associate those with "John Smith". '
-                    'Names only! Ignore long meaningless strings, addresses, and numbers!'
+                    'You must only find names! Ignore meaningless numbers, strings or addresses! '
+                    'For example, "412 Gold St, Brooklyn, NY 11201" is not a name. For example, "123456789" is not a name. '
+                    'Be very conservative! Only extract names and only if you\'re certain!! '
                 ),                
             }, {
                 'role': 'user',
@@ -104,13 +128,14 @@ class EntityExtractor:
             function_call={'name': 'find_and_infer_entities'},
             model='gpt-3.5-turbo-0613'
         )
-        print(f'[EntityExtractor._llm_find_entities] response: {response}')
+        self._logger.debug(f'[_llm_find_entities] response: {response}')
         entities: List[Entity] = []
         inferred_entities = response.get('inferred_entities', None)
         identifiable_entities = response.get('identifiable_entities', None)
         if inferred_entities:
             for inferred_entity_name in inferred_entities:
-                entities.append(Entity(identifiables=None, name=inferred_entity_name))
+                if self._is_valid_entity_name(inferred_entity_name):
+                    entities.append(Entity(identifiables=None, name=inferred_entity_name))
         if identifiable_entities:
             for identifiable_entity in identifiable_entities:
                 name = identifiable_entity.get('name')
@@ -119,14 +144,14 @@ class EntityExtractor:
                     continue
 
                 identifiable = identifiable_entity.get('identifiable')
-                if name and identifiable_type and identifiable:
+                if self._is_valid_entity_name(name) and identifiable_type and identifiable:
                     entities.append(Entity(identifiables=set([identifiable]), name=name))
-        print(f'[EntityExtractor._llm_find_entities] ending with {len(entities)} entities')
+        self._logger.debug(f'[_llm_find_entities] ending with {len(entities)} entities')
         return entities
 
     # TODO: experiment with spaCy NER and see if it's better than LLM
     def with_llm_reasoned_entities(self, block: Block, entities: List[Entity]) -> None:
-        print(f'[EntityExtractor.with_llm_reasoned_entities] starting with block length: {len(block.properties)} and entities length: {len(entities)}')
+        self._logger.debug(f'[with_llm_reasoned_entities] starting with block length: {len(block.properties)} and entities length: {len(entities)}')
 
         aggregated_text = ''
         for property in block.properties:
@@ -147,7 +172,7 @@ class EntityExtractor:
             reasoned_entities = self._llm_find_entities(aggregated_text)
             entities.extend(reasoned_entities)
 
-        print(f'[EntityExtractor.with_llm_reasoned_entities] ending with entities length: {len(entities)}')
+        self._logger.debug(f'[with_llm_reasoned_entities] ending with entities length: {len(entities)}')
 
     def deduplicate(self, entities: List[Entity]) -> None:
         deduplicated_entities: List[Entity] = []
