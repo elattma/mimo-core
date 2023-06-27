@@ -1,22 +1,24 @@
 import logging
 from math import sqrt
-from typing import Dict, List
+from typing import Dict, List, Literal
 
 import tiktoken
+from context_agent.model import Request
 from dstruct.model import (Block, Chunk, StructuredProperty,
                            UnstructuredProperty)
 
 _logger = logging.getLogger('Reranker')
 
+MeasurementMethod = Literal['euclidean_distance', 'cosine_similarity', 'cohere_ai_ranker']
+
 class Reranker:
-    def __init__(self, encoding_name: str, log_level: int) -> None:
-        self._encoding_name = encoding_name
+    def __init__(self, log_level: int) -> None:
+        _logger.setLevel(log_level)
 
     def _count_tokens(self, string: str, encoding_name: str) -> int:
         encoding = tiktoken.get_encoding(encoding_name)
         tokens = encoding.encode(string)
-        count = len(tokens)
-        return count
+        return len(tokens)
 
     def _count_tokens_chunk(self, chunk: Chunk, encoding_name: str) -> int:
         return self._count_tokens(chunk.text, encoding_name)
@@ -32,7 +34,7 @@ class Reranker:
         return total_tokens
 
     def _euclidean_distance(self, x, y):
-        # TODO: remove once we embed chunks
+        # TODO: remove once we start embedding chunks
         if not x and not y:
             return 1
 
@@ -48,13 +50,27 @@ class Reranker:
         
         blocks.sort(key=lambda block: self._euclidean_distance(block.embedding, focal_embedding))
 
-    def minify(self, request_embedding: List[float], blocks: List[Block], token_limit: int, encoding_name: str = 'cl100k_base', num_blocks: int = None) -> None:
-        print(f'[Weaver.minify] Minifying {len(blocks)} with {token_limit} limit using {encoding_name}')
-        if len(blocks) <= 1:
-            return blocks
-        
-        # sort blocks and chunks by distance to focal embedding
-        self._sort(request_embedding, blocks)
+    def _rank(self, request: Request, blocks: List[Block]) -> List[int]:
+        pass
+
+    def minify(self, request: Request, blocks: List[Block], measurement_method: MeasurementMethod, encoding_name: str) -> None:
+        _logger.debug(f'[minify] {len(blocks)} blocks with token_limit {request.token_limit} and block_limit {request.end.limit}')
+        if not (request and blocks and measurement_method and encoding_name):
+            _logger.error(f'[minify] missing required arguments (request: {request}, blocks: {blocks}, measurement_method: {measurement_method}, encoding_name: {encoding_name})')
+            return
+
+        # sort blocks and chunks
+        if measurement_method == 'cohere_ai_ranker':
+            self._rank(request, blocks)
+        else:
+            self._sort(request.end.embedding, blocks)
+
+        if request.end.limit:
+            blocks = blocks[:request.end.limit]
+            return
+        if not request.token_limit:
+            blocks = blocks[:10]
+            return
 
         # count tokens
         block_to_tokens_map: Dict[str, int] = {}
@@ -63,29 +79,23 @@ class Reranker:
             token_count = self._count_tokens_block(block, encoding_name)
             block_to_tokens_map[block.id] = token_count
             total_token_count += token_count
-
-        if num_blocks is not None:
-            blocks = blocks[:num_blocks]
-            total_token_count = sum(block_to_tokens_map[block.id] for block in blocks)
+        
+        if total_token_count < request.token_limit:
             return
         
-        # fast return if total token count is already below limit
-        if not token_limit or total_token_count < token_limit:
-            return
-
         # pop blocks until total token count is below limit besides the last block
         while len(blocks) > 1:
             last_block = blocks[-1]
             last_block_token_count = block_to_tokens_map[last_block.id]
 
-            if total_token_count - last_block_token_count < token_limit:
+            if total_token_count - last_block_token_count < request.token_limit:
                 break
 
             total_token_count -= last_block_token_count
             blocks.pop()
 
         # pop chunks and even properties from last block until total token count is below limit
-        if total_token_count > token_limit:
+        if total_token_count > request.token_limit:
             last_block = blocks[-1]
 
             # first pop least relevant chunks from properties with #chunks > 1
@@ -111,6 +121,6 @@ class Reranker:
                 property_to_chunks_count[property] -= 1
                 total_token_count -= chunk_to_tokens[chunk.text]
                 chunk_to_property[chunk.text].chunks.remove(chunk)
-                if total_token_count < token_limit:
+                if total_token_count < request.token_limit:
                     break
-        print(f'[Weaver.minify] Minified to {len(blocks)} blocks with {total_token_count} tokens')
+        _logger.debug(f'[minify] minified to {len(blocks)} blocks with {total_token_count} tokens')

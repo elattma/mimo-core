@@ -74,6 +74,9 @@ def main():
 
     for table in tables:
         label = classifier.get_normalized_label(table)
+        if not label:
+            continue
+
         _logger.info(f'[main] table: {table}, label: {label}')
         for block_key in lake.block_iterator(table):
             block_dicts = lake.get_block_csv(block_key)

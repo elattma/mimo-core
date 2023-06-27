@@ -44,7 +44,7 @@ class DStructDao:
                 _logger.error(f'[_listed_dict_as_properties] Failed to parse {dictionary_property_str} as JSON: {e}')
             if dictionary_property.get('value'):
                 properties.add(StructuredProperty(
-                    key=dictionary_property.get('key'),
+                key=dictionary_property.get('key'),
                     value=dictionary_property.get('value'),
                 ))
             elif dictionary_property.get('chunks'):

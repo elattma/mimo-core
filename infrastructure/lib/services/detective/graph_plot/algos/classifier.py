@@ -10,9 +10,9 @@ class Classifier:
     def __init__(self, log_level: int) -> None:
         _logger.setLevel(log_level)
 
-    def get_normalized_label(self, label: str):
+    def get_normalized_label(self, label: str) -> str:
         if not label:
-            raise Exception(f'[S3Lake.get_normalized_label] invalid label: {label}')
+            _logger.exception(f'[get_normalized_label] empty label!')
 
         if label in LABEL_NORMALIZE_MAP:
             return LABEL_NORMALIZE_MAP.get(label)
@@ -21,7 +21,8 @@ class Classifier:
             if supported_label in label:
                 return supported_label
         
-        raise Exception(f'[Normalizer.get_normalized_label] invalid label: {label}')
+        _logger.info(f'[get_normalized_label] invalid label: {label}]')
+        return None
     
     def _is_valid_id(self, id: Any) -> bool:
         if not id:

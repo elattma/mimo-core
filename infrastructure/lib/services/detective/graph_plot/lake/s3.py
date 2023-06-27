@@ -3,21 +3,17 @@ from logging import getLogger
 from typing import Dict, Generator, List
 
 import boto3
-from algos.classifier import Classifier
 
 _logger = getLogger('S3Lake')
 
 class S3Lake:
     _bucket_name: str
     _prefix: str
-    _classifier = None
     _s3_client = None
 
     def __init__(self, bucket_name: str, prefix: str, log_level: int) -> None:
         if not self._s3_client:
             self._s3_client = boto3.client('s3')
-        if not self._classifier:
-            self._classifier = Classifier(log_level=log_level)
         self._bucket_name = bucket_name
         self._prefix = prefix
         _logger.setLevel(log_level)
@@ -32,8 +28,6 @@ class S3Lake:
 
         listed_tables = [common_prefix['Prefix'].split('/')[-2] for common_prefix in response.get('CommonPrefixes', [])]
         _logger.info(f'[get_tables] listed_tables: {listed_tables}')
-        for table in listed_tables:
-            self._classifier.get_normalized_label(table)
 
         return listed_tables
         

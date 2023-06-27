@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List
 
 from context_agent.model import Request
-from context_agent.weaver import Weaver
+from context_agent.reranker import Reranker
 from dstruct.base import DStruct
 from dstruct.model import Block, BlockQuery
 from external.openai_ import OpenAI
@@ -15,14 +15,13 @@ class ContextAgent:
         self,
         dstruct: DStruct,
         openai: OpenAI,
+        reranker: Reranker,
         log_level: int
     ) -> None:
         _logger.setLevel(log_level)
-        _logger.debug('[__init__] starting')
         self._dstruct = dstruct
         self._llm = openai
-        self._weaver = Weaver()
-        _logger.debug('[__init__] completed')
+        self._reranker = reranker
 
     def _with_embedding(self, block_query: BlockQuery, raw_query: str) -> None:
         if block_query.search_method != 'relevant':
@@ -51,7 +50,7 @@ class ContextAgent:
             # TODO: if that doesn't work, we try to formulate a broader query based on our own reasoning of the request and knowledge of our data structure
             return None
         
-        self._weaver.minify(request.end.embedding, blocks, request.token_limit, num_blocks=request.end.limit if request.end.limit else None)
+        self._reranker.minify(request, blocks, 'euclidean_distance', 'cl100k_base')
         return blocks
 
     def _with_llm_reasoning(self, request: Request) -> None:

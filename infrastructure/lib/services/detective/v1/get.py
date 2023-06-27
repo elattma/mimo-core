@@ -5,6 +5,7 @@ from typing import Dict, List
 
 from context_agent.agent import ContextAgent
 from context_agent.model import ContextQuery, Request
+from context_agent.reranker import Reranker
 from dstruct.base import DStruct
 from dstruct.graphdb import GraphDB
 from dstruct.model import (Block, BlockQuery, StructuredProperty,
@@ -16,8 +17,11 @@ from external.pinecone_ import Pinecone
 from shared.response import Errors, to_response_error, to_response_success
 from store.params import SSM
 
-_logger = logging.getLogger('DetectiveContextRetriever')
+_logger = logging.getLogger('ContextRetriever')
 logging.basicConfig(level=logging.INFO)
+log_level = os.getenv('LOG_LEVEL')
+log_level = logging.getLevelName(log_level) if log_level else logging.DEBUG
+_logger.setLevel(log_level)
 
 def handler(event: dict, context):
     global dstruct, _logger
@@ -25,13 +29,9 @@ def handler(event: dict, context):
     stage: str = os.getenv('STAGE')
     neo4j_uri: str = os.getenv('NEO4J_URI')
     app_secrets_path: str = os.getenv('APP_SECRETS_PATH')
-    log_level = os.getenv('LOG_LEVEL')
-    log_level = logging.getLevelName(log_level) if log_level else logging.DEBUG
-    if not (stage and neo4j_uri and app_secrets_path and log_level):
+    if not (stage and neo4j_uri and app_secrets_path):
         _logger.exception(Errors.MISSING_ENV.value)
         return to_response_error(Errors.MISSING_ENV)
-
-    _logger.setLevel(log_level)
 
     body: str = event.get('body', None) if event else None
     body: Dict = json.loads(body) if body else None
@@ -44,7 +44,6 @@ def handler(event: dict, context):
     if not (context_query and library):
         _logger.exception(Errors.MISSING_PARAMS.value)
         return to_response_error(Errors.MISSING_PARAMS)
-    
     try:
         context_query: ContextQuery = ContextQuery.parse_obj(context_query)
     except Exception as e:
@@ -65,7 +64,8 @@ def handler(event: dict, context):
     graphdb = GraphDB(db=neo4j)
     dstruct = DStruct(graphdb=graphdb, vectordb=vectordb, library=library, log_level=log_level)
     openai = OpenAI(api_key=openai_api_key, log_level=log_level)
-    context_agent = ContextAgent(dstruct=dstruct, openai=openai, log_level=log_level)
+    reranker = Reranker(log_level=log_level)
+    context_agent = ContextAgent(dstruct=dstruct, openai=openai, reranker=reranker, log_level=log_level)
 
     blocks: List[Block] = context_agent.fetch(Request(
         raw=context_query.lingua,
@@ -118,8 +118,6 @@ def handler(event: dict, context):
             block_dict['properties'] = properties
             response_blocks.append(block_dict)
     response['blocks'] = response_blocks
-    
     neo4j.close()
-
     return to_response_success(response)
 

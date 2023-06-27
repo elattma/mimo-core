@@ -22,7 +22,9 @@ class Neo4j:
         
     def read(self, query: str, **kwargs):
         with self.driver.session(database='neo4j') as session:
+            _logger.debug(f'[read] query: {query}, kwargs: {kwargs}')
             result = session.execute_read(self._call, query, **kwargs)
+            _logger.debug(f'[read] result: {str(result)}')
             return result
 
     @staticmethod

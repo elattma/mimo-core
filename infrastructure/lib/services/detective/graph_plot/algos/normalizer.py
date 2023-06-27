@@ -4,7 +4,7 @@ from logging import getLogger
 from typing import Any, Dict, List
 
 from dateutil import parser
-from dstruct.model import (Block, Chunk, StructuredProperty,
+from dstruct.model import (Block, Chunk, Property, StructuredProperty,
                            UnstructuredProperty)
 
 _logger = getLogger('Normalizer')
@@ -93,17 +93,9 @@ class Normalizer:
     def _to_structured_property(self, key: str, value: Any) -> StructuredProperty:
         _logger.debug(f'[_to_structured_property] key: {key}, value: {value}')
         return StructuredProperty(key=key, value=value)
-
+    
     def _to_unstructured_property(self, key: str, value: str) -> UnstructuredProperty:
         value_len = len(value)
-        if value_len <= self._max_chunk_len:
-            _logger.debug(f'[_to_unstructured_property] key: {key}, value: {value}')
-            return UnstructuredProperty(key=key, chunks=[Chunk(
-                order=0,
-                text=value,
-                embedding=None
-            )])
-        
         min_chunkable = 1 + (value_len - self._chunk_overlap) // (self._max_chunk_len - self._chunk_overlap)
         chunks: List[Chunk] = []
         for i in range(0, min_chunkable):
@@ -116,6 +108,13 @@ class Normalizer:
             ))
         _logger.debug(f'[_to_unstructured_property] key: {key}, value: {chunks}')
         return UnstructuredProperty(key=key, chunks=chunks)
+
+    def _to_property(self, key: str, value: str) -> Property:
+        if len(value) <= self._max_chunk_len:
+            _logger.debug(f'[_to_property] key: {key}, value: {value}')
+            return StructuredProperty(key=key, value=value)
+        
+        return self._to_unstructured_property(key=key, value=value)        
 
     def sanitize(self, dictionary: Dict[str, Any]) -> None:
         _logger.debug(f'[sanitize] dictionary: {dictionary}')
@@ -135,16 +134,18 @@ class Normalizer:
         properties = set()
         for key, value in dictionary.items():
             property = None
-            if isinstance(value, dict):
+            if isinstance(value, datetime):
+                property = self._to_structured_property(key=key, value=value)
+            elif isinstance(value, dict):
                 flattened = self._get_flattened(value)
-                property = self._to_unstructured_property(key=key, value=flattened)
+                property = self._to_property(key=key, value=flattened)
             elif isinstance(value, (int, float)):
                 property = self._to_structured_property(key=key, value=value)
             elif isinstance(value, list):
                 list_str = str(value)
-                property = self._to_unstructured_property(key=key, value=list_str)
+                property = self._to_property(key=key, value=list_str)
             elif isinstance(value, str):
-                property = self._to_unstructured_property(key=key, value=value)
+                property = self._to_property(key=key, value=value)
             
             if not property:
                 _logger.debug(f'Unknown type: {type(value)} for value: {value}')
@@ -173,6 +174,6 @@ class Normalizer:
                     _logger.debug(f'[find_last_updated_timestamp] Error parsing date: {e}')
                     continue
 
-        # TODO: fallback with LLM call on keys
+        # TODO: fallback with llm call on keys
         _logger.error('[find_last_updated_timestamp] No last updated timestamp found')
         return 0
