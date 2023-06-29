@@ -184,7 +184,7 @@ export class MimoStage extends Stage {
         })
       );
       if (method.name === "GET") {
-        dynamo.mimoTable.grantReadData(method.handler);
+        dynamo.mimoTable.grantReadWriteData(method.handler);
       } else if (method.name === "POST") {
         dynamo.mimoTable.grantWriteData(method.handler);
       } else if (method.name === "DELETE") {
@@ -209,6 +209,12 @@ export class MimoStage extends Stage {
     }
     for (const method of detectiveService.methods) {
       secrets.grantRead(method.handler);
+      method.handler.addToRolePolicy(
+        new PolicyStatement({
+          actions: ["ssm:Describe*", "ssm:Get*", "ssm:List*"],
+          resources: ["*"],
+        })
+      );
     }
     secrets.grantRead(detectiveService.v0GetContextMethod.handler);
 

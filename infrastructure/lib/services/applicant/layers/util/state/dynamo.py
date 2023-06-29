@@ -126,7 +126,7 @@ class LibraryAppItem(ParentChildItem):
         return LibraryAppItem(
             parent=parent,
             app_id=app_id,
-            created_at=created_at,
+            created_at=int(created_at) if created_at else None,
         )
     
 @dataclass
@@ -250,8 +250,8 @@ class ParentChildDB:
         else:
             response_item: Dict = response.get('Item', None) if response else []
             item: ParentChildItem = None
-            parent = response_item.get('parent', None)
-            child = response_item.get('child', None)
+            parent = response_item.get('parent', None) if response_item else None
+            child = response_item.get('child', None) if response_item else None
             if not (parent and child):
                 return None
             if parent.startswith(KeyNamespaces.LIBRARY.value):
@@ -290,7 +290,7 @@ class ParentChildDB:
                 if not (parent and child):
                     continue
                 
-                if child.startswith(KeyNamespaces.LIBRARY.value):
+                if parent.startswith(KeyNamespaces.LIBRARY.value):
                     item = LibraryAppItem.from_dict(response_item)
                 elif child.startswith(KeyNamespaces.APP.value):
                     item = ParentAppItem.from_dict(response_item)

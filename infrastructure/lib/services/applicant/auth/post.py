@@ -48,6 +48,8 @@ def handler(event: dict, context):
     payload = _kms.verify(token=token, key_id=kms_key_id)
     if not payload:
         return to_response_error(Errors.INVALID_TOKEN)
+    if payload.user == user:
+        return to_response_error(Errors.LIBRARY_APP_SAME_USER)
     
     try:
         parent_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=payload.user)

@@ -1,9 +1,9 @@
 import os
 from typing import List
 
+from boto3.dynamodb.conditions import Key
 from shared.response import Errors, to_response_error, to_response_success
-from state.dynamo import (KeyNamespaces, LibraryAppItem, ParentChildDB,
-                          ParentChildItem)
+from state.dynamo import KeyNamespaces, LibraryAppItem, ParentChildDB
 
 _db: ParentChildDB = None
 
@@ -23,6 +23,14 @@ def handler(event: dict, context):
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
 
+    try:
+        item = _db.get(f'{KeyNamespaces.USER.value}{user}', f'{KeyNamespaces.APP.value}{app}')
+        if not item:
+            return to_response_error(Errors.APP_NOT_FOUND)
+    except Exception as e:
+        print(e)
+        return to_response_error(Errors.DB_READ_FAILED)
+    
     library_namespace = KeyNamespaces.LIBRARY.value
     app_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app)
     libraries = []
@@ -39,12 +47,18 @@ def handler(event: dict, context):
     
     user_key = '{namespace}{user}'.format(namespace=KeyNamespaces.USER.value, user=user)
     try:
-        user_libraries: List[ParentChildItem] = _db.query(user_key, library_namespace)
-        for user_library in user_libraries:
-            libraries.append({
-                'id': user_library.get_raw_parent(),
-                'created_at': 0,
-            })
+        response = _db.table.query(KeyConditionExpression=Key('parent').eq(user_key) & Key('child').begins_with(KeyNamespaces.LIBRARY.value))
+        response_items = response.get('Items', None) if response else None
+        if response_items:
+            for response_item in response_items:
+                item_child: str = response_item.get('child', None) if response_item else None
+                if item_child and item_child.startswith(KeyNamespaces.LIBRARY.value):
+                    library_id: str = item_child.replace(KeyNamespaces.LIBRARY.value, '')
+                    created_at: int = response_item.get('created_at', None) if response_item else None
+                    libraries.append({
+                        'id': library_id,
+                        'created_at': int(created_at) if created_at else 0,
+                    })
     except Exception as e:
         print(e)
         return to_response_error(Errors.DB_READ_FAILED)

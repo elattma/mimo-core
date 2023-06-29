@@ -24,6 +24,18 @@ export class DetectiveStack extends Stack {
     super(scope, id, props);
 
     const layers: PythonLayerVersion[] = [];
+    const util = new PythonLayerVersion(
+      this,
+      `${props.stageId}-detective-util-layer`,
+      {
+        entry: path.join(__dirname, `layers/util`),
+        bundling: {
+          assetExcludes: ["**.venv**", "**pycache**"],
+        },
+        compatibleRuntimes: [Runtime.PYTHON_3_9],
+      }
+    );
+    layers.push(util);
     const contextMethod = this.contextMethod(props.stageId, layers);
     this.methods.push(contextMethod);
     this.v0GetContextMethod = this.getV0GetContextMethod(props.stageId, layers);
@@ -45,7 +57,8 @@ export class DetectiveStack extends Stack {
         memorySize: 1024,
         environment: {
           STAGE: stage,
-          GRAPH_DB_URI: "neo4j+s://67eff9a1.databases.neo4j.io",
+          NEO4J_URI: "neo4j+s://67eff9a1.databases.neo4j.io",
+          APP_SECRETS_PATH: `/${stage}/app_secrets`,
         },
         retryAttempts: 0,
         bundling: {

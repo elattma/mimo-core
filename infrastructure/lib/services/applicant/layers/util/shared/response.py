@@ -22,6 +22,7 @@ class Errors(Enum):
     MISSING_UPDATE_PARAMS = 'missing update params'
     SSM_WRITE_FAILED = 'ssm write failed'
     API_KEY_CREATION_FAILED = 'api key creation failed'
+    LIBRARY_APP_SAME_USER = 'library and app both belong to the same user'
 
 def to_response_error(error_message: Errors):
     return {

@@ -590,8 +590,8 @@ export class ConnectorStack extends Stack {
       handler: handler,
       requestParameters: {
         "method.request.querystring.library": true,
-        "method.request.querystring.file_name": true,
-        "method.request.querystring.file_type": true,
+        "method.request.querystring.name": true,
+        "method.request.querystring.type": true,
       },
       responseModelOptions: methodResponseOptions,
       authorizerType: AuthorizerType.APP_OAUTH,

@@ -22,6 +22,14 @@ def handler(event: dict, context):
     if not _db:
         _db = ParentChildDB('mimo-{stage}-pc'.format(stage=stage))
 
+    try:
+        item = _db.get(f'{KeyNamespaces.USER.value}{user}', f'{KeyNamespaces.APP.value}{app}')
+        if not item:
+            return to_response_error(Errors.APP_NOT_FOUND)
+    except Exception as e:
+        print(e)
+        return to_response_error(Errors.DB_READ_FAILED)
+
     parent_key = '{namespace}{library}'.format(namespace=KeyNamespaces.LIBRARY.value, library=library)
     child_key = '{namespace}{app}'.format(namespace=KeyNamespaces.APP.value, app=app)
     try:

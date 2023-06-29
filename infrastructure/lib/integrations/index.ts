@@ -1,5 +1,6 @@
 import googleDocs from "./config/google_docs";
 import googleMail from "./config/google_mail";
+import hubspot from "./config/hubspot";
 import intercomSupport from "./config/intercom_support";
 import microsoftMail from "./config/microsoft_mail";
 import notionDocs from "./config/notion_docs";
@@ -23,4 +24,5 @@ export const INTEGRATION_CONFIGS: IntegrationConfig[] = [
   microsoftMail,
   uploadFile,
   webLink,
+  hubspot,
 ];

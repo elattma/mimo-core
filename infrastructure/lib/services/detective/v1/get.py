@@ -39,7 +39,7 @@ def handler(event: dict, context):
     context_query: str = body.get('query', None) if body else None
     token_limit: str = body.get('token_limit', None) if body else None
     token_limit: int = int(token_limit) if token_limit else None
-    library: str = body.get('library', 'google-oauth2|108573573074253667565') if body else None
+    library: str = body.get('library', None) if body else None
     next_token: str = body.get('next_token', None) if body else None
 
     if not (context_query and library):

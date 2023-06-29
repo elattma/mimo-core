@@ -1,10 +1,12 @@
 import os
+from time import time
 from typing import List
 
-from shared.model import Connection
+from shared.model import Connection, Library
 from shared.response import Errors, to_response_error, to_response_success
 from state.dynamo import (KeyNamespaces, LibraryConnectionItem, ParentChildDB,
                           UserLibraryItem)
+from ulid import ulid
 
 _db: ParentChildDB = None
 
@@ -38,8 +40,15 @@ def handler(event: dict, context):
         child_namespace = KeyNamespaces.LIBRARY.value
         user_library_items: List[UserLibraryItem] = _db.query(parent_key, child_namespace=child_namespace, Limit=100)
         if not user_library_items:
-            return to_response_error(Errors.DB_READ_FAILED)
-        library = user_library_items[0].library.id
+            default_library = Library(id=ulid(), name='Default', created_at=int(time()))
+            try:
+                _db.write([UserLibraryItem(parent=parent_key, library=default_library)])
+            except Exception as e:
+                print(f'error writing default library: {e}')
+                return to_response_error(Errors.DB_WRITE_FAILED)
+            library = default_library.id
+        else:
+            library = user_library_items[0].library.id
     
     response_connections: List[Connection] = []
     if not connection:
