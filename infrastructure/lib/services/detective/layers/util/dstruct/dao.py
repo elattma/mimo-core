@@ -39,23 +39,23 @@ class DStructDao:
         properties = set()
         for dictionary_property_str in listed_dict:
             try:
-                dictionary_property = json.loads(dictionary_property_str.replace('\'', '"'))
-            except Exception as e:
-                _logger.error(f'[_listed_dict_as_properties] Failed to parse {dictionary_property_str} as JSON: {e}')
-            if dictionary_property.get('value'):
-                properties.add(StructuredProperty(
-                key=dictionary_property.get('key'),
-                    value=dictionary_property.get('value'),
-                ))
-            elif dictionary_property.get('chunks'):
-                properties.add(UnstructuredProperty(
+                dictionary_property = json.loads(dictionary_property_str)
+                if dictionary_property.get('value'):
+                    properties.add(StructuredProperty(
                     key=dictionary_property.get('key'),
-                    chunks=[Chunk(
-                        order=chunk.get('order'),
-                        text=chunk.get('text'),
-                        embedding=None
-                    ) for chunk in dictionary_property.get('chunks')],
-                ))
+                        value=dictionary_property.get('value'),
+                    ))
+                elif dictionary_property.get('chunks'):
+                    properties.add(UnstructuredProperty(
+                        key=dictionary_property.get('key'),
+                        chunks=[Chunk(
+                            order=chunk.get('order'),
+                            text=chunk.get('text'),
+                            embedding=None
+                        ) for chunk in dictionary_property.get('chunks')],
+                    ))
+            except Exception as e:
+                _logger.error(f'[_listed_dict_as_properties] failed to parse {dictionary_property_str} as JSON: {e}')
         return properties
 
     def block_to_node(self, block: Block, has_block_ids: Set[str] = None) -> Node:
@@ -150,22 +150,3 @@ class DStructDao:
             type='block',
             label=block.label
         )
-
-    def block_chunks_to_rows(self, block: Block) -> List[Row]:
-        unstructured_properties = block.get_unstructured_properties()
-        if not unstructured_properties:
-            return []
-        
-        rows = []
-        date_day = self._ts_to_date_day(block.last_updated_timestamp)
-        for unstructured in unstructured_properties:
-            if len(unstructured.chunks) == 1:
-                continue
-            rows.extend([Row(
-                embedding=chunk.embedding,
-                library=self._library,
-                date_day=date_day,
-                type='chunk',
-                label=block.label
-            ) for chunk in unstructured.chunks])
-        return rows

@@ -11,15 +11,15 @@ class Cohere:
 
         _logger.setLevel(log_level)
 
-    def rank(self, query: str, documents: List[str], top_n: int = None, return_documents: bool = False, model: str = 'rerank-english-v2.0') -> List[float]:
+    def rank(self, query: str, documents: List[str], top_n: int = None, model: str = 'rerank-english-v2.0') -> List[float]:
         response = self._client.rerank(
             model=model,
             query=query,
             documents=documents,
-            return_documents=return_documents,
             top_n=top_n
         )
         _logger.debug(f'[rank] response: {response}')
-        results = response.get('results', []) if response else []
-        in_order_results = sorted(results, key=lambda result: result.get('index'))
-        return [result.get('relevance_score') for result in in_order_results]
+        results = response.results if response else None
+        if results:
+            results.sort(key=lambda result: result.index)
+        return [result.relevance_score for result in results] if results else []

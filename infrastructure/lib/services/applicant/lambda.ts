@@ -528,6 +528,7 @@ export class ApplicantStack extends Stack {
       memorySize: 1024,
       environment: {
         WAITLIST_TABLE: `mimo-${stage}-waitlist`,
+        STAGE: stage,
       },
       retryAttempts: 0,
       bundling: {

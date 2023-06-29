@@ -14,7 +14,7 @@ class OpenAI:
 
         _logger.setLevel(log_level)
         
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=15, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=70, jitter=full_jitter)
     def embed(self, text: str) -> List[float]:
         if not (self._api_key and text):
             return None
@@ -29,7 +29,7 @@ class OpenAI:
         embedding = first.get('embedding', None) if first else None
         return embedding
     
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=15, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=70, jitter=full_jitter)
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -57,7 +57,7 @@ class OpenAI:
         message: Dict = choices[0].get('message', None) if choices and len(choices) > 0 else None
         return message.get('content', None) if message else None
     
-    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=15, jitter=full_jitter)
+    @on_exception(expo, (RateLimitError, APIConnectionError), max_time=70, jitter=full_jitter)
     def function_call(
         self,
         messages: List[Dict[str, str]],

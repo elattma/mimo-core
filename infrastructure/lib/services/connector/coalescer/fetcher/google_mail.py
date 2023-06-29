@@ -32,7 +32,7 @@ class GoogleMail(Fetcher):
                 if not thread_id:
                     continue
                 yield StreamData(
-                    name='thread',
+                    name='email_thread',
                     id=thread_id,
                 )
                 if limit:
@@ -105,16 +105,15 @@ class GoogleMail(Fetcher):
 
             author = self._get_author(headers)
             title = self._get_title(headers)
-            recipients = self._get_recipients(headers)
+            recipients = self._get_recipients(headers) 
             body = self._get_body(payload.get('parts', None) if payload else None)
 
             stream.add_structured_data_as_list('author', author)
             stream.add_unstructured_data('title', title)
             stream.add_structured_data_as_list('recipients', recipients)
             stream.add_unstructured_data('body', body)
-        stream.add_structured_data('thread_id', thread_id)
         stream.add_structured_data('last_updated_timestamp', last_updated_timestamp)
 
     def fetch(self, stream: StreamData) -> None:
-        if stream._name == 'thread':
+        if stream._name == 'email_thread':
             self.fetch_thread(stream)

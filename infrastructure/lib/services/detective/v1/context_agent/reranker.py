@@ -35,8 +35,7 @@ class Reranker:
         return total_tokens
 
     def _euclidean_distance(self, x, y):
-        # TODO: remove once we start embedding chunks
-        if not x and not y:
+        if not (x and y):
             return 1.
 
         return sqrt(sum([(x[i] - y[i]) ** 2 for i in range(len(x))]))
@@ -83,7 +82,6 @@ class Reranker:
 
         if request.end.limit:
             blocks = blocks[:request.end.limit]
-            return
         if not request.token_limit:
             blocks = blocks[:10]
             return
@@ -120,7 +118,7 @@ class Reranker:
             chunk_to_property: Dict[str, UnstructuredProperty] = {}
             chunk_to_tokens: Dict[str, int] = {}
             property_to_chunks_count: Dict[UnstructuredProperty, int] = {}
-            for property in last_block.properties:
+            for property in blocks[-1].properties:
                 if not (isinstance(property, UnstructuredProperty) and len(property.chunks) > 1):
                     continue
                 all_chunks.extend(property.chunks)

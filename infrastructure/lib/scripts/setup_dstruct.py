@@ -25,7 +25,7 @@ def _get_constraints() -> List[str]:
     return [
         'CREATE CONSTRAINT block_uniqueness IF NOT EXISTS FOR (b:Block) REQUIRE (b.library, b.id) IS NODE KEY; ',
         'CREATE CONSTRAINT entity_uniqueness IF NOT EXISTS FOR (e:Entity) REQUIRE (e.library, e.id) IS NODE KEY; ',
-        'CREATE RANGE INDEX entity_value_index IF NOT EXISTS FOR (e:Entity) ON (e.library, e.value); '
+        'CREATE RANGE INDEX entity_id_index IF NOT EXISTS FOR (e:Entity) ON (e.library, e.id); '
     ]
 
 def setup_neo4j():

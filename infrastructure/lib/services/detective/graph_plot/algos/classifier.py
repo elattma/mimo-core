@@ -2,7 +2,8 @@ from logging import getLogger
 from typing import Any, Dict
 
 from lake.label_config import LABEL_NORMALIZE_MAP
-from store.block_state import SUPPORTED_BLOCK_LABELS
+from store.block_state import (MESSAGE_BLOCK_LABEL, MESSAGE_THREAD_BLOCK_LABEL,
+                               SUPPORTED_BLOCK_LABELS)
 
 _logger = getLogger('Classifier')
 
@@ -33,14 +34,24 @@ class Classifier:
         
         return False
 
-    def find_id(self, raw_dict: Dict) -> str:
+    def find_id(self, raw_dict: Dict, label: str = None) -> str:
         if not raw_dict:
             return None
         
         id = raw_dict.pop("id", None)
-        # TODO: add other validations
-        # TODO: fuzzy match on other fields if applicable, maybe make this configurable
         if self._is_valid_id(id):
             return id
+        
+        # TODO: add other validations
+        # TODO: fuzzy match on other fields if applicable, maybe make this configurable
+        if label:
+            if label == MESSAGE_THREAD_BLOCK_LABEL:
+                id = raw_dict.pop("thread_ts", None)
+                if self._is_valid_id(id):
+                    return id
+            elif label == MESSAGE_BLOCK_LABEL:
+                id = raw_dict.pop("ts", None)
+                if self._is_valid_id(id):
+                    return id
         
         return None

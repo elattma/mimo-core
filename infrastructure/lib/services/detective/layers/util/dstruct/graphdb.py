@@ -116,6 +116,22 @@ class GraphDB:
         records = self._db.read(query=self._query_ids_cypher(), ids=ids, library=library)
         return [self._record_to_node(record) for record in records] if records else []
     
+    def get_labels(self, library: str) -> List[str]:
+        if not library:
+            raise ValueError(f'[GraphDB.get_labels] library {library} must not be empty')
+
+        query = (
+            'MATCH (b: Block {library: $library}) '
+            'RETURN DISTINCT b.label as label '
+        )
+
+        records = self._db.read(query, library=library)
+        labels: List[str] = []
+        for record in records:
+            if record['label']:
+                labels.append(record['label'])
+        return labels
+
     def _node_index_match(self, name: str):
         return ', '.join([f'{key}: {name}.{key}' for key in Node.get_index_keys()])
 

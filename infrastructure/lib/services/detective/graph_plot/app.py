@@ -68,8 +68,9 @@ def main():
     entity_extractor = EntityExtractor(llm=llm, log_level=log_level)
     embedder = Embedder(llm=llm, log_level=log_level)
     
-    lake = S3Lake(lake_bucket_name, prefix=f'{library}/{connection}/', log_level=log_level)
+    lake = S3Lake(lake_bucket_name, prefix=f'v1/{library}/{connection}/', log_level=log_level)
     tables = lake.get_tables()
+    max_sequential_failures = 200
 
     for table in tables:
         label = classifier.get_normalized_label(table)
@@ -95,6 +96,14 @@ def main():
 
             for future in as_completed(futures):
                 result = future.result()
+                if not result:
+                    max_sequential_failures -= 1
+                    if max_sequential_failures <= 0:
+                        dstruct.clean_adjacent_blocks(connection=connection)
+                        neo4j.close()
+                        raise Exception(f'[main] max_sequential_failures reached!')
+                else:
+                    max_sequential_failures = 200
                 _logger.info(f'[main] result: {result}')
 
     # TODO: for each root block, find all adjacent blocks. for each cluster of data summarize and embed into the vector db
@@ -111,9 +120,8 @@ def ingest_block(dstruct: DStruct,
                  connection: str,
                  block_dict: Dict[str, Any]) -> bool:
     global _logger
-    block_id = None
     try:
-        block_id = classifier.find_id(block_dict)
+        block_id = classifier.find_id(raw_dict=block_dict, label=label)
         if not block_id:
             _logger.error(f'[ingest_block] error invalid block_id for block: {block_dict}')
             return False
@@ -147,8 +155,8 @@ def ingest_block(dstruct: DStruct,
         dstruct.merge(block=dstruct_block, entities=entities, adjacent_block_ids=adjacent_block_ids)
         return True
     except Exception as e:
-        _logger.error(f'[ingest_block] error: {e} for block: {block_id}')
-        traceback.print_exc()
+        _logger.error(f'[ingest_block] error: {str(e)}')
+        _logger.error(traceback.format_exc())
         return False
 
 if __name__ == '__main__':

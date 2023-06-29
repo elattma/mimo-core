@@ -26,28 +26,20 @@ class Embedder:
             }, {
                 'role': 'user',
                 'content': text
-            }]
+            }],
+            max_tokens=800,
         )
 
     def _embeddable(self, chunks: List[Chunk]) -> str:
-        chunk_strings: List[str] = ['']
-        for chunk in chunks:
-            if len(chunk_strings[-1]) + len(chunk.text) > 2000:
-                chunk_strings.append('')
-            chunk_strings[-1] += chunk.text
+        embeddable = '\n\n'.join([chunk.text for chunk in chunks])
 
-        MAX_TREE_BLOCKS_CHILDREN = 10
-        while len(chunk_strings) > 1:
-            chunk_strings_len = len(chunk_strings)
-            temp_chunk_strings = []
-            for i in range(0, chunk_strings_len, MAX_TREE_BLOCKS_CHILDREN):
-                chunk_strings_input = '\n\n'.join(chunk_strings[i : min(i + MAX_TREE_BLOCKS_CHILDREN, chunk_strings_len)])
-                stringified_block = self._summarize(chunk_strings_input)
-                temp_chunk_strings.append(stringified_block)
-            chunk_strings = temp_chunk_strings
-        if len(chunk_strings) != 1:
-            raise Exception("[_embeddable]: len(chunk_strings) != 1")
-        return chunk_strings[0]
+        while len(embeddable) > 4000:
+            to_summarize = embeddable[:4000]
+            embeddable = embeddable[4000:]
+            summarized = self._summarize(to_summarize)
+            embeddable = embeddable + '\n\n' + summarized
+
+        return embeddable
 
     def block_with_embeddings(self, block: Block) -> None:
         unstructured_properties = block.get_unstructured_properties()

@@ -8,7 +8,7 @@ import {
   PythonFunction,
   PythonLayerVersion,
 } from "@aws-cdk/aws-lambda-python-alpha";
-import { Duration, Size, Stack, StackProps } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, Size, Stack, StackProps } from "aws-cdk-lib";
 import {
   IRestApi,
   JsonSchemaType,
@@ -108,6 +108,7 @@ export class ConnectorStack extends Stack {
         resources: ["*"],
       })
     );
+    this.definition.applyRemovalPolicy(RemovalPolicy.RETAIN);
 
     const util = new PythonLayerVersion(this, `${props.stageId}-util-layer`, {
       entry: path.join(__dirname, `layers/util`),
@@ -140,6 +141,7 @@ export class ConnectorStack extends Stack {
         resources: ["*"],
       })
     );
+    this.graphPlotDefinition.applyRemovalPolicy(RemovalPolicy.RETAIN);
 
     const syncSfn = this.getSyncSfn(
       props.stageId,
@@ -398,7 +400,7 @@ export class ConnectorStack extends Stack {
 
   getWaitForAirbyte = (api: IRestApi, table: ITable): IChainable => {
     const checkAirbyte = new Wait(this, "Wait for Airbyte", {
-      time: WaitTime.duration(Duration.minutes(2)),
+      time: WaitTime.duration(Duration.minutes(10)),
     }).next(
       new CallApiGatewayRestApiEndpoint(this, "Check Airbyte Job status", {
         api: api,
@@ -410,6 +412,19 @@ export class ConnectorStack extends Stack {
         }),
         resultPath: "$.checkAirbyteResult",
       })
+        .addRetry({
+          maxAttempts: 10,
+          interval: Duration.seconds(10),
+          backoffRate: 1.5,
+          errors: ["States.ALL"],
+        })
+        .addCatch(
+          this.getUpdateStatus(
+            table,
+            "airbyte-replication-release-lock",
+            "FAILED"
+          ).next(new Fail(this, "Airbyte Sync Failed"))
+        )
     );
 
     return checkAirbyte.next(

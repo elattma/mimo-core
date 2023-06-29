@@ -9,6 +9,9 @@ from dstruct.model import (Block, Chunk, Property, StructuredProperty,
 
 _logger = getLogger('Normalizer')
 
+now_datetime = datetime.now()
+ten_years_ago_datetime = now_datetime.replace(year=now_datetime.year - 10)
+
 # TODO: experiment with using LLMs to normalize text or determine whether a property is structured
 # TODO: normalize any timestamp or datetime object formats
 class Normalizer:
@@ -63,7 +66,8 @@ class Normalizer:
             pass
 
         try:  # datetime
-            raw_dict[key] = parser.parse(value)
+            date_time = parser.parse(value)
+            raw_dict[key] = int(date_time.timestamp())
             return
         except ValueError:
             pass
@@ -160,20 +164,22 @@ class Normalizer:
         potential_keys: List[str] = []
         for key in dictionary_keys:
             key_normal = key.lower()
-            if isinstance(dictionary[key], datetime):
+            if isinstance(dictionary[key], int):
                 if 'time' in key_normal and ('last' in key_normal or 'modified' in key_normal):
                     potential_keys.append(key)
 
-        if potential_keys:
-            for potential_key in potential_keys:
-                try:
-                    dictionary_value: datetime = dictionary[potential_key]
-                    timestamp: int = int(dictionary_value.timestamp())
-                    return timestamp
-                except Exception as e:
-                    _logger.debug(f'[find_last_updated_timestamp] Error parsing date: {e}')
+        for potential_key in potential_keys:
+            try:
+                timestamp: int = dictionary[potential_key]
+                date_time = datetime.fromtimestamp(timestamp)
+                if not (now_datetime > date_time > ten_years_ago_datetime):
+                    _logger.debug(f'[find_last_updated_ts] Invalid date: {date_time} for key: {potential_key}')
                     continue
+                return timestamp
+            except Exception as e:
+                _logger.debug(f'[find_last_updated_ts] Error parsing date: {e}')
+                continue
 
         # TODO: fallback with llm call on keys
-        _logger.error('[find_last_updated_timestamp] No last updated timestamp found')
+        _logger.error('[find_last_updated_ts] No last updated timestamp found')
         return 0

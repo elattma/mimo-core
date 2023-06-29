@@ -85,10 +85,11 @@ class BlockQuery(BaseModel):
     ))
     # TODO: add the exact relation between these entities and the blocks
     entities: Optional[List[str]] = Field(description=(
-        'A list of names of people. For example, '
+        'A list of names of people or organizational things. For example, '
         'if "The subjects of my last 5 emails from Troy Wilkerson", '
-        'the entities should be ["Troy Wilkerson"]. You must be absolutely '
-        'certain that they are a person!'
+        'the entities should be ["Troy Wilkerson"]. If given a question like "'
+        'tell me more about Truhlar and Truhlar", the entities should be '
+        '["Truhlar and Truhlar"]. '
     ))
     absolute_time_start: Optional[str] = Field(description=(
         'Datetime representing the beginning of the requested time range. '
@@ -109,7 +110,8 @@ class BlockQuery(BaseModel):
     ))
     limit: Optional[int] = Field(description=(
         'Number of blocks to get. For example, if "most recent", '
-        'then it should be 1. If "3 emails" it should be 3.'
+        'then it should be 1. If "3 emails" it should be 3. '
+        'This must be explicitly mentioned!'
     ))
     offset: Optional[int] = Field(description=(
         'Number of blocks to skip. For example, if "most recent", '
@@ -120,8 +122,8 @@ class BlockQuery(BaseModel):
         'For example, when the user refers to "emails related to", the list of labels should be '
         '["email_thread"]. When the user refers to "notes about", the labels should be '
         '["document", "note", "website"]. When you are not absolutely certain, include '
-        'any labels that could possibly be related. Be very leenient! If you\'re not sure, '
-        'do not guess!'
+        'any labels that could possibly be related. Be very lenient! If you\'re not sure, '
+        'do not guess and you must leave this field empty!'
     ))
 
     ids: Optional[List[str]]

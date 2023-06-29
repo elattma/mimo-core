@@ -50,15 +50,16 @@ def main():
         auth_strategy=auth_strategy, 
         config=item.connection.config,
         last_ingested_at=0, 
-        limit=1
+        limit=1000
     )
     s3_lake = S3Lake(
         bucket_name=lake_bucket_name,
-        prefix=f'{library}/{connection}'
+        prefix=f'v1/{library}/{connection}'
     )
 
     for stream in fetcher.discover():
         fetcher.fetch(stream)
+        stream.add_structured_data('id', stream._id)
         stream._name = f'{fetcher._INTEGRATION}-{stream._name}'
         s3_lake.add(stream)
 

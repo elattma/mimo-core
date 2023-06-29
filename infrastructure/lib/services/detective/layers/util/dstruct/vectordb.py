@@ -90,7 +90,7 @@ class VectorDB:
                 date_day['$gte'] = block_query.absolute_time_start
                 filter['date_day'] = date_day
             if block_query.labels:
-                filter['id'] = {
+                filter['label'] = {
                     '$in': block_query.labels
                 }
 

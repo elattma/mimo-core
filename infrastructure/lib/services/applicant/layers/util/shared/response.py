@@ -20,6 +20,8 @@ class Errors(Enum):
     TOKEN_EXPIRED = 'token expired'
     GENERATE_SECRET_KEY_FAILED = 'generate secret key failed'
     MISSING_UPDATE_PARAMS = 'missing update params'
+    SSM_WRITE_FAILED = 'ssm write failed'
+    API_KEY_CREATION_FAILED = 'api key creation failed'
 
 def to_response_error(error_message: Errors):
     return {

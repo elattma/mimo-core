@@ -123,7 +123,8 @@ class EntityExtractor:
                 }
             }],
             function_call={'name': 'find_and_infer_entities'},
-            model='gpt-3.5-turbo-0613'
+            model='gpt-3.5-turbo-0613',
+            max_tokens=3000
         )
         self._logger.debug(f'[_llm_find_entities] response: {response}')
         entities: List[Entity] = []
@@ -160,14 +161,16 @@ class EntityExtractor:
                 aggregated_text += f'{property.value}'
             aggregated_text += '\n'
 
-            if len(aggregated_text) > 6000:
-                reasoned_entities = self._llm_find_entities(aggregated_text)
+            if len(aggregated_text) > 1000:
+                reasoned_entities = self._llm_find_entities(aggregated_text[0:1000])
                 entities.extend(reasoned_entities)
-                aggregated_text = ''
+                aggregated_text = aggregated_text[1000:]
         
         if aggregated_text:
-            reasoned_entities = self._llm_find_entities(aggregated_text)
-            entities.extend(reasoned_entities)
+            for start in range(0, len(aggregated_text), 1000):
+                text = aggregated_text[start:min(start+1000, len(aggregated_text))]
+                reasoned_entities = self._llm_find_entities(text)
+                entities.extend(reasoned_entities)
 
         self._logger.debug(f'[with_llm_reasoned_entities] ending with entities length: {len(entities)}')
 

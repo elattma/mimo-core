@@ -11,6 +11,7 @@ from dstruct.graphdb import GraphDB
 from dstruct.model import (Block, BlockQuery, StructuredProperty,
                            UnstructuredProperty)
 from dstruct.vectordb import VectorDB
+from external.cohere_ import Cohere
 from external.neo4j_ import Neo4j
 from external.openai_ import OpenAI
 from external.pinecone_ import Pinecone
@@ -52,10 +53,11 @@ def handler(event: dict, context):
     
     secrets = SSM().load_params(app_secrets_path)
     openai_api_key = secrets.get('openai_api_key', None)
+    cohere_api_key = secrets.get('cohere_api_key', None)
     neo4j_user = secrets.get('neo4j_user', None)
     neo4j_password = secrets.get('neo4j_password', None)
     pinecone_api_key = secrets.get('pinecone_api_key', None)
-    if not (openai_api_key and neo4j_user and neo4j_password and pinecone_api_key):
+    if not (openai_api_key and cohere_api_key and neo4j_user and neo4j_password and pinecone_api_key):
         _logger.exception(Errors.MISSING_SECRETS.value)
         return to_response_error(Errors.MISSING_SECRETS)
     pinecone = Pinecone(api_key=pinecone_api_key, environment='us-east1-gcp', index_name='beta', log_level=log_level)
@@ -64,7 +66,8 @@ def handler(event: dict, context):
     graphdb = GraphDB(db=neo4j)
     dstruct = DStruct(graphdb=graphdb, vectordb=vectordb, library=library, log_level=log_level)
     openai = OpenAI(api_key=openai_api_key, log_level=log_level)
-    reranker = Reranker(log_level=log_level)
+    cohere = Cohere(api_key=cohere_api_key, log_level=log_level)
+    reranker = Reranker(cohere=cohere, log_level=log_level)
     context_agent = ContextAgent(dstruct=dstruct, openai=openai, reranker=reranker, log_level=log_level)
 
     blocks: List[Block] = context_agent.fetch(Request(
@@ -83,7 +86,7 @@ def handler(event: dict, context):
             integrations=context_query.integrations,
         )
     ))
-    _logger.debug(f'blocks: {blocks}')
+    _logger.debug(f'[main] blocks fetched: {str([block.id for block in blocks])}')
     response = { 'next_token': None }
     response_blocks: List[Dict] = []
     if blocks:

@@ -20,11 +20,10 @@ class DStruct:
     def merge(self, block: Block, entities: List[Entity] = None, adjacent_block_ids: Set[str] = None) -> None:
         graph_node = self._dao.block_to_node(block, adjacent_block_ids)
         block_row = self._dao.block_to_row(block)
-        block_chunk_rows = self._dao.block_chunks_to_rows(block)
         entity_nodes = [self._dao.entity_to_node(entity, [block.id]) for entity in entities] if entities else []
 
         self._graphdb.add_blocks([graph_node])
-        self._vectordb.upsert([block_row] + block_chunk_rows if block_chunk_rows else [block_row])
+        self._vectordb.upsert([block_row])
         if entity_nodes:
             self._graphdb.add_entities(entity_nodes)
         _logger.debug(f'[merge] merged block {str(block.id)} with {len(block.properties)} properties entities {str(entities)} adjacent_block_ids {str(adjacent_block_ids)}')
@@ -50,10 +49,13 @@ class DStruct:
             node_block = self._dao.node_to_block(node)
             id_to_block[node_block.id].properties = node_block.properties
 
+    def _is_exact_query(self, block_query: BlockQuery) -> bool:
+        return block_query and block_query.search_method == 'exact' and block_query.entities
+
     def query(self, end: BlockQuery, start: BlockQuery = None, with_data = True, with_embeddings = True) -> List[Block]:
         blocks: List[Block] = []
-        if end.search_method == 'exact':
-            if not start or start.search_method == 'exact':
+        if self._is_exact_query(end):
+            if not start or self._is_exact_query:
                 _logger.debug(f'[query] exact query {start} -> {end}')
                 nodes = self._graphdb.query_blocks(end=end, library=self._library, start=start)
                 _logger.debug(f'[query] found nodes in neo4j {str(nodes)}')
@@ -61,7 +63,7 @@ class DStruct:
                     return None
 
                 blocks = [self._dao.node_to_block(node) for node in nodes]
-            elif start.search_method == 'relevant':
+            else:
                 _logger.debug(f'[query] relevant then exact query {start} -> {end}')
                 rows: List[Row] = self._vectordb.query(
                     block_query=start,
@@ -81,7 +83,7 @@ class DStruct:
                     return None
                 
                 blocks = [self._dao.node_to_block(node) for node in nodes]
-        elif end.search_method == 'relevant':
+        else:
             if not start:
                 _logger.debug(f'[query] relevant query {end}')
                 rows = self._vectordb.query(
@@ -98,14 +100,14 @@ class DStruct:
                 if not nodes:
                     return None
                 blocks = [self._dao.node_to_block(node) for node in nodes]
-            elif start.search_method == 'exact':
+            elif self._is_exact_query(start):
                 _logger.debug(f'[query] exact then relevant query {start} -> {end}')
                 nodes = self._graphdb.query_blocks(end=end, library=self._library, start=start)
                 if not nodes:
                     return None
                 blocks = [self._dao.node_to_block(node) for node in nodes]
                 # TODO: rerank with cohere ai?
-            elif start.search_method == 'relevant':
+            else:
                 _logger.debug(f'[query] relevant then relevant query {start} -> {end}')
                 rows: Dict[str, List[float]] = self._vectordb.query(
                     block_query=start,
@@ -131,9 +133,11 @@ class DStruct:
                 self._blocks_with_data(blocks)
             if with_embeddings and not blocks[0].embedding:
                 self._blocks_with_embeddings(blocks)
-            _logger.debug(f'[query] found blocks {str(blocks)}')
+            _logger.debug(f'[query] found blocks {str([block.id for block in blocks])}')
             return blocks
         
         _logger.debug(f'[query] no blocks found')
         return None
   
+    def get_labels(self) -> List[str]:
+        return self._graphdb.get_labels(library=self._library)

@@ -1,10 +1,19 @@
-from csv import DictReader
+import csv
+import sys
 from logging import getLogger
 from typing import Dict, Generator, List
 
 import boto3
 
 _logger = getLogger('S3Lake')
+
+max_int = sys.maxsize
+while True:
+    try:
+        csv.field_size_limit(max_int)
+        break
+    except OverflowError:
+        max_int = int(max_int / 10)
 
 class S3Lake:
     _bucket_name: str
@@ -65,7 +74,7 @@ class S3Lake:
         content = self._get_block(block_key)
         dict_list = []
 
-        csv_reader = DictReader(content.splitlines())
+        csv_reader = csv.DictReader(content.splitlines())
         for row in csv_reader:
             dict_list.append(row)
         return dict_list

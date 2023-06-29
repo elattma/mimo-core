@@ -24,8 +24,6 @@ class ContextAgent:
         self._reranker = reranker
 
     def _with_embedding(self, block_query: BlockQuery, raw_query: str) -> None:
-        if block_query.search_method != 'relevant':
-            return
         block_query.embedding = self._llm.embed(block_query.concepts if block_query.concepts else raw_query)
     
     def fetch(self, request: Request) -> List[Block]:
@@ -39,12 +37,16 @@ class ContextAgent:
             self._with_embedding(request.start, request.raw)
         self._with_embedding(request.end, request.raw)
 
-        # first we try the raw query and see if that yields any results
         blocks: List[Block] = self._dstruct.query(request.end, request.start, with_embeddings=True, with_data=True)
 
         if not blocks:
             _logger.debug(f'[fetch] No results for raw query {request.end} -> {request.start}')
             _logger.debug(f'[fetch] Trying to formulate a broader query... naive fallback')
+
+            embedding = request.end.embedding
+            if not embedding:
+                _logger.debug(f'[fetch] no embedding found in end. embedding now...')
+                embedding = self._llm.embed(request.end.concepts if request.end.concepts else request.raw)
 
             fallback_query = BlockQuery(
                 search_method='relevant',
@@ -55,17 +57,16 @@ class ContextAgent:
                 relative_time=None,
                 limit=request.end.limit if request.end.limit else 5,
                 offset=request.end.offset if request.end.offset else 0,
-                labels=request.end.labels if request.end.labels else None,
+                labels=None,
                 ids=request.end.ids if request.end.ids else None,
                 integrations=request.end.integrations,
-                embedding=request.end.embedding,
+                embedding=embedding,
             )
 
             blocks = self._dstruct.query(fallback_query)
             _logger.debug(f'[fetch] Fallback query {fallback_query} yielded {len(blocks)} results')
-            return None
         
-        self._reranker.minify(request, blocks, 'euclidean_distance', 'cl100k_base')
+        self._reranker.minify(request, blocks, 'cl100k_base')
         return blocks
 
     def _with_llm_reasoning(self, request: Request) -> None:
@@ -75,7 +76,12 @@ class ContextAgent:
         block_query_properties.pop('ids')
         block_query_properties.pop('integrations')
         block_query_properties.pop('embedding')
-        block_query_properties['labels']['items']['enum'] = list(SUPPORTED_BLOCK_LABELS) # TODO: fill this in somehow, dynamically or statically from config
+
+        # get list of supported labels from neo4j
+        labels: List[str] = self._dstruct.get_labels()
+        _logger.debug(f'[_with_llm_reasoning] labels = {labels}')
+
+        block_query_properties['labels']['items']['enum'] = labels
         _logger.debug(f'[_with_llm_reasoning] block_query_properties = {block_query_properties}')
 
         specified_end_properties: Dict[str, Dict] = {}
@@ -143,4 +149,3 @@ class ContextAgent:
                     continue
                 setattr(request.end, key, value)
         _logger.debug(f'[_with_llm_reasoning] decorated with language reasoning for request: {request}')
-    

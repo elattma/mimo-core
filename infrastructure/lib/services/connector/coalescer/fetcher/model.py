@@ -32,7 +32,6 @@ class StreamData:
         else:
             self._data[key] = value
         
-
     def add_structured_data(self, key: str, value: Any):
         if not (key and value):
             print(f'[add_structured_data] kv missing..')

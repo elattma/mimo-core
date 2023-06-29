@@ -281,6 +281,20 @@ export class MimoStage extends Stage {
       }
       if (method.name === "POST") {
         dynamo.waitlistTable.grantWriteData(method.handler);
+        method.handler.addToRolePolicy(
+          new PolicyStatement({
+            actions: ["ssm:PutParameter"],
+            resources: ["*"],
+          })
+        );
+        method.handler.addEnvironment("API_PATH", apiPath);
+        method.handler.addEnvironment("USAGE_PLANS_PATH", usagePlansPath);
+        method.handler.addToRolePolicy(
+          new PolicyStatement({
+            actions: ["apigateway:POST", "apigateway:PATCH"],
+            resources: ["*"],
+          })
+        );
       }
       if (method.name === "GET") {
         dynamo.waitlistTable.grantReadData(method.handler);
