@@ -13,7 +13,7 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
 
 const salesforceCrmIntegrationConfig: IntegrationConfig = {
   id: "salesforce_crm",
-  name: "Salesforce CRM",
+  name: "Salesforce",
   description: "Some description for Salesforce CRM",
   airbyte_id: "b117307c-14b6-41aa-9422-947e34922962",
   auth_strategies: [tokenOAuth2Strategy],

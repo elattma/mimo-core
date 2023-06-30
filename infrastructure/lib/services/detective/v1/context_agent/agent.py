@@ -73,9 +73,9 @@ class ContextAgent:
         _logger.debug(f'[_with_llm_reasoning] decorating with language reasoning for request: {request}')
 
         block_query_properties: Dict[str, Dict] = BlockQuery.schema().get('properties')
-        block_query_properties.pop('ids')
-        block_query_properties.pop('integrations')
-        block_query_properties.pop('embedding')
+        block_query_properties.pop('ids', {})
+        block_query_properties.pop('integrations', {})
+        block_query_properties.pop('embedding', {})
 
         # get list of supported labels from neo4j
         labels: List[str] = self._dstruct.get_labels()

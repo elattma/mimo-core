@@ -20,8 +20,11 @@ def handler(_, __):
         integrations: Dict[str, Any] = _ssm.load_params(integrations_path)
         _integrations = [Integration.from_dict(integration_params) for integration_params in integrations.values()]
     
-    return to_response_success({
-        'integrations': [{
+    integrations = []
+    for integration in _integrations:
+        if not integration:
+            continue
+        integrations.append({
             'id': integration.id,
             'name': integration.name,
             'description': integration.description,
@@ -30,6 +33,9 @@ def handler(_, __):
                 'type': type.value,
                 'params': strategy.get_params()
             } for type, strategy in integration.auth_strategies.items()]
-        } for integration in _integrations],
+        })
+    
+    return to_response_success({
+        'integrations': integrations,
         'next_token': None
     })

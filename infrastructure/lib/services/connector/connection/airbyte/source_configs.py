@@ -117,6 +117,38 @@ def notion_config(auth_strategy: AuthStrategy) -> Dict:
         'start_date': '2000-06-01T00:00:00.000Z',
     }
 
+def hubspot_config(auth_strategy: AuthStrategy) -> Dict:
+    if auth_strategy.get_type() != AuthType.TOKEN_OAUTH2:
+        return None
+    
+    auth_strategy: TokenOAuth2Strategy = auth_strategy
+    hubspot_auth: TokenOAuth2 = auth_strategy._auth
+    return {
+        'credentials': {
+            'credentials_title': 'OAuth Credentials',
+            'refresh_token': hubspot_auth.refresh_token,
+            'client_id': auth_strategy.client_id,
+            'client_secret': auth_strategy.client_secret,
+        },
+        'start_date': '2010-06-01T00:00:00Z',
+    }
+
+def asana_config(auth_strategy: AuthStrategy) -> Dict:
+    if auth_strategy.get_type() != AuthType.TOKEN_OAUTH2:
+        return None
+    
+    auth_strategy: TokenOAuth2Strategy = auth_strategy
+    asana_auth: TokenOAuth2 = auth_strategy._auth
+    return {
+        'credentials': {
+            'option_title': 'OAuth Credentials',
+            'refresh_token': asana_auth.refresh_token,
+            'client_id': auth_strategy.client_id,
+            'client_secret': auth_strategy.client_secret,
+        },
+        'start_date': '2010-06-01T00:00:00Z',
+    }
+
 
 # TODO: add config to onboarding beyond auth strategy. should be able to configure anything you can in airbyte
 # can have default values though
@@ -126,5 +158,7 @@ source_definition_id_to_config: Dict[str, Callable[[AuthStrategy], Dict]] = {
     'c2281cee-86f9-4a86-bb48-d23286b4c7bd': slack_config,
     '79c1aa37-dae3-42ae-b333-d1c105477715': zendesk_config,
     '4942d392-c7b5-4271-91f9-3b4f4e51eb3e': zoho_config,
-    '6e00b415-b02e-4160-bf02-58176a0ae687': notion_config
+    '6e00b415-b02e-4160-bf02-58176a0ae687': notion_config,
+    '36c891d9-4bd9-43ac-bad2-10e12756272c': hubspot_config,
+    'd0243522-dccf-4978-8ba0-37ed47a0bdbf': asana_config
 }

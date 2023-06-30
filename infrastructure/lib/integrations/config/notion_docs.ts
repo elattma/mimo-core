@@ -12,7 +12,7 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
 
 const notionDocsIntegrationConfig: IntegrationConfig = {
   id: "notion_docs",
-  name: "Notion Docs",
+  name: "Notion",
   description: "Some description for Notion Docs",
   airbyte_id: "6e00b415-b02e-4160-bf02-58176a0ae687",
   auth_strategies: [tokenOAuth2Strategy],

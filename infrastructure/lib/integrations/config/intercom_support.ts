@@ -12,7 +12,7 @@ const tokenOAuth2Strategy: TokenOAuth2AuthStrategy = {
 
 const intercomSupportIntegrationConfig: IntegrationConfig = {
   id: "intercom_support",
-  name: "Intercom Customer Support",
+  name: "Intercom",
   description: "Some description for Intercom Support",
   airbyte_id: "d8313939-3782-41b0-be29-b3ca20d8dd3a",
   auth_strategies: [tokenOAuth2Strategy],
