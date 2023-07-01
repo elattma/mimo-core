@@ -1,11 +1,16 @@
 import asana from "./config/asana";
+import clickup from "./config/clickup";
 import googleDocs from "./config/google_docs";
 import googleMail from "./config/google_mail";
 import hubspot from "./config/hubspot";
 import intercomSupport from "./config/intercom_support";
 import jira from "./config/jira";
+import linear from "./config/linear";
+import mailchimp from "./config/mailchimp";
 import microsoftMail from "./config/microsoft_mail";
+import monday from "./config/monday";
 import notionDocs from "./config/notion_docs";
+import pipedrive from "./config/pipedrive";
 import salesforceCrm from "./config/salesforce_crm";
 import slackMessaging from "./config/slack_messaging";
 import uploadFile from "./config/upload_file";
@@ -29,4 +34,9 @@ export const INTEGRATION_CONFIGS: IntegrationConfig[] = [
   hubspot,
   asana,
   jira,
+  monday,
+  mailchimp,
+  linear,
+  clickup,
+  pipedrive,
 ];

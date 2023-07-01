@@ -149,6 +149,36 @@ def asana_config(auth_strategy: AuthStrategy) -> Dict:
         'start_date': '2010-06-01T00:00:00Z',
     }
 
+def monday_config(auth_strategy: AuthStrategy) -> Dict:
+    if auth_strategy.get_type() != AuthType.TOKEN_OAUTH2:
+        return None
+    
+    auth_strategy: TokenOAuth2Strategy = auth_strategy
+    monday_auth: TokenOAuth2 = auth_strategy._auth
+    return {
+        'credentials': {
+            'auth_type': 'oauth2.0',
+            'access_token': monday_auth.access_token,
+            'client_id': auth_strategy.client_id,
+            'client_secret': auth_strategy.client_secret,
+            'subdomain': ''
+        },
+    }
+
+def mailchimp_config(auth_strategy: AuthStrategy) -> Dict:
+    if auth_strategy.get_type() != AuthType.TOKEN_OAUTH2:
+        return None
+    
+    auth_strategy: TokenOAuth2Strategy = auth_strategy
+    mailchimp_auth: TokenOAuth2 = auth_strategy._auth
+    return {
+        'credentials': {
+            'auth_type': 'oauth2.0',
+            'access_token': mailchimp_auth.access_token,
+            'client_id': auth_strategy.client_id,
+            'client_secret': auth_strategy.client_secret,
+        },
+    }
 
 # TODO: add config to onboarding beyond auth strategy. should be able to configure anything you can in airbyte
 # can have default values though
@@ -160,5 +190,7 @@ source_definition_id_to_config: Dict[str, Callable[[AuthStrategy], Dict]] = {
     '4942d392-c7b5-4271-91f9-3b4f4e51eb3e': zoho_config,
     '6e00b415-b02e-4160-bf02-58176a0ae687': notion_config,
     '36c891d9-4bd9-43ac-bad2-10e12756272c': hubspot_config,
-    'd0243522-dccf-4978-8ba0-37ed47a0bdbf': asana_config
+    'd0243522-dccf-4978-8ba0-37ed47a0bdbf': asana_config,
+    '80a54ea2-9959-4040-aac1-eee42423ec9b': monday_config,
+    'b03a9f3e-22a5-11eb-adc1-0242ac120002': mailchimp_config,
 }

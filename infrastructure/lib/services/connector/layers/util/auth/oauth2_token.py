@@ -103,7 +103,9 @@ class TokenOAuth2Strategy(AuthStrategy):
             headers.update(override_headers)
 
         response = requests.post(self.authorize_endpoint, data = data, headers = headers, auth = (self.client_id, self.client_secret))
+        print(f'code auth response: {str(response) if response else "empty"}')
         auth_response: dict = response.json() if response else None
+        print(f'auth response json: {auth_response}')
         access_token = auth_response.get('access_token', None) if auth_response else None
         refresh_token = auth_response.get('refresh_token', None) if auth_response else None
         expires_in = auth_response.get('expires_in', None) if auth_response else None
@@ -147,7 +149,9 @@ class TokenOAuth2Strategy(AuthStrategy):
             headers.update(override_headers)
 
         response = requests.post(self.refresh_endpoint, data = data, headers = headers)
+        print(f'code auth response: {str(response) if response else "empty"}')
         auth_response: dict = response.json() if response else None
+        print(f'auth response json: {auth_response}')
         access_token = auth_response.get('access_token', None) if auth_response else None
         expires_in = auth_response.get('expires_in', None) if auth_response else None
         timestamp = int(time())
