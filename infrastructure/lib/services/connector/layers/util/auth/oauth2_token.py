@@ -72,6 +72,12 @@ class TokenOAuth2Strategy(AuthStrategy):
             return self._auth
         if grant_type == 'refresh_token':
             if not refresh_token and access_token:
+                self._auth = TokenOAuth2(
+                    timestamp=kwargs.get('timestamp', None),
+                    refresh_token=None,
+                    expiry_timestamp=None,
+                    access_token=access_token
+                )
                 return self._auth
             self._auth = self._refresh_auth(
                 refresh_token=refresh_token,

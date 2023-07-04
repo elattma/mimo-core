@@ -14,7 +14,7 @@ LABEL_NORMALIZE_MAP.update({
     'incremental_events_zoho_crm_stream': EVENT_BLOCK_LABEL, 
     'incremental_leads_zoho_crm_stream': LEAD_BLOCK_LABEL, 
     'incremental_notes_zoho_crm_stream': COMMENT_BLOCK_LABEL, 
-    'incremental_tasks_zoho_crm_stream': TASK_BLOCK_LABEL
+    'incremental_tasks_zoho_crm_stream': TICKET_BLOCK_LABEL
 })
  
 # Zendesk
@@ -38,4 +38,25 @@ LABEL_NORMALIZE_MAP.update({
 # Salesforce
 LABEL_NORMALIZE_MAP.update({
     'Account': ACCOUNT_BLOCK_LABEL,
+})
+
+# Monday
+LABEL_NORMALIZE_MAP.update({
+    'boards': PROJECT_BLOCK_LABEL,
+    'items': TICKET_BLOCK_LABEL,
+})
+
+# Asana
+LABEL_NORMALIZE_MAP.update({
+    'projects': PROJECT_BLOCK_LABEL,
+    'sections': SECTION_BLOCK_LABEL,
+    'stories': STORY_BLOCK_LABEL,
+    'tasks': TICKET_BLOCK_LABEL,
+    'teams': GROUP_BLOCK_LABEL,
+    'users': USER_BLOCK_LABEL,
+})
+
+# Hubspot
+LABEL_NORMALIZE_MAP.update({
+    'products': PRODUCT_BLOCK_LABEL,
 })

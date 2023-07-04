@@ -30,7 +30,6 @@ class EntityExtractor:
             entities.append(Entity(identifiables=identifiables, name=dictionary.get('name')))
 
         for key, value in dictionary.items():
-            self._logger.debug(f'[with_defined_entities] key: {key}, value: {value}, type {type(value)}')
             if isinstance(value, dict):
                 self.with_defined_entities(value, entities)
                 continue
@@ -195,11 +194,13 @@ class EntityExtractor:
                 if entity.name:
                     dictionary[entity.name] = entity
             else:
-                dictionary_entity.name = entity.name if len(entity.name) > len(dictionary_entity.name) else dictionary_entity.name
+                dictionary_entity.name = entity.name if entity.name and len(entity.name) > len(dictionary_entity.name) else dictionary_entity.name
                 if not dictionary_entity.identifiables:
                     dictionary_entity.identifiables = entity.identifiables
                 elif entity.identifiables:
                     dictionary_entity.identifiables.update(entity.identifiables)
 
         entities.clear()
-        entities.extend(deduplicated_entities)
+        for entity in deduplicated_entities:
+            if entity.name:
+                entities.append(entity)

@@ -1,2 +1,2 @@
-from . import (base, google_docs, google_mail, microsoft_mail, upload_file,
-               web_link)
+from . import (base, clickup, google_docs, google_mail, linear, microsoft_mail,
+               pipedrive, upload_file, web_link)

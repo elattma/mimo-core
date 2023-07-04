@@ -59,6 +59,7 @@ class Fetcher(ABC):
                 authorization = f'Bearer {auth.access_token}'
             elif self._auth_strategy.get_type() == AuthType.TOKEN_OAUTH2:
                 auth: TokenOAuth2 = self._auth_strategy._auth
+                print(auth)
                 authorization = f'Bearer {auth.access_token}'
             elif self._auth_strategy.get_type() == AuthType.BASIC:
                 auth: Basic = self._auth_strategy._auth
@@ -68,7 +69,7 @@ class Fetcher(ABC):
             })
         if self._auth_strategy.get_type() == AuthType.TOKEN_OAUTH2:
             auth: TokenOAuth2 = self._auth_strategy._auth
-            if auth.expiry_timestamp < int(time()) + 300:
+            if auth.refresh_token and auth.expiry_timestamp < int(time()) + 300:
                 auth = self._auth_strategy.auth()
                 self._requester.headers.update({
                     'Authorization': f'Bearer {auth.access_token}'
