@@ -2,7 +2,7 @@ import { IntegrationConfig } from "../model";
 
 const webLinkIntegrationConfig: IntegrationConfig = {
   id: "web_link",
-  name: "Link a website",
+  name: "Website",
   description: "Some description for website",
   auth_strategies: [],
 };

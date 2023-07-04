@@ -22,7 +22,7 @@ class Classifier:
             if supported_label in label:
                 return supported_label
         
-        _logger.info(f'[get_normalized_label] invalid label: {label}]')
+        _logger.info(f'[get_normalized_label] invalid label: {label}')
         return None
     
     def _is_valid_id(self, id: Any) -> bool:
@@ -33,25 +33,32 @@ class Classifier:
             return True
         
         return False
+    
+    def _pop_and_validate(self, raw_dict: Dict, key: str) -> Any:
+        value = raw_dict.pop(key, None)
+        if self._is_valid_id(value):
+            return value
+        
+        return None
 
     def find_id(self, raw_dict: Dict, label: str = None) -> str:
         if not raw_dict:
             return None
         
-        id = raw_dict.pop("id", None)
-        if self._is_valid_id(id):
+        id = self._pop_and_validate(raw_dict=raw_dict, key="id")
+        if id:
             return id
         
         # TODO: add other validations
         # TODO: fuzzy match on other fields if applicable, maybe make this configurable
         if label:
             if label == MESSAGE_THREAD_BLOCK_LABEL:
-                id = raw_dict.pop("thread_ts", None)
-                if self._is_valid_id(id):
+                id = self._pop_and_validate(raw_dict=raw_dict, key="thread_ts")
+                if id:
                     return id
-            elif label == MESSAGE_BLOCK_LABEL:
-                id = raw_dict.pop("ts", None)
-                if self._is_valid_id(id):
+            if label == MESSAGE_BLOCK_LABEL:
+                id = self._pop_and_validate(raw_dict=raw_dict, key="ts")
+                if id:
                     return id
-        
+            
         return None
