@@ -15,7 +15,7 @@ class GoogleDocs(Fetcher):
     _INTEGRATION = 'google_docs'
 
     def _get_supported_auth_types(self) -> List[AuthType]:
-        return [AuthType.BASIC, AuthType.TOKEN_OAUTH2, AuthType.TOKEN_DIRECT]
+        return [AuthType.TOKEN_BEARER_OAUTH2]
     
     def discover(self) -> Generator[StreamData, None, None]:
         discover_filters = ['mimeType="application/vnd.google-apps.document"', 'trashed=false']
@@ -30,7 +30,7 @@ class GoogleDocs(Fetcher):
                     'pageToken': next_token
                 })
             
-            response = self.request(DISCOVERY_ENDPOINT, params=params)
+            response = self.request(DISCOVERY_ENDPOINT, headers={'Authorization': f'Bearer {self._auth.token}'}, params=params)
             next_token = response.get('nextPageToken', None) if response else None
             files: List[Dict] = response.get('files', None) if response else None
             for file in files:
@@ -93,6 +93,7 @@ class GoogleDocs(Fetcher):
     def fetch_document(self, stream: StreamData) -> None:
         response = self.request(
             GET_METADATA_ENDPOINT.format(id=stream._id),
+            headers={'Authorization': f'Bearer {self._auth.token}'},
             params={
                 'fields': 'modifiedTime, owners'
             }
@@ -100,7 +101,7 @@ class GoogleDocs(Fetcher):
         last_updated_timestamp = self._get_last_updated_timestamp(response.get('modifiedTime', None)) if response else None
         owners = self._get_owners(response.get('owners', None) if response else None)
 
-        response = self.request(GET_DOCUMENT_ENDPOINT.format(id=stream._id))
+        response = self.request(GET_DOCUMENT_ENDPOINT.format(id=stream._id), headers={'Authorization': f'Bearer {self._auth.token}'})
         title = response.get('title', None)
         body = self._get_body(response.get('body', None))
         stream.add_unstructured_data('title', title)
@@ -111,3 +112,4 @@ class GoogleDocs(Fetcher):
     def fetch(self, stream: StreamData) -> None:
         if stream._name == 'document':
             self.fetch_document(stream)
+
